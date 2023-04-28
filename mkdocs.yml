@@ -1,0 +1,7 @@
+site_name: Badgers Documentation
+site_url: https://github.com/siebert-julien/
+nav:
+    - Home: index.md
+    - About: about.md
+    - Changes: changelog.md
+theme: readthedocs
