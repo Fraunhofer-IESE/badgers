@@ -1,5 +1,3 @@
-import abc
-
 from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.preprocessing import StandardScaler
@@ -17,10 +15,6 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
             A random generator
         """
         self.random_generator = random_generator
-
-    @abc.abstractmethod
-    def transform(self, X):
-        pass
 
 
 class GaussianNoiseTransformer(NoiseTransformer):

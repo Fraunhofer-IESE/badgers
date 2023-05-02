@@ -19,23 +19,6 @@ class ExtremeValuesTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
         self.outliers_indices_ = None
 
-    def transform(self, X):
-        """
-        Replaces values in X with the precomputing extreme values.
-
-        :param X: {array-like, sparse-matrix}, shape (n_samples, n_features)
-            The input samples.
-        :return X_transformed: array, shape (n_samples, n_features)
-            The array containing missing values.
-        """
-        check_is_fitted(self, ["outliers_indices_"])
-        X = check_array(X, accept_sparse=False)
-
-        # generate missing values
-        for (row, col), val in self.extreme_values_mapping_.items():
-            X[row, col] = val
-        return X
-
 
 class LocalZScoreTransformer(ExtremeValuesTransformer):
     """

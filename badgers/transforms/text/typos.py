@@ -1,5 +1,3 @@
-import abc
-from copy import deepcopy
 from typing import List
 
 from numpy.random import default_rng
@@ -10,6 +8,7 @@ class TyposTransformer(TransformerMixin, BaseEstimator):
     """
     Base class for transformers creating typos in a list of words
     """
+
     def __init__(self, random_generator=default_rng(seed=0)):
         """
 
@@ -17,17 +16,6 @@ class TyposTransformer(TransformerMixin, BaseEstimator):
             A random generator
         """
         self.random_generator = random_generator
-
-    @abc.abstractmethod
-    def transform(self, X: List[str]):
-        """
-        Creates typos in a list of words.
-        Abstract method. Need to be implemented by the children classes.
-
-        :param X: a list of words (str)
-        :return: a list of transformed words
-        """
-        pass
 
 
 class SwitchLettersTransformer(TyposTransformer):
@@ -57,17 +45,14 @@ class SwitchLettersTransformer(TyposTransformer):
             A list of words where we apply typos
         :return: the transformed list of words
         """
-        # TODO assert X is a list of words
-        X_transformed = deepcopy(X)
-        for i in range(len(X_transformed)):
-            if len(X_transformed[i]) > 3 and self.random_generator.random() <= self.switching_proba:
-
+        for i in range(len(X)):
+            if len(X[i]) > 3 and self.random_generator.random() <= self.switching_proba:
                 # get the ith word in the list and make it a list of letters
-                word = list(X_transformed[i])
+                word = list(X[i])
                 # randomly chose letters to switch
-                idx = self.random_generator.integers(1, len(word)-2)
+                idx = self.random_generator.integers(1, len(word) - 2)
                 word[idx], word[idx + 1] = word[idx + 1], word[idx]
                 # save the word with switched letters as string
-                X_transformed[i] = ''.join(word)
+                X[i] = ''.join(word)
 
-        return X_transformed
+        return X

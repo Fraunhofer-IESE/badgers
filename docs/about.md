@@ -33,7 +33,7 @@ A library for generating data quality issues.
 
 ## Contributors
 
-- Dr. julien Siebert: julien.siebert@iese.fraunhofer.de
+
 
 ## Citing Badgers
 

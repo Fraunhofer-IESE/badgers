@@ -15,7 +15,7 @@ class TestDummyMissingAtRandom(unittest.TestCase):
 
     def test_transform_numpy_1D_array(self):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -23,7 +23,7 @@ class TestDummyMissingAtRandom(unittest.TestCase):
 
     def test_transform_numpy_2D_array(self):
         X = self.rng.normal(size=(100, 10))
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -34,7 +34,7 @@ class TestDummyMissingAtRandom(unittest.TestCase):
             data=self.rng.normal(size=(10)).reshape(-1, 1),
             columns=['col']
         )
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -45,7 +45,7 @@ class TestDummyMissingAtRandom(unittest.TestCase):
             data=self.rng.normal(size=(100, 10)),
             columns=[f'col{i}' for i in range(10)]
         )
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -59,7 +59,7 @@ class TestDummyMissingNotAtRandom(unittest.TestCase):
 
     def test_transform_numpy_1D_array(self):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -67,7 +67,7 @@ class TestDummyMissingNotAtRandom(unittest.TestCase):
 
     def test_transform_numpy_2D_array(self):
         X = self.rng.normal(size=(100, 10))
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -78,7 +78,7 @@ class TestDummyMissingNotAtRandom(unittest.TestCase):
             data=self.rng.normal(size=(10)).reshape(-1, 1),
             columns=['col']
         )
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -89,7 +89,7 @@ class TestDummyMissingNotAtRandom(unittest.TestCase):
             data=self.rng.normal(size=(100, 10)),
             columns=[f'col{i}' for i in range(10)]
         )
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -104,7 +104,7 @@ class TestMissingCompletelyAtRandom(unittest.TestCase):
 
     def test_transform_numpy_1D_array(self):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -112,7 +112,7 @@ class TestMissingCompletelyAtRandom(unittest.TestCase):
 
     def test_transform_numpy_2D_array(self):
         X = self.rng.normal(size=(100, 10))
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -123,7 +123,7 @@ class TestMissingCompletelyAtRandom(unittest.TestCase):
             data=self.rng.normal(size=(10)).reshape(-1, 1),
             columns=['col']
         )
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
@@ -134,7 +134,7 @@ class TestMissingCompletelyAtRandom(unittest.TestCase):
             data=self.rng.normal(size=(100, 10)),
             columns=[f'col{i}' for i in range(10)]
         )
-        X_transformed = self.missing_transformer.fit(X).transform(X)
+        X_transformed = self.missing_transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of nans
