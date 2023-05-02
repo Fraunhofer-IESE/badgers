@@ -1,5 +1,3 @@
-import abc
-
 import numpy as np
 from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
@@ -72,6 +70,7 @@ class RandomShiftClasses(DriftTransformer):
 
     def transform(self, X, y):
         X = check_array(X)
+        classes = np.unique(y)
         # normalize data
         scaler = StandardScaler()
         scaler.fit(X)
@@ -79,7 +78,7 @@ class RandomShiftClasses(DriftTransformer):
         # generate random values for the shift
         shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[0])
         # add shift
-        for c in np.unique(y):
-            Xt[y==c] += shift
+        for c in classes:
+            Xt[y == c] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
