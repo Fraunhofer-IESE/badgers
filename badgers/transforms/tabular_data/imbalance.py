@@ -17,7 +17,7 @@ class ImbalanceTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
 
 
-class RandomSamplingClasses(ImbalanceTransformer):
+class RandomSamplingClassesTransformer(ImbalanceTransformer):
 
     def __init__(self, random_generator=default_rng(seed=0), min: int = None):
         """
@@ -45,16 +45,16 @@ class RandomSamplingClasses(ImbalanceTransformer):
         # get the unique classes names and the number of unique classes
         classes, instances_per_class = np.unique(y, return_counts=True)
         # compute boundary for the sampling
-        low = self.min if not None else 0.1 * min(instances_per_class)
+        low = self.min if self.min is not None else int(0.1 * min(instances_per_class))
         high = max(instances_per_class)
         # compute the number of instances to be samples for each class
-        samples_per_class = self.random_generator.uniform(low, high, size=len(classes))
+        samples_per_class = self.random_generator.integers(low, high, size=len(classes))
         # sampling with replacement
         for c, n in zip(classes, samples_per_class):
             Xt.append(self.random_generator.choice(X[y == c], size=n, replace=True))
             yt += [c] * n
 
-        Xt = np.stack(Xt)
+        Xt = np.vstack(Xt)
         yt = np.array(yt)
 
         return Xt, yt

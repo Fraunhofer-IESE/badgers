@@ -18,7 +18,7 @@ class DriftTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
 
 
-class RandomShift(DriftTransformer):
+class RandomShiftTransformer(DriftTransformer):
     """
     Randomly shift (geometrical translation) values of each column independently of one another.
     Data are first standardized (mean = 0, var = 1) and a random number is added to each column.
@@ -42,8 +42,8 @@ class RandomShift(DriftTransformer):
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
-        # generate random values for the shift
-        shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[0])
+        # generate random values for the shift for each column
+        shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[1])
         # add shift
         Xt += shift
         # inverse transform
@@ -76,9 +76,9 @@ class RandomShiftClasses(DriftTransformer):
         scaler.fit(X)
         Xt = scaler.transform(X)
         # generate random values for the shift
-        shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[0])
+        shifts = self.random_generator.normal(loc=0, scale=self.shift_std, size=len(classes))
         # add shift
-        for c in classes:
-            Xt[y == c] += shift
+        for c, s in zip(classes, shifts):
+            Xt[y == c] += s
         # inverse transform
         return scaler.inverse_transform(Xt)

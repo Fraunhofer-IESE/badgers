@@ -6,7 +6,7 @@ from sklearn.utils.validation import check_is_fitted
 from badgers.utils.utils import random_sign
 
 
-class ExtremeValuesTransformer(TransformerMixin, BaseEstimator):
+class OutliersTransformer(TransformerMixin, BaseEstimator):
     """
     Base class for transformers that add noise to tabular data
     """
@@ -20,7 +20,7 @@ class ExtremeValuesTransformer(TransformerMixin, BaseEstimator):
         self.outliers_indices_ = None
 
 
-class LocalZScoreTransformer(ExtremeValuesTransformer):
+class LocalZScoreTransformer(OutliersTransformer):
     """
     Randomly generates extreme values
     """

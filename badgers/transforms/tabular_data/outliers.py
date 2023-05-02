@@ -5,7 +5,7 @@ from sklearn.utils import check_array
 from badgers.utils.utils import random_sign
 
 
-class ExtremeValuesTransformer(TransformerMixin, BaseEstimator):
+class OutliersTransfomer(TransformerMixin, BaseEstimator):
     """
     Base class for transformers that add outliers to tabular data
     """
@@ -19,7 +19,7 @@ class ExtremeValuesTransformer(TransformerMixin, BaseEstimator):
         self.outliers_indices_ = None
 
 
-class ZScoreTransformer(ExtremeValuesTransformer):
+class ZScoreTransformer(OutliersTransfomer):
     """
     Randomly generates outliers based on a z-score
     """
@@ -40,28 +40,26 @@ class ZScoreTransformer(ExtremeValuesTransformer):
         """
         Computes indices of outliers using a uniform distribution.
         Computes the absolute values uniformly at random between mean(X) + 3 sigma(X) and mean(X) + 5 sigma(X).
-        The sign of the outliers is the same as the value being replaced.
 
         :param X:
         :return:
         """
         X = check_array(X, accept_sparse=False)
         means = X.mean(axis=0)
-        vars = X.var(axis=0)
+        stds = X.std(axis=0)
         self.n_features_in_ = X.shape[1]
         # compute number of outliers per column
-        nb_extreme_values = int(X.shape[0] * self.percentage_extreme_values / 100)
+        n_outliers = int(X.shape[0] * self.percentage_extreme_values / 100)
         # generate outliers
         self.outliers_indices_ = []
         for col in range(X.shape[1]):
-            rows = self.random_generator.choice(X.shape[0], size=nb_extreme_values, replace=False, p=None)
+            rows = self.random_generator.choice(X.shape[0], size=n_outliers, replace=False, p=None)
             # keeping track of the outliers indices
             self.outliers_indices_ += [(row, col) for row in rows]
             # computing outliers
             for row in rows:
-                value = means[col] + random_sign(self.random_generator) * self.random_generator.uniform(
-                    low=means[col] + 3. * vars[col],
-                    high=means[col] + 5 * vars[col]
+                value = means[col] + random_sign(self.random_generator) * stds[col] + self.random_generator.uniform(
+                    low=3., high=5.
                 )
                 # updating with new outliers
                 X[row, col] = value

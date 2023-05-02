@@ -15,30 +15,32 @@ class TestZScoreTransformer(TestCase):
     def test_transform_numpy_1D_array(self):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
         means = np.mean(X, axis=0)
-        vars = np.var(X, axis=0)
-        X_transformed = self.transformer.transform(X)
+        variances = np.var(X, axis=0)
+        Xt = self.transformer.transform(X)
         # assert arrays have same shape
-        self.assertEqual(X.shape, X_transformed.shape)
+        self.assertEqual(X.shape, Xt.shape)
         # assert number of extreme values
-        self.assertEqual(len(self.transformer.extreme_values_mapping_), 1)
-        for (row, col) in self.transformer.extreme_values_mapping_:
-            val = X_transformed[row, col]
-            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
-            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
+        self.assertEqual(len(self.transformer.outliers_indices_), 1)
+        for (row, col) in self.transformer.outliers_indices_:
+            value = Xt[row, col]
+            z_score = abs(value - means[col]) / variances[col]
+            self.assertGreaterEqual(z_score, 3.)
+            self.assertLessEqual(z_score, 5.)
 
     def test_transform_numpy_2D_array(self):
         X = self.rng.normal(size=(100, 10))
         means = np.mean(X, axis=0)
-        vars = np.var(X, axis=0)
-        X_transformed = self.transformer.transform(X)
+        variances = np.var(X, axis=0)
+        Xt = self.transformer.transform(X)
         # assert arrays have same shape
-        self.assertEqual(X.shape, X_transformed.shape)
+        self.assertEqual(X.shape, Xt.shape)
         # assert number of extreme values
-        self.assertEqual(len(self.transformer.extreme_values_mapping_), 100)
-        for (row, col) in self.transformer.extreme_values_mapping_:
-            val = X_transformed[row, col]
-            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
-            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
+        self.assertEqual(len(self.transformer.outliers_indices_), 100)
+        for (row, col) in self.transformer.outliers_indices_:
+            value = Xt[row, col]
+            z_score = abs(value - means[col]) / variances[col]
+            self.assertGreaterEqual(z_score, 3.)
+            self.assertLessEqual(z_score, 5.)
 
     def test_transform_pandas_1D_array(self):
         X = pd.DataFrame(
@@ -46,16 +48,17 @@ class TestZScoreTransformer(TestCase):
             columns=['col']
         )
         means = np.mean(X, axis=0)
-        vars = np.var(X, axis=0)
-        X_transformed = self.transformer.transform(X)
+        variances = np.var(X, axis=0)
+        Xt = self.transformer.transform(X)
         # assert arrays have same shape
-        self.assertEqual(X.shape, X_transformed.shape)
+        self.assertEqual(X.shape, Xt.shape)
         # assert number of extreme values
-        self.assertEqual(len(self.transformer.extreme_values_mapping_), 1)
-        for (row, col) in self.transformer.extreme_values_mapping_:
-            val = X_transformed[row, col]
-            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
-            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
+        self.assertEqual(len(self.transformer.outliers_indices_), 1)
+        for (row, col) in self.transformer.outliers_indices_:
+            value = Xt[row, col]
+            z_score = abs(value - means[col]) / variances[col]
+            self.assertGreaterEqual(z_score, 3.)
+            self.assertLessEqual(z_score, 5.)
 
     def test_transform_pandas_2D_array(self):
         X = pd.DataFrame(
@@ -64,12 +67,13 @@ class TestZScoreTransformer(TestCase):
         )
         means = np.mean(X, axis=0)
         vars = np.var(X, axis=0)
-        X_transformed = self.transformer.transform(X)
+        Xt = self.transformer.transform(X)
         # assert arrays have same shape
-        self.assertEqual(X.shape, X_transformed.shape)
+        self.assertEqual(X.shape, Xt.shape)
         # assert number of extreme values
-        self.assertEqual(len(self.transformer.extreme_values_mapping_), 100)
-        for (row, col) in self.transformer.extreme_values_mapping_:
-            val = X_transformed[row, col]
-            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
-            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
+        self.assertEqual(len(self.transformer.outliers_indices_), 100)
+        for (row, col) in self.transformer.outliers_indices_:
+            value = Xt[row, col]
+            z_score = abs(value - means[col]) / vars[col]
+            self.assertGreaterEqual(z_score, 3.)
+            self.assertLessEqual(z_score, 5.)

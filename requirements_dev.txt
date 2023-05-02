@@ -1,3 +1,4 @@
 mkdocs
 twine
 build
+coverage
