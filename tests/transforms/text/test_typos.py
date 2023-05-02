@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 
 from numpy.random import default_rng
 
@@ -26,7 +27,7 @@ class TestSwitchLettersTransformer(unittest.TestCase):
             'a'
         ]
 
-        X_transformed = trf.transform(X)
+        X_transformed = trf.transform(deepcopy(X))
 
         for i in range(len(X)):
             if len(X[i]) > 3:

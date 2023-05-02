@@ -1,19 +1,18 @@
-import abc
-
 import numpy as np
 import numpy.random
 import pandas as pd
 from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
-from sklearn.utils.validation import check_array, check_is_fitted
+from sklearn.utils.validation import check_array
 
-from badgers.transforms.tabular_data.utils import normalize_proba
+from badgers.utils.utils import normalize_proba
 
 
 class MissingValueTransformer(TransformerMixin, BaseEstimator):
     """
     Base class for missing values transformer
     """
+
     def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
         """
 
@@ -25,49 +24,7 @@ class MissingValueTransformer(TransformerMixin, BaseEstimator):
         assert 0 <= percentage_missing <= 100
         self.percentage_missing = percentage_missing
         self.random_generator = random_generator
-
-    @abc.abstractmethod
-    def fit(self, X, y=None, **fit_params):
-        """
-        Generates a list of indices for the missing values (`self.missing_values_indices_`).
-        The list of indices takes the form of a list of tuples (or list of list)
-        each tuple containing the row index and the column index of the missing values.
-
-
-
-        :param X:
-        :param y:
-        :param fit_params:
-        :return:
-        """
-        pass
-
-    def fit_transform(self, X, y=None, **fit_params):
-        """
-
-        :param X:
-        :param y:
-        :param fit_params:
-        :return:
-        """
-        self.fit(X, y=None)
-        return self.transform(X)
-
-    def transform(self, X):
-        """
-
-        :param X: {array-like, sparse-matrix}, shape (n_samples, n_features)
-            The input samples.
-        :return X_transformed: array, shape (n_samples, n_features)
-            The array containing missing values.
-        """
-        check_is_fitted(self, ["missing_values_indices_"])
-        X = check_array(X, accept_sparse=False)
-
-        # generate missing values
-        for row, col in self.missing_values_indices_:
-            X[row, col] = np.nan
-        return X
+        self.missing_values_indices_ = None
 
 
 class MissingCompletelyAtRandom(MissingValueTransformer):
@@ -84,7 +41,7 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    def fit(self, X, y=None, **fit_param):
+    def transform(self, X):
         """
         Computes indices of missing values using a uniform distribution.
 
@@ -102,8 +59,10 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         for col in range(X.shape[1]):
             rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=None)
             self.missing_values_indices_ += [(row, col) for row in rows]
+            # generate missing values
+            X[rows, col] = np.nan
 
-        return self
+        return X
 
 
 class DummyMissingAtRandom(MissingValueTransformer):
@@ -121,7 +80,7 @@ class DummyMissingAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    def fit(self, X, y=None, **fit_params):
+    def transform(self, X):
         """
 
         :param self:
@@ -152,10 +111,12 @@ class DummyMissingAtRandom(MissingValueTransformer):
         # generate missing values indices
         self.missing_values_indices_ = []
         for col in range(X.shape[1]):
-            rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:,col])
+            rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:, col])
             self.missing_values_indices_ += [(row, col) for row in rows]
+            # generate missing values
+            X[rows, col] = np.nan
 
-        return self
+        return X
 
 
 class DummyMissingNotAtRandom(MissingValueTransformer):
@@ -170,7 +131,7 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    def fit(self, X, y=None, **fit_params):
+    def transform(self, X):
         """
 
         :param self:
@@ -196,5 +157,7 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
         for col in range(X.shape[1]):
             rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:, col])
             self.missing_values_indices_ += [(row, col) for row in rows]
+            # generate missing values
+            X[rows, col] = np.nan
 
-        return self
+        return X

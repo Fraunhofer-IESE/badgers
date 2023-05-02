@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.utils import normalize_proba
+from badgers.utils.utils import normalize_proba
 
 
 class TestUtils(TestCase):

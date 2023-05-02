@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.extreme_values import ZScoreTransformer
+from badgers.transforms.tabular_data.outliers import ZScoreTransformer
 
 
 class TestZScoreTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.transformer = ZScoreTransformer(random_generator=self.rng, percentage_extreme_values=10)
+        self.transformer = ZScoreTransformer(random_generator=self.rng, percentage_outliers=10)
 
     def test_transform_numpy_1D_array(self):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
