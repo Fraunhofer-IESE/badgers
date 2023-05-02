@@ -16,29 +16,29 @@ class TestZScoreTransformer(TestCase):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
         means = np.mean(X, axis=0)
         vars = np.var(X, axis=0)
-        X_transformed = self.transformer.fit(X).transform(X)
+        X_transformed = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of extreme values
         self.assertEqual(len(self.transformer.extreme_values_mapping_), 1)
-        for (row, col), val in self.transformer.extreme_values_mapping_.items():
-            self.assertGreaterEqual(abs(val), means[col] + 3. * vars[col])
-            self.assertLessEqual(abs(val), means[col] + 5. * vars[col])
-            self.assertEqual(np.sign(val), np.sign(X[row, col]))
+        for (row, col) in self.transformer.extreme_values_mapping_:
+            val = X_transformed[row, col]
+            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
+            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
 
     def test_transform_numpy_2D_array(self):
         X = self.rng.normal(size=(100, 10))
         means = np.mean(X, axis=0)
         vars = np.var(X, axis=0)
-        X_transformed = self.transformer.fit(X).transform(X)
+        X_transformed = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of extreme values
         self.assertEqual(len(self.transformer.extreme_values_mapping_), 100)
-        for (row, col), val in self.transformer.extreme_values_mapping_.items():
-            self.assertGreaterEqual(abs(val), means[col] + 3. * vars[col])
-            self.assertLessEqual(abs(val), means[col] + 5. * vars[col])
-            self.assertEqual(np.sign(val), np.sign(X[row, col]))
+        for (row, col) in self.transformer.extreme_values_mapping_:
+            val = X_transformed[row, col]
+            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
+            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
 
     def test_transform_pandas_1D_array(self):
         X = pd.DataFrame(
@@ -47,15 +47,15 @@ class TestZScoreTransformer(TestCase):
         )
         means = np.mean(X, axis=0)
         vars = np.var(X, axis=0)
-        X_transformed = self.transformer.fit(X).transform(X)
+        X_transformed = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of extreme values
         self.assertEqual(len(self.transformer.extreme_values_mapping_), 1)
-        for (row, col), val in self.transformer.extreme_values_mapping_.items():
-            self.assertGreaterEqual(abs(val), means[col] + 3. * vars[col])
-            self.assertLessEqual(abs(val), means[col] + 5. * vars[col])
-            self.assertEqual(np.sign(val), np.sign(X.iloc[row, col]))
+        for (row, col) in self.transformer.extreme_values_mapping_:
+            val = X_transformed[row, col]
+            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
+            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])
 
     def test_transform_pandas_2D_array(self):
         X = pd.DataFrame(
@@ -64,12 +64,12 @@ class TestZScoreTransformer(TestCase):
         )
         means = np.mean(X, axis=0)
         vars = np.var(X, axis=0)
-        X_transformed = self.transformer.fit(X).transform(X)
+        X_transformed = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, X_transformed.shape)
         # assert number of extreme values
         self.assertEqual(len(self.transformer.extreme_values_mapping_), 100)
-        for (row, col), val in self.transformer.extreme_values_mapping_.items():
-            self.assertGreaterEqual(abs(val), means[col] + 3. * vars[col])
-            self.assertLessEqual(abs(val), means[col] + 5. * vars[col])
-            self.assertEqual(np.sign(val), np.sign(X.iloc[row, col]))
+        for (row, col) in self.transformer.extreme_values_mapping_:
+            val = X_transformed[row, col]
+            self.assertGreaterEqual(abs(val - means[col]), 3. * vars[col])
+            self.assertLessEqual(abs(val - means[col]), 5. * vars[col])

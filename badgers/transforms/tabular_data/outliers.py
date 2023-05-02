@@ -1,13 +1,13 @@
 import abc
 
-import numpy as np
 from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
+
+from badgers.transforms.tabular_data.utils import random_sign
 
 
-class NoiseTransformer(TransformerMixin, BaseEstimator):
+class ExtremeValuesTransformer(TransformerMixin, BaseEstimator):
     """
     Base class for transformers that add noise to tabular data
     """
@@ -20,31 +20,6 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def fit(self, X, y=None, **fit_params):
-        """
-        Generates a mapping between extreme values indices and the value itself (`extreme_values_mapping_`).
-        The mapping must be implemented as a dictionary where:
-        - the keys are tuple containing the row index and the column index of the extreme values
-        - the values are the extreme values
-
-        :param X:
-        :param y:
-        :param fit_params:
-        :return:
-        """
-        pass
-
-    def fit_transform(self, X, y=None, **fit_params):
-        """
-
-        :param X:
-        :param y:
-        :param fit_params:
-        :return:
-        """
-        self.fit(X, y=None)
-        return self.transform(X)
-
     def transform(self, X):
         """
         Replaces values in X with the precomputing extreme values.
@@ -54,16 +29,10 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
         :return X_transformed: array, shape (n_samples, n_features)
             The array containing missing values.
         """
-        check_is_fitted(self, ["extreme_values_mapping_"])
-        X = check_array(X, accept_sparse=False)
-
-        # generate missing values
-        for (row, col), val in self.extreme_values_mapping_.items():
-            X[row, col] = val
-        return X
+        pass
 
 
-class ZScoreTransformer(NoiseTransformer):
+class ZScoreTransformer(ExtremeValuesTransformer):
     """
     Randomly generates extreme values
     """
@@ -79,8 +48,9 @@ class ZScoreTransformer(NoiseTransformer):
         super().__init__(random_generator=random_generator)
         assert 0 <= percentage_extreme_values <= 100
         self.percentage_extreme_values = percentage_extreme_values
+        self.extreme_values_mapping_ = None
 
-    def fit(self, X, y=None, **fit_param):
+    def transform(self, X):
         """
         Computes indices of extreme values using a uniform distribution.
         Computes the absolute values uniformly at random between mean(X) + 3 sigma(X) and mean(X) + 5 sigma(X).
@@ -95,17 +65,21 @@ class ZScoreTransformer(NoiseTransformer):
         means = X.mean(axis=0)
         vars = X.var(axis=0)
         self.n_features_in_ = X.shape[1]
-        # compute number of missing values per column
+        # compute number of extreme values per column
         nb_extreme_values = int(X.shape[0] * self.percentage_extreme_values / 100)
-        # generate missing values indices
-        self.extreme_values_mapping_ = dict()
+        # generate extreme values
+        self.extreme_values_mapping_ = []
         for col in range(X.shape[1]):
             rows = self.random_generator.choice(X.shape[0], size=nb_extreme_values, replace=False, p=None)
+            # keeping track of the extreme values indices
+            self.extreme_values_mapping_ += [(row, col) for row in rows]
+            # computing extreme values
             for row in rows:
-                abs_value = self.random_generator.uniform(
+                value = means[col] + random_sign(self.random_generator) * self.random_generator.uniform(
                     low=means[col] + 3. * vars[col],
                     high=means[col] + 5 * vars[col]
                 )
-                self.extreme_values_mapping_[(row, col)] = np.sign(X[row, col]) * abs_value
+                # updating with new extreme value
+                X[row, col] = value
 
-        return self
+        return X
