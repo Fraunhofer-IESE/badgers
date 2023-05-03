@@ -3,6 +3,7 @@ from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
+from sklearn.utils.validation import check_is_fitted
 
 
 class DriftTransformer(TransformerMixin, BaseEstimator):
@@ -18,7 +19,7 @@ class DriftTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
 
 
-class RandomShift(DriftTransformer):
+class RandomShiftTransformer(DriftTransformer):
     """
     Randomly shift (geometrical translation) values of each column independently of one another.
     Data are first standardized (mean = 0, var = 1) and a random number is added to each column.
@@ -37,20 +38,27 @@ class RandomShift(DriftTransformer):
         self.shift_std = shift_std
 
     def transform(self, X):
+        """
+
+        :param X:
+        :return:
+        """
+        # input validation
         X = check_array(X)
+        self.n_features_in_ = X.shape[1]
         # normalize data
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
-        # generate random values for the shift
-        shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[0])
+        # generate random values for the shift for each column
+        shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[1])
         # add shift
         Xt += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
 
 
-class RandomShiftClasses(DriftTransformer):
+class RandomShiftClassesTransformer(DriftTransformer):
     """
     Randomly shift (geometrical translation) values of each class independently of one another.
     Data are first standardized (mean = 0, var = 1) and
@@ -68,17 +76,37 @@ class RandomShiftClasses(DriftTransformer):
         super().__init__(random_generator=random_generator)
         self.shift_std = shift_std
 
-    def transform(self, X, y):
+    def fit(self, X, y):
+        """
+
+        :param X:
+        :param y:
+        :return:
+        """
         X = check_array(X)
-        classes = np.unique(y)
+        self.original_labels_ = y
+        return self
+
+    def transform(self, X):
+        """
+
+        :param X:
+        :return:
+        """
+        # input validation
+        check_is_fitted(self, ['original_labels_'])
+        X = check_array(X)
+        self.n_features_in_ = X.shape[1]
+        # extract unique labels
+        classes = np.unique(self.original_labels_)
         # normalize data
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
         # generate random values for the shift
-        shift = self.random_generator.normal(loc=0, scale=self.shift_std, size=X.shape[0])
+        shifts = self.random_generator.normal(loc=0, scale=self.shift_std, size=len(classes))
         # add shift
-        for c in classes:
-            Xt[y == c] += shift
+        for c, s in zip(classes, shifts):
+            Xt[self.original_labels_ == c] += s
         # inverse transform
         return scaler.inverse_transform(Xt)
