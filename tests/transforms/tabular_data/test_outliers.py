@@ -15,7 +15,7 @@ class TestZScoreTransformer(TestCase):
     def test_transform_numpy_1D_array(self):
         X = self.rng.normal(size=(10)).reshape(-1, 1)
         means = np.mean(X, axis=0)
-        variances = np.var(X, axis=0)
+        stds = np.std(X, axis=0)
         Xt = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, Xt.shape)
@@ -23,14 +23,14 @@ class TestZScoreTransformer(TestCase):
         self.assertEqual(len(self.transformer.outliers_indices_), 1)
         for (row, col) in self.transformer.outliers_indices_:
             value = Xt[row, col]
-            z_score = abs(value - means[col]) / variances[col]
+            z_score = abs(value - means[col]) / stds[col]
             self.assertGreaterEqual(z_score, 3.)
             self.assertLessEqual(z_score, 5.)
 
     def test_transform_numpy_2D_array(self):
         X = self.rng.normal(size=(100, 10))
         means = np.mean(X, axis=0)
-        variances = np.var(X, axis=0)
+        stds = np.std(X, axis=0)
         Xt = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, Xt.shape)
@@ -38,7 +38,7 @@ class TestZScoreTransformer(TestCase):
         self.assertEqual(len(self.transformer.outliers_indices_), 100)
         for (row, col) in self.transformer.outliers_indices_:
             value = Xt[row, col]
-            z_score = abs(value - means[col]) / variances[col]
+            z_score = abs(value - means[col]) / stds[col]
             self.assertGreaterEqual(z_score, 3.)
             self.assertLessEqual(z_score, 5.)
 
@@ -48,7 +48,7 @@ class TestZScoreTransformer(TestCase):
             columns=['col']
         )
         means = np.mean(X, axis=0)
-        variances = np.var(X, axis=0)
+        stds = np.std(X, axis=0)
         Xt = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, Xt.shape)
@@ -56,7 +56,7 @@ class TestZScoreTransformer(TestCase):
         self.assertEqual(len(self.transformer.outliers_indices_), 1)
         for (row, col) in self.transformer.outliers_indices_:
             value = Xt[row, col]
-            z_score = abs(value - means[col]) / variances[col]
+            z_score = abs(value - means[col]) / stds[col]
             self.assertGreaterEqual(z_score, 3.)
             self.assertLessEqual(z_score, 5.)
 
@@ -66,7 +66,7 @@ class TestZScoreTransformer(TestCase):
             columns=[f'col{i}' for i in range(10)]
         )
         means = np.mean(X, axis=0)
-        vars = np.var(X, axis=0)
+        vars = np.std(X, axis=0)
         Xt = self.transformer.transform(X)
         # assert arrays have same shape
         self.assertEqual(X.shape, Xt.shape)

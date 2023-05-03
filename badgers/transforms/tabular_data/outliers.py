@@ -58,7 +58,7 @@ class ZScoreTransformer(OutliersTransfomer):
             self.outliers_indices_ += [(row, col) for row in rows]
             # computing outliers
             for row in rows:
-                value = means[col] + random_sign(self.random_generator) * stds[col] + self.random_generator.uniform(
+                value = means[col] + random_sign(self.random_generator) * stds[col] * self.random_generator.uniform(
                     low=3., high=5.
                 )
                 # updating with new outliers
