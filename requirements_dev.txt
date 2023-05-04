@@ -1,4 +1,4 @@
 mkdocs
 twine
 build
-coverage
+tox
