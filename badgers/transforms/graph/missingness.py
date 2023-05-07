@@ -22,32 +22,6 @@ class MissingNodesTransformer(TransformerMixin, BaseEstimator):
         self.percentage_missing = percentage_missing
         self.random_generator = random_generator
 
-    @abc.abstractmethod
-    def fit(self, X, y=None, **fit_params):
-        """
-        Generates a list of indices for the missing nodes (`self.missing_nodes_indices_`).
-        The list of indices takes the form of a list of nodes_ids.
-
-
-
-        :param X: Graph object
-        :param y:
-        :param fit_params:
-        :return:
-        """
-        pass
-
-    def fit_transform(self, X, y=None, **fit_params):
-        """
-
-        :param X:
-        :param y:
-        :param fit_params:
-        :return:
-        """
-        self.fit(X, y=None)
-        return self.transform(X)
-
     def transform(self, X):
         """
 
