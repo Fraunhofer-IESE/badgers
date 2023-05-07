@@ -1,7 +1,9 @@
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
+from sklearn.base import TransformerMixin, BaseEstimator, OneToOneFeatureMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
+
+from badgers.decorators.tabular_data import input_checker
 
 
 class NoiseTransformer(TransformerMixin, BaseEstimator):
@@ -17,7 +19,7 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
 
 
-class GaussianNoiseTransformer(NoiseTransformer):
+class GaussianNoiseTransformer(NoiseTransformer, OneToOneFeatureMixin):
     def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1):
         """
 
@@ -39,9 +41,8 @@ class GaussianNoiseTransformer(NoiseTransformer):
         :param X:
         :return:
         """
-        X = check_array(X, accept_sparse=False)
-        self.n_features_in_ = X.shape[1]
-        #
+        X = check_array(X)
+        # standardize data
         scaler = StandardScaler()
         # fit, transform
         scaler.fit(X)
