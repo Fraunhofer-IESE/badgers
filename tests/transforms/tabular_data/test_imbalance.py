@@ -1,55 +1,27 @@
 import unittest
+from unittest import TestCase
 
-import numpy as np
-import pandas as pd
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.imbalance import RandomSamplingClassesTransformer
+from badgers.transforms.tabular_data.imbalance import ImbalanceTransformer
+from tests.transforms.tabular_data import generate_test_data_with_labels
 
 
-class TestRandomSamplingClassesTransformer(unittest.TestCase):
-
+class TestImbalanceTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.transformer = RandomSamplingClassesTransformer(random_generator=self.rng)
+        self.transformers_classes = ImbalanceTransformer.__subclasses__()
+        self.input_test_data = generate_test_data_with_labels(rng=self.rng)
 
-    def test_transform_numpy_1D_array(self):
-        X = self.rng.normal(size=(10)).reshape(-1, 1)
-        y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
-        Xt = self.transformer.fit_transform(X, y)
-        # assert arrays have same shape
-        self.assertEqual(Xt.shape[1], X.shape[1])
-        self.assertEqual(Xt.shape[0], self.transformer.labels_.shape[0])
-
-    def test_transform_numpy_2D_array(self):
-        X = self.rng.normal(size=(100, 10))
-        y = np.array([1, 2, 3, 4, 5] * 20)
-        Xt = self.transformer.fit_transform(X, y)
-        # assert arrays have same shape
-        self.assertEqual(Xt.shape[1], X.shape[1])
-        self.assertEqual(Xt.shape[0], self.transformer.labels_.shape[0])
-
-    def test_transform_pandas_1D_array(self):
-        X = pd.DataFrame(
-            data=self.rng.normal(size=(10)).reshape(-1, 1),
-            columns=['col']
-        )
-        y = np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
-        Xt = self.transformer.fit_transform(X, y)
-        # assert arrays have same shape
-        self.assertEqual(Xt.shape[1], X.shape[1])
-        self.assertEqual(Xt.shape[0], self.transformer.labels_.shape[0])
-
-    def test_transform_pandas_2D_array(self):
-        X = pd.DataFrame(
-            data=self.rng.normal(size=(100, 10)),
-            columns=[f'col{i}' for i in range(10)]
-        )
-        y = np.array([1, 2, 3, 4, 5] * 20)
-        Xt = self.transformer.fit_transform(X, y)
-        # assert arrays have same shape
-        self.assertEqual(Xt.shape[1], X.shape[1])
-        self.assertEqual(Xt.shape[0], self.transformer.labels_.shape[0])
+    def test_all_transformers(self):
+        for cls in self.transformers_classes:
+            transformer = cls()
+            for input_type, (X,y) in self.input_test_data.items():
+                with self.subTest(transformer=transformer.__class__, input_type=input_type):
+                    Xt = transformer.fit_transform(X.copy(), y)
+                    # assert arrays have same shape
+                    self.assertEqual(Xt.shape[1], X.shape[1])
+                    self.assertEqual(Xt.shape[0], transformer.labels_.shape[0])
 
 
 if __name__ == '__main__':

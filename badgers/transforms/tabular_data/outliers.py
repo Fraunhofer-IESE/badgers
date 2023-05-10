@@ -6,7 +6,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
 
-from badgers.utils.utils import random_sign
+from badgers.core.utils import random_sign
 
 
 class OutliersTransfomer(TransformerMixin, BaseEstimator):
@@ -104,7 +104,6 @@ class PCATransformer(OutliersTransfomer):
         X = check_array(X)
 
         # check the number of components for the PCA
-
         if self.n_components is None:
             if X.shape[1] <= 2:
                 n_components = 1

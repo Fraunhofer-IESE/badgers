@@ -3,7 +3,7 @@ from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from badgers.utils.utils import random_sign
+from badgers.core.utils import random_sign
 
 
 class OutliersTransformer(TransformerMixin, BaseEstimator):
