@@ -3,7 +3,6 @@ from sklearn.base import TransformerMixin, BaseEstimator, OneToOneFeatureMixin
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
 
-from badgers.decorators.tabular_data import input_checker
 
 
 class NoiseTransformer(TransformerMixin, BaseEstimator):

@@ -5,7 +5,7 @@ from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils.validation import check_array
 
-from badgers.utils.utils import normalize_proba
+from badgers.core.utils import normalize_proba
 
 
 class MissingValueTransformer(TransformerMixin, BaseEstimator):

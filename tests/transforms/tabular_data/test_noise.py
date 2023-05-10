@@ -1,47 +1,37 @@
 import unittest
+from unittest import TestCase
 
-import pandas as pd
+import numpy as np
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.noise import GaussianNoiseTransformer
+from badgers.transforms.tabular_data.noise import NoiseTransformer
+from tests.transforms.tabular_data import generate_test_data
 
 
-class TestGaussianWhiteNoiseTransformer(unittest.TestCase):
+class TestNoiseTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.noise_transformer = GaussianNoiseTransformer()
+        self.transformers_classes = NoiseTransformer.__subclasses__()
+        self.input_test_data = generate_test_data(rng=self.rng)
 
-    def test_transform_numpy_1D_array(self):
-        X = self.rng.normal(size=(10)).reshape(-1, 1)
-        Xt = self.noise_transformer.transform(X)
-        # assert arrays have same shape
-        self.assertEqual(X.shape, Xt.shape)
+    def assertIncreaseVariance(self, X, Xt):
+        self.assertTrue(all(np.var(X, axis=0) < np.var(Xt, axis=0)))
 
-    def test_transform_numpy_2D_array(self):
-        X = self.rng.normal(size=(100, 10))
-        Xt = self.noise_transformer.transform(X)
-        # assert arrays have same shape
-        self.assertEqual(X.shape, Xt.shape)
-
-    def test_transform_pandas_1D_array(self):
-        X = pd.DataFrame(
-            data=self.rng.normal(size=(10)).reshape(-1, 1),
-            columns=['col']
-        )
-        Xt = self.noise_transformer.transform(X)
-        # assert arrays have same shape
-        self.assertEqual(X.shape, Xt.shape)
-        self.assertTrue(isinstance(Xt, pd.DataFrame))
-
-    def test_transform_pandas_2D_array(self):
-        X = pd.DataFrame(
-            data=self.rng.normal(size=(100, 10)),
-            columns=[f'col{i}' for i in range(10)]
-        )
-        Xt = self.noise_transformer.transform(X)
-        # assert arrays have same shape
-        self.assertEqual(X.shape, Xt.shape)
-        self.assertTrue(isinstance(Xt, pd.DataFrame))
+    def test_all_transformers(self):
+        """
+        run generic tests for all transformer classes:
+        - checks that the transformed array has the same shape as the input array
+        - checks that the variance of the transformed array is greater than the one of the input array
+        """
+        for cls in self.transformers_classes:
+            transformer = cls()
+            for input_type, X in self.input_test_data.items():
+                with self.subTest(transformer=transformer.__class__, input_type=input_type):
+                    Xt = transformer.transform(X.copy())
+                    # assert arrays have same shape
+                    self.assertEqual(X.shape, Xt.shape)
+                    # assert variance is greater after the transformation
+                    self.assertIncreaseVariance(X, Xt)
 
 
 if __name__ == '__main__':
