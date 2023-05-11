@@ -4,7 +4,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
 
 
-
 class NoiseTransformer(TransformerMixin, BaseEstimator):
     """
     Base class for transformers that add noise to tabular data

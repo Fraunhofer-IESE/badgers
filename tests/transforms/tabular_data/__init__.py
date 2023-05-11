@@ -4,7 +4,7 @@ import pandas as pd
 from numpy.random import default_rng
 
 
-def generate_test_data(rng: numpy.random.Generator = default_rng(0)):
+def generate_test_data_without_labels(rng: numpy.random.Generator = default_rng(0)):
     """
 
     :param rng:
