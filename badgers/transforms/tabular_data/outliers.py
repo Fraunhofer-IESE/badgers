@@ -9,12 +9,12 @@ from sklearn.utils import check_array
 from badgers.core.utils import random_sign
 
 
-class OutliersTransfomer(TransformerMixin, BaseEstimator):
+class OutliersTransformer(TransformerMixin, BaseEstimator):
     """
     Base class for transformers that add outliers to tabular data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10, ):
+    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
         """
         :param random_generator: numpy.random.Generator, default default_rng(seed=0)
             A random generator
@@ -28,10 +28,13 @@ class OutliersTransfomer(TransformerMixin, BaseEstimator):
         self.outliers_indices_ = None
 
 
-class ZScoreTransformer(OutliersTransfomer):
+class ZScoreTransformer(OutliersTransformer):
     """
     Randomly generates outliers as data points with a z-score > 3.
     """
+
+    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
+        super().__init__(random_generator, percentage_outliers)
 
     def transform(self, X):
         """
@@ -68,7 +71,7 @@ class ZScoreTransformer(OutliersTransfomer):
         return scaler.inverse_transform(Xt)
 
 
-class PCATransformer(OutliersTransfomer):
+class PCATransformer(OutliersTransformer):
     """
     Randomly generate outliers by first applying a PCA and a z-score transformer
     """

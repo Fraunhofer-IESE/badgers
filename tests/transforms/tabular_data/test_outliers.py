@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 from sklearn.ensemble import IsolationForest
 
-from badgers.transforms.tabular_data.outliers import OutliersTransfomer, ZScoreTransformer
+from badgers.transforms.tabular_data.outliers import OutliersTransformer, ZScoreTransformer
 from tests.transforms.tabular_data import generate_test_data
 
 
@@ -13,7 +13,7 @@ class TestOutliersTransformer(TestCase):
 
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.transformers_classes = OutliersTransfomer.__subclasses__()
+        self.transformers_classes = OutliersTransformer.__subclasses__()
         self.input_test_data = generate_test_data(rng=self.rng)
 
     def test_all_transformers(self):
