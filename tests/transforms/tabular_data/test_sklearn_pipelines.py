@@ -5,14 +5,14 @@ from sklearn.pipeline import make_pipeline
 
 from badgers.transforms.tabular_data.noise import NoiseTransformer
 from badgers.transforms.tabular_data.outliers import OutliersTransformer
-from tests.transforms.tabular_data import generate_test_data
+from tests.transforms.tabular_data import generate_test_data_without_labels
 
 
 class TestPipelinesOutliers(unittest.TestCase):
 
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.input_test_data = generate_test_data(rng=self.rng)
+        self.input_test_data = generate_test_data_without_labels(rng=self.rng)
         self.transformers_classes = OutliersTransformer.__subclasses__()
 
     def test_pipeline_single_transformer(self):
@@ -33,7 +33,7 @@ class TestPipelinesNoise(unittest.TestCase):
 
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.input_test_data = generate_test_data(rng=self.rng)
+        self.input_test_data = generate_test_data_without_labels(rng=self.rng)
         self.transformers_classes = NoiseTransformer.__subclasses__()
 
     def test_pipeline_single_transformer(self):
