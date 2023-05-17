@@ -3,12 +3,12 @@ site_url: https://github.com/siebert-julien/
 
 nav:
     - Home: index.md
+    - About: about.md
+    - Changes: changelog.md
     - Tutorials:
         - Generating Noise: tutorials/Noise-Tabular-Data.ipynb
         - Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
-    - About: about.md
-    - Changes: changelog.md
-    - API Reference: reference/
+    - API: reference/
 
 theme:
     name: material
