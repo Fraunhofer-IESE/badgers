@@ -1,9 +1,10 @@
 import unittest
 from unittest import TestCase
 
+import numpy as np
 from numpy.random import default_rng
 
-from badgers.core.utils import normalize_proba
+from badgers.core.utils import normalize_proba, random_sign
 
 
 class TestUtils(TestCase):
@@ -17,6 +18,21 @@ class TestUtils(TestCase):
         self.assertEqual(p.shape, (3, 5))
         for s in p.sum(axis=0).tolist():
             self.assertAlmostEqual(s, 1.0)
+
+    def test_random_signs(self):
+        for X in [np.ones(1), np.ones(10), np.ones((10, 10))]:
+            Xt = random_sign(random_generator=self.rng, shape=X.shape)
+            with self.subTest(X=X):
+                self.assertEqual(
+                    X.shape, Xt.shape
+                )
+                self.assertTrue(
+                    np.all(X == np.abs(Xt))
+                )
+                if X.shape != (1,):
+                    self.assertNotEquals(
+                        np.sum(X == 1), np.sum(Xt == 1)
+                    )
 
 
 if __name__ == '__main__':

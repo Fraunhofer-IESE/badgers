@@ -34,7 +34,7 @@ class LocalZScoreTransformer(OutliersTransformer):
         :param percentage_extreme_values: int, default 10
             The percentage of extreme values to generate
         :param  local_window_size: int, default 10
-            The size (number of data points) of the local window to compute local Z-score
+            The shape (number of data points) of the local window to compute local Z-score
         """
         super().__init__(random_generator=random_generator)
         assert 0 <= percentage_extreme_values <= 100
@@ -66,7 +66,7 @@ class LocalZScoreTransformer(OutliersTransformer):
                 local_window = X[row - int(self.local_window_size / 2):row + int(self.local_window_size / 2), col]
                 local_mean = local_window.mean()
                 local_var = local_window.var()
-                value = local_mean + random_sign(self.random_generator) * self.random_generator.uniform(
+                value = local_mean + random_sign(self.random_generator, 1) * self.random_generator.uniform(
                     low=3. * local_var[col], high=5 * local_mean[col]
                 )
                 # updating with new outliers
