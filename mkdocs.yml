@@ -3,6 +3,9 @@ site_url: https://github.com/siebert-julien/
 
 nav:
     - Home: index.md
+    - Tutorials:
+        - Generating Noise: tutorials/Noise-Tabular-Data.ipynb
+        - Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
     - About: about.md
     - Changes: changelog.md
     - API Reference: reference/
@@ -28,6 +31,6 @@ plugins:
                     show_source: false
                 selection:
                     docstring_style: sphinx
-
+    - mkdocs-jupyter
 watch:
     - ../badgers
