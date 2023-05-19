@@ -13,8 +13,7 @@ class OutliersTransformer(TransformerMixin, BaseEstimator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param random_generator: a random number generator
         """
         self.random_generator = random_generator
         self.outliers_indices_ = None
@@ -29,12 +28,9 @@ class LocalZScoreTransformer(OutliersTransformer):
                  local_window_size: int = 10):
         """
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
-        :param percentage_extreme_values: int, default 10
-            The percentage of extreme values to generate
-        :param  local_window_size: int, default 10
-            The shape (number of data points) of the local window to compute local Z-score
+        :param random_generator: a random number generator
+        :param percentage_extreme_values: the percentage of extreme values to generate
+        :param  local_window_size: the width (number of data points) of the local window to compute local Z-Score
         """
         super().__init__(random_generator=random_generator)
         assert 0 <= percentage_extreme_values <= 100
@@ -48,9 +44,7 @@ class LocalZScoreTransformer(OutliersTransformer):
         The sign of the extreme value is the same as the value being replaced.
 
         :param X:
-        :param y:
-        :param fit_param:
-        :return:
+        :return: the transformed array
         """
         X = check_array(X, accept_sparse=False)
 

@@ -26,7 +26,7 @@ class TestPipelinesOutliers(unittest.TestCase):
             for input_type, X in self.input_test_data.items():
                 with self.subTest(input_type=input_type):
                     Xt = pipeline.transform(X)
-                    self.assertEqual(X.shape, Xt.shape)
+                    self.assertEqual(X.shape[1], Xt.shape[1])
 
 
 class TestPipelinesNoise(unittest.TestCase):

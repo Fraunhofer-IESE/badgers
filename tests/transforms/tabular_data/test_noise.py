@@ -20,7 +20,7 @@ class TestNoiseTransformer(TestCase):
     def test_all_transformers(self):
         """
         run generic tests for all transformer classes:
-        - checks that the transformed array has the same shape as the input array
+        - checks that the transformed array has the same size as the input array
         - checks that the variance of the transformed array is greater than the one of the input array
         """
         for cls in self.transformers_classes:
@@ -28,7 +28,7 @@ class TestNoiseTransformer(TestCase):
             for input_type, X in self.input_test_data.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
                     Xt = transformer.transform(X.copy())
-                    # assert arrays have same shape
+                    # assert arrays have same size
                     self.assertEqual(X.shape, Xt.shape)
                     # assert variance is greater after the transformation
                     self.assertIncreaseVariance(X, Xt)

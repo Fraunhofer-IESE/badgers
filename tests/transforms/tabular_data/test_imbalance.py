@@ -19,7 +19,7 @@ class TestImbalanceTransformer(TestCase):
             for input_type, (X,y) in self.input_test_data.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
                     Xt = transformer.fit_transform(X.copy(), y)
-                    # assert arrays have same shape
+                    # assert arrays have same size
                     self.assertEqual(Xt.shape[1], X.shape[1])
                     self.assertEqual(Xt.shape[0], transformer.labels_.shape[0])
 

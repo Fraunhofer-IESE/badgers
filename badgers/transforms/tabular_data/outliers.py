@@ -7,7 +7,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
 
-from badgers.core.utils import random_sign
+from badgers.core.utils import random_sign, random_spherical_coordinate
 
 
 class OutliersTransformer(TransformerMixin, BaseEstimator):
@@ -24,7 +24,6 @@ class OutliersTransformer(TransformerMixin, BaseEstimator):
 
         self.random_generator = random_generator
         self.percentage_extreme_values = percentage_outliers
-        self.outliers_indices_ = None
 
 
 class ZScoreTransformer(OutliersTransformer):
@@ -43,32 +42,81 @@ class ZScoreTransformer(OutliersTransformer):
         2. Randomly selects indices for the outliers (uniformly at random)
         3. Replace the value of the data points marked as outliers as follows:
             - the sign is randomly chosen
-            - the value is equal to 3 + a random number following an exponential distribution function with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
+            - for each dimension: the value is equal to 3 + a random number following an exponential distribution function
+            with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
         4. Inverse the standardization transformation
 
         :param X:
         :return:
         """
         X = check_array(X, accept_sparse=False)
+
         # standardize data
         scaler = StandardScaler()
+
         # fit, transform
         scaler.fit(X)
         Xt = scaler.transform(X)
 
         # compute number of outliers
-        n_outliers = int(X.shape[0] * self.percentage_extreme_values / 100)
+        n_outliers = int(Xt.shape[0] * self.percentage_extreme_values / 100)
+
         # generate outliers
-        self.outliers_indices_ = self.random_generator.choice(X.shape[0], size=n_outliers, replace=False, p=None)
+        outliers = np.array([
+            random_sign(self.random_generator, size=Xt.shape[1]) * (
+                3. + self.random_generator.exponential(size=Xt.shape[1]))
+            for _ in range(n_outliers)
+        ])
+
+        return scaler.inverse_transform(outliers)
+
+
+class HypersphereSamplingTransformer(OutliersTransformer):
+    """
+    Generates outliers by sampling points from an hypersphere with radius at least 3 sigma
+    """
+
+    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
+        super().__init__(random_generator, percentage_outliers)
+
+    def transform(self, X):
+        """
+        Randomly generates outliers as data points with a z-score > 3.
+
+        1. Standardize the input data (mean = 0, variance = 1)
+        2. Randomly selects indices for the outliers (uniformly at random)
+        3. Replace the value of the data points marked as outliers as follows:
+            - the sign is randomly chosen
+            - for each dimension: the value is equal to 3 + a random number following an exponential distribution function
+            with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
+        4. Inverse the standardization transformation
+
+        :param X:
+        :return:
+        """
+        X = check_array(X, accept_sparse=False)
+
+        # standardize data
+        scaler = StandardScaler()
+
+        # fit, transform
+        scaler.fit(X)
+        Xt = scaler.transform(X)
+
+        # compute number of outliers
+        n_outliers = int(Xt.shape[0] * self.percentage_extreme_values / 100)
 
         # computing outliers
-        for row in self.outliers_indices_:
-            value = random_sign(self.random_generator, shape=X.shape[1]) * (
-                3. + self.random_generator.exponential(size=X.shape[1]))
-            # updating with new outliers
-            Xt[row, :] = value
+        outliers = np.array([
+            random_spherical_coordinate(
+                random_generator=self.random_generator,
+                size=Xt.shape[1],
+                radius=3. + self.random_generator.exponential()
+            )
+            for _ in range(n_outliers)
+        ])
 
-        return scaler.inverse_transform(Xt)
+        return scaler.inverse_transform(outliers)
 
 
 # class HistogramTransformer(OutliersTransformer):
@@ -104,9 +152,9 @@ class ZScoreTransformer(OutliersTransformer):
 #         Xt = scaler.transform(X)
 #
 #         # compute number of outliers
-#         n_outliers = int(X.shape[0] * self.percentage_extreme_values / 100)
+#         n_outliers = int(X.size[0] * self.percentage_extreme_values / 100)
 #         # generate outliers indices
-#         self.outliers_indices_ = self.random_generator.choice(X.shape[0], shape=n_outliers, replace=False, p=None)
+#         self.outliers_indices_ = self.random_generator.choice(X.size[0], size=n_outliers, replace=False, p=None)
 #
 #         # compute the histogram of the data
 #         hist, edges = np.histogramdd(Xt, density=False, bins=self.bins)
@@ -139,7 +187,7 @@ class DecompositionZScoreTransformer(OutliersTransformer):
 
         :param random_generator: A random generator
         :param percentage_outliers: The percentage of outliers to generate
-        :param n_components: The number of components to be used by the decomposition transformation. If not set, it will default to log2(X.shape[1]) (if X.shape[1] > 2) or 1 (if X.shape[1] <= 2)
+        :param n_components: The number of components to be used by the decomposition transformation. If not set, it will default to log2(X.size[1]) (if X.size[1] > 2) or 1 (if X.size[1] <= 2)
         :param decomposition_transformer_class: The class of the dimensionality reduction transformer to be used before the ZScoreTransformer. It needs to implement a `inverse_transform()` function and have the attribute `n_components`
         :param decomposition_transformer_kwargs: The parameters to be passed to the decomposition_transformer_class
         """
@@ -187,8 +235,6 @@ class DecompositionZScoreTransformer(OutliersTransformer):
         Xt = pipeline.fit_transform(X)
         # add outliers using the zscore_transformer
         Xt = self._z_score_transformer.transform(Xt)
-        # update outliers indices
-        self.outliers_indices_ = self._z_score_transformer.outliers_indices_
         # inverse the manifold and standardization transformations
         return pipeline.inverse_transform(Xt)
 
@@ -213,7 +259,7 @@ class PCATransformer(DecompositionZScoreTransformer):
             The percentage of outliers to generate
         :param n_components: int, default None
             The number of components to be used by the PCA transformation.
-            If not set, it will default to log2(X.shape[1]) (if X.shape[1] > 2) or 1 (if X.shape[1] <= 2)
+            If not set, it will default to log2(X.size[1]) (if X.size[1] > 2) or 1 (if X.size[1] <= 2)
         """
         super().__init__(
             random_generator=random_generator,
@@ -239,7 +285,7 @@ class KernelPCATransformer(DecompositionZScoreTransformer):
 
         :param random_generator: A random generator
         :param percentage_outliers: The percentage of outliers to generate
-        :param n_components: The number of components to be used by the PCA transformation. If not set, it will default to log2(X.shape[1]) (if X.shape[1] > 2) or 1 (if X.shape[1] <= 2)
+        :param n_components: The number of components to be used by the PCA transformation. If not set, it will default to log2(X.size[1]) (if X.size[1] > 2) or 1 (if X.size[1] <= 2)
         """
         # forcing the fit_inverse_transform argument to be True
         kernel_pca_kwargs['fit_inverse_transform'] = True
@@ -250,3 +296,66 @@ class KernelPCATransformer(DecompositionZScoreTransformer):
             decomposition_transformer_class=KernelPCA,
             **kernel_pca_kwargs
         )
+
+
+class DecompositionHypersphereSamplingTransformer(OutliersTransformer):
+
+    def __init__(self, random_generator=default_rng(seed=0),
+                 percentage_outliers: int = 10,
+                 n_components: int = None,
+                 decomposition_transformer_class: sklearn.base.TransformerMixin = PCA,
+                 **decomposition_transformer_kwargs):
+        """
+
+        :param random_generator: A random generator
+        :param percentage_outliers: The percentage of outliers to generate
+        :param n_components: The number of components to be used by the decomposition transformation. If not set, it will default to log2(X.size[1]) (if X.size[1] > 2) or 1 (if X.size[1] <= 2)
+        :param decomposition_transformer_class: The class of the dimensionality reduction transformer to be used before the ZScoreTransformer. It needs to implement a `inverse_transform()` function and have the attribute `n_components`
+        :param decomposition_transformer_kwargs: The parameters to be passed to the decomposition_transformer_class
+        """
+        assert hasattr(
+            decomposition_transformer_class,
+            'inverse_transform'), \
+            f'the decomposition transformer class must implement the inverse_transform function.' \
+            f'\nUnfortunately the class {decomposition_transformer_class} does not'
+        super().__init__(random_generator, percentage_outliers)
+        self.n_components = n_components
+        self.decomposition_transformer_class = decomposition_transformer_class
+        self.decomposition_transformer_kwargs = decomposition_transformer_kwargs
+        self._hypersphere_transformer = HypersphereSamplingTransformer(random_generator=random_generator,
+                                                                       percentage_outliers=percentage_outliers)
+
+    def transform(self, X):
+        """
+        Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)
+        and a z-score transformer.
+
+        1. Standardize the input data (mean = 0, variance = 1)
+        2. Apply the dimensionality reduction transformer
+        3. Generates outliers by applying the ZScoreTransformer
+        4. Inverse the dimensionality reduction and the standardization transformations
+
+        :param X:
+        :return:
+        """
+        X = check_array(X)
+
+        # check the number of components for the dimensionality reduction transformer
+        if self.n_components is None:
+            if X.shape[1] <= 2:
+                n_components = 1
+            else:
+                n_components = int(np.log2(X.shape[1]))
+        else:
+            n_components = self.n_components
+
+        # sctandardize the data and apply the manifold transformer
+        pipeline = make_pipeline(
+            StandardScaler(),
+            self.decomposition_transformer_class(n_components=n_components, **self.decomposition_transformer_kwargs),
+        )
+        Xt = pipeline.fit_transform(X)
+        # add outliers using the zscore_transformer
+        Xt = self._hypersphere_transformer.transform(Xt)
+        # inverse the manifold and standardization transformations
+        return pipeline.inverse_transform(Xt)

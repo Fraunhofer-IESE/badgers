@@ -21,7 +21,7 @@ class TestMissingValueTransformer(TestCase):
             for input_type, X in self.input_test_data.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
                     Xt = transformer.transform(X.copy())
-                    # assert arrays have same shape
+                    # assert arrays have same size
                     self.assertEqual(X.shape, Xt.shape)
                     # assert that the right number of nans have been generated
                     self.assertEqual(np.isnan(Xt).sum(), transformer.percentage_missing / 100. * X.shape[0] * X.shape[1])
