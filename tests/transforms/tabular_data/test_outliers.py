@@ -3,7 +3,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.outliers import OutliersTransformer, ZScoreTransformer
+from badgers.transforms.tabular_data.outliers import OutliersTransformer, ZScoreSampling, HistogramSampling
 from tests.transforms.tabular_data import generate_test_data_without_labels
 
 
@@ -24,19 +24,23 @@ class TestOutliersTransformer(TestCase):
         for cls in self.transformers_classes:
             transformer = cls()
             for input_type, X in self.input_test_data.items():
-                with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                    outliers = transformer.transform(X.copy())
-                    # assert number of outliers
-                    self.assertEqual(outliers.shape[0], int(transformer.percentage_extreme_values * X.shape[0] / 100))
-                    # assert shape
-                    self.assertEqual(outliers.shape[1], X.shape[1])
-                    # TODO assert outlierness score
+                if X.shape[1] > 5 and transformer.__class__ is HistogramSampling:
+                    with self.assertRaises(NotImplementedError):
+                        _ = transformer.transform(X.copy())
+                else:
+                    with self.subTest(transformer=transformer.__class__, input_type=input_type):
+                        outliers = transformer.transform(X.copy())
+                        # assert number of outliers
+                        self.assertEqual(outliers.shape[0], int(transformer.percentage_extreme_values * X.shape[0] / 100))
+                        # assert shape
+                        self.assertEqual(outliers.shape[1], X.shape[1])
+                        # TODO assert outlierness score
 
 
 class TestZScoreTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.transformer = ZScoreTransformer(random_generator=self.rng, percentage_outliers=10)
+        self.transformer = ZScoreSampling(random_generator=self.rng, percentage_outliers=10)
         self.input_test_data = generate_test_data_without_labels(rng=self.rng)
 
     def assert_zscore_larger_than_3(self, X):

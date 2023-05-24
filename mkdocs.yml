@@ -6,6 +6,7 @@ nav:
     - About: about.md
     - Changes: changelog.md
     - Tutorials:
+        - Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
         - Generating Noise: tutorials/Noise-Tabular-Data.ipynb
         - Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
     - API: reference/

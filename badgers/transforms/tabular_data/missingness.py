@@ -51,7 +51,7 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         :return:
         """
         X = check_array(X, accept_sparse=False)
-        self.n_features_in_ = X.shape[1]
+
         # compute number of missing values per column
         nb_missing = int(X.shape[0] * self.percentage_missing / 100)
         # generate missing values indices
@@ -85,12 +85,9 @@ class DummyMissingAtRandom(MissingValueTransformer):
 
         :param self:
         :param X:
-        :param y:
-        :param fit_params:
         :return:
         """
         X = check_array(X)
-        self.n_features_in_ = X.shape[1]
 
         if isinstance(X, pd.DataFrame):
             X = X.to_numpy()
@@ -101,7 +98,8 @@ class DummyMissingAtRandom(MissingValueTransformer):
         # make columns i depends on all the other
         if X.shape[1] > 1:
             for i in range(X.shape[1]):
-                p[:, i] = np.delete(X_norm, i, axis=1).sum(axis=1)
+                j = self.random_generator.choice([x for x in range(X.shape[1]) if x != i])
+                p[:, i] = X_norm[:, j]
         else:
             p = X_norm
         p = normalize_proba(p)
@@ -141,7 +139,6 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
         :return:
         """
         X = check_array(X)
-        self.n_features_in_ = X.shape[1]
 
         if isinstance(X, pd.DataFrame):
             X = X.to_numpy()
