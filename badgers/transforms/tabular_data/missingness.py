@@ -46,8 +46,6 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         Computes indices of missing values using a uniform distribution.
 
         :param X:
-        :param y:
-        :param fit_param:
         :return:
         """
         X = check_array(X, accept_sparse=False)

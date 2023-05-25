@@ -4,6 +4,8 @@ from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
+from badgers.core.utils import normalize_proba
+
 
 class ImbalanceTransformer(TransformerMixin, BaseEstimator):
     """
@@ -12,25 +14,51 @@ class ImbalanceTransformer(TransformerMixin, BaseEstimator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param random_generator: A random generator
         """
         self.random_generator = random_generator
 
 
+class RandomSamplingFeaturesTransformer(ImbalanceTransformer):
+
+    def __init__(self, random_generator=default_rng(seed=0), percentage_missing: int = 10,
+                 sampling_proba_func=lambda X: normalize_proba(X[:, 0])):
+        """
+
+        :param random_generator: A random generator
+        :param estimator:
+        """
+        assert 0 < percentage_missing < 100
+        super().__init__(random_generator=random_generator)
+        self.sampling_proba_func = sampling_proba_func
+        self.percentage_missing = percentage_missing
+
+    def transform(self, X):
+        """
+        Randomly samples instances based on the features values in X
+
+        :param X:
+        :return:
+        """
+        X = check_array(X)
+        # total number of instances that will be missing
+        size = int(X.shape[0] * (100 - self.percentage_missing) / 100)
+        # sampling
+        sampling_proba = self.sampling_proba_func(X)
+        Xt = self.random_generator.choice(X, p=sampling_proba, size=size)
+        return Xt
+
+
 class RandomSamplingClassesTransformer(ImbalanceTransformer):
 
-    def __init__(self, random_generator=default_rng(seed=0), min: int = None):
+    def __init__(self, random_generator=default_rng(seed=0), min_instances: int = None):
         """
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
-        :param min: int, default None
-            The minimum number of instance per class.
-            If `None` defaults to 10% of the number of instance in the smallest class
+        :param random_generator: A random generator
+        :param min_instances: The minimum number of instance per class. If `None` defaults to 10% of the number of instance in the smallest class
         """
         super().__init__(random_generator=random_generator)
-        self.min = min
+        self.min = min_instances
 
     def fit(self, X, y):
         """
@@ -54,7 +82,6 @@ class RandomSamplingClassesTransformer(ImbalanceTransformer):
         # input validation
         check_is_fitted(self, ['original_labels_'])
         X = check_array(X)
-        self.n_features_in_ = X.shape[1]
         # local variables
         Xt = []
         transformed_labels = []

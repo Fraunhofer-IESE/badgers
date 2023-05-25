@@ -16,7 +16,8 @@ def normalize_proba(p: np.array) -> np.array:
     # make the sum of each column = 1
     sum = p.sum(axis=0)
     # assure that no division by 0
-    sum[sum == 0] = 1
+    if isinstance(sum, np.ndarray) and sum.ndim > 1:
+        sum[sum == 0] = 1
     # normalize
     p = p / sum
     return p
