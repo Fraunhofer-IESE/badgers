@@ -3,16 +3,16 @@ from unittest import TestCase
 from numpy.random import default_rng
 
 from badgers.transforms.tabular_data.drift import DriftTransformer
-from tests.transforms.tabular_data import generate_test_data_with_labels, generate_test_data_without_labels
+from tests.transforms.tabular_data import generate_test_data_with_classification_labels, generate_test_data_only_features
 
 
 class TestDriftTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.input_data_without_labels = generate_test_data_without_labels(rng=self.rng)
+        self.input_data_without_labels = generate_test_data_only_features(rng=self.rng)
         self.transformer_without_fit_classes = [cls for cls in DriftTransformer.__subclasses__() if
                                                 not hasattr(cls, 'fit')]
-        self.input_data_with_labels = generate_test_data_with_labels(rng=self.rng)
+        self.input_data_with_labels = generate_test_data_with_classification_labels(rng=self.rng)
         self.transformer_with_fit_classes = [cls for cls in DriftTransformer.__subclasses__() if hasattr(cls, 'fit')]
 
     def test_all_transformers(self):

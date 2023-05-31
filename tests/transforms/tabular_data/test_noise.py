@@ -5,14 +5,14 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.transforms.tabular_data.noise import NoiseTransformer
-from tests.transforms.tabular_data import generate_test_data_without_labels
+from tests.transforms.tabular_data import generate_test_data_only_features
 
 
 class TestNoiseTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
         self.transformers_classes = NoiseTransformer.__subclasses__()
-        self.input_test_data = generate_test_data_without_labels(rng=self.rng)
+        self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def assertIncreaseVariance(self, X, Xt):
         self.assertTrue(all(np.var(X, axis=0) < np.var(Xt, axis=0)))

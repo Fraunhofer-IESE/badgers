@@ -16,10 +16,8 @@ class MissingValueTransformer(TransformerMixin, BaseEstimator):
     def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
         """
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         assert 0 <= percentage_missing <= 100
         self.percentage_missing = percentage_missing
@@ -34,10 +32,8 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
 
         See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
@@ -71,10 +67,8 @@ class DummyMissingAtRandom(MissingValueTransformer):
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, defaut default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
@@ -120,20 +114,15 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
     def transform(self, X):
         """
 
-        :param self:
         :param X:
-        :param y:
-        :param fit_params:
         :return:
         """
         X = check_array(X)

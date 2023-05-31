@@ -2,14 +2,16 @@ site_name: Badgers Documentation
 site_url: https://github.com/siebert-julien/
 
 nav:
-    - Home: index.md
-    - About: about.md
-    - Changes: changelog.md
-    - Tutorials:
-        - Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
-        - Generating Noise: tutorials/Noise-Tabular-Data.ipynb
-        - Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
-    - API: reference/
+    -   Home: index.md
+    -   About: about.md
+    -   Changes: changelog.md
+    -   Tutorials:
+            - Tabular Data:
+                -   Generating Imbalanced Data: tutorials/Imbalance-Tabular-Data.ipynb
+                -   Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
+                -   Generating Noise: tutorials/Noise-Tabular-Data.ipynb
+                -   Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
+    -   API: reference/
 
 theme:
     name: material
@@ -20,18 +22,18 @@ theme:
 
 plugins:
     - search
-    - gen-files:
-        scripts:
-            - docs/gen_ref_pages.py
-    - literate-nav:
-        nav_file: SUMMARY.md
-    - mkdocstrings:
-        handlers:
-            python:
-                options:
-                    show_source: false
-                selection:
-                    docstring_style: sphinx
+    -   gen-files:
+            scripts:
+                - docs/gen_ref_pages.py
+    -   literate-nav:
+            nav_file: SUMMARY.md
+    -   mkdocstrings:
+            handlers:
+                python:
+                    options:
+                        show_source: false
+                    selection:
+                        docstring_style: sphinx
     - mkdocs-jupyter
 watch:
     - ../badgers

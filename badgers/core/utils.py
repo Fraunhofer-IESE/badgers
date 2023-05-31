@@ -23,7 +23,7 @@ def normalize_proba(p: np.array) -> np.array:
     return p
 
 
-def random_sign(random_generator: numpy.random.Generator = default_rng(0), size: Tuple[int] | int = 1) -> np.array:
+def random_sign(random_generator: numpy.random.Generator = default_rng(0), size: Tuple[int] = (1,)) -> np.array:
     """
     Generates an array full of ones, with randomly assigned signs.
 
@@ -50,7 +50,7 @@ def random_spherical_coordinate(random_generator: numpy.random.Generator = defau
     assert size > 0
     x = None
     if size == 1:
-        x = random_sign(random_generator, size=1) * radius
+        x = random_sign(random_generator, size=(1,)) * radius
     elif size == 2:
         phi = random_generator.uniform(0, 2. * np.pi)
         x = np.array([radius * np.cos(phi), radius * np.sin(phi)])

@@ -4,7 +4,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.transforms.tabular_data.outliers import OutliersTransformer, ZScoreSampling, HistogramSampling
-from tests.transforms.tabular_data import generate_test_data_without_labels
+from tests.transforms.tabular_data import generate_test_data_only_features
 
 
 class TestOutliersTransformer(TestCase):
@@ -12,7 +12,7 @@ class TestOutliersTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
         self.transformers_classes = OutliersTransformer.__subclasses__()
-        self.input_test_data = generate_test_data_without_labels(rng=self.rng)
+        self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def test_all_transformers(self):
         """
@@ -41,7 +41,7 @@ class TestZScoreTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
         self.transformer = ZScoreSampling(random_generator=self.rng, percentage_outliers=10)
-        self.input_test_data = generate_test_data_without_labels(rng=self.rng)
+        self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def assert_zscore_larger_than_3(self, X):
         """
