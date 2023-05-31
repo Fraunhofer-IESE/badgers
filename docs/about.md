@@ -1,10 +1,4 @@
-# Badgers: bad data generators
 
-A library for generating data quality issues.
-
-## Why use badgers?
-- Robustness analysis
-- Chaos Data Engineering
 
 ## Who is using badgers?
 
@@ -36,7 +30,7 @@ A library for generating data quality issues.
 
 
 ## Citing Badgers
-
+    
 
 ## Contributing to Badgers
 

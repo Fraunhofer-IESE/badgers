@@ -25,9 +25,9 @@ class MissingNodesTransformer(TransformerMixin, BaseEstimator):
     def transform(self, X):
         """
 
-        :param X: {array-like, sparse-matrix}, shape (n_samples, n_features)
+        :param X: {array-like, sparse-matrix}, size (n_samples, n_features)
             The input samples.
-        :return X_transformed: array, shape (n_samples, n_features)
+        :return X_transformed: array, size (n_samples, n_features)
             The array containing missing values.
         """
         check_is_fitted("missing_nodes_indices_")

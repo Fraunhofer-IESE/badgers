@@ -16,10 +16,8 @@ class MissingValueTransformer(TransformerMixin, BaseEstimator):
     def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
         """
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         assert 0 <= percentage_missing <= 100
         self.percentage_missing = percentage_missing
@@ -34,10 +32,8 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
 
         See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
@@ -46,12 +42,10 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         Computes indices of missing values using a uniform distribution.
 
         :param X:
-        :param y:
-        :param fit_param:
         :return:
         """
         X = check_array(X, accept_sparse=False)
-        self.n_features_in_ = X.shape[1]
+
         # compute number of missing values per column
         nb_missing = int(X.shape[0] * self.percentage_missing / 100)
         # generate missing values indices
@@ -73,10 +67,8 @@ class DummyMissingAtRandom(MissingValueTransformer):
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, defaut default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
@@ -85,12 +77,9 @@ class DummyMissingAtRandom(MissingValueTransformer):
 
         :param self:
         :param X:
-        :param y:
-        :param fit_params:
         :return:
         """
         X = check_array(X)
-        self.n_features_in_ = X.shape[1]
 
         if isinstance(X, pd.DataFrame):
             X = X.to_numpy()
@@ -101,7 +90,8 @@ class DummyMissingAtRandom(MissingValueTransformer):
         # make columns i depends on all the other
         if X.shape[1] > 1:
             for i in range(X.shape[1]):
-                p[:, i] = np.delete(X_norm, i, axis=1).sum(axis=1)
+                j = self.random_generator.choice([x for x in range(X.shape[1]) if x != i])
+                p[:, i] = X_norm[:, j]
         else:
             p = X_norm
         p = normalize_proba(p)
@@ -124,24 +114,18 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """
 
-        :param percentage_missing: int, default 10
-            The percentage of missing values (int value between 0 and 100 included)
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
+        :param random_generator: A random generator
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
     def transform(self, X):
         """
 
-        :param self:
         :param X:
-        :param y:
-        :param fit_params:
         :return:
         """
         X = check_array(X)
-        self.n_features_in_ = X.shape[1]
 
         if isinstance(X, pd.DataFrame):
             X = X.to_numpy()

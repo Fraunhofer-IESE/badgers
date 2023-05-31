@@ -4,7 +4,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.random import default_rng
 
-from badgers.core.utils import normalize_proba, random_sign
+from badgers.core.utils import normalize_proba, random_sign, random_spherical_coordinate
 
 
 class TestUtils(TestCase):
@@ -21,7 +21,7 @@ class TestUtils(TestCase):
 
     def test_random_signs(self):
         for X in [np.ones(1), np.ones(10), np.ones((10, 10))]:
-            Xt = random_sign(random_generator=self.rng, shape=X.shape)
+            Xt = random_sign(random_generator=self.rng, size=X.shape)
             with self.subTest(X=X):
                 self.assertEqual(
                     X.shape, Xt.shape
@@ -33,6 +33,12 @@ class TestUtils(TestCase):
                     self.assertNotEquals(
                         np.sum(X == 1), np.sum(Xt == 1)
                     )
+
+    def test_random_spherical_coordinate(self):
+        size = 2
+        r = 1
+        x = random_spherical_coordinate(random_generator=self.rng, size=size, radius=r)
+        self.assertAlmostEqual(np.sum(x ** 2), r ** 2)
 
 
 if __name__ == '__main__':
