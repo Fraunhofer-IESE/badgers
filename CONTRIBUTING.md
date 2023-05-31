@@ -1,7 +1,7 @@
 # Contributing
 
 Contributions are welcome, and they are greatly appreciated! Every little bit
-helps, and credit will always be given.
+helps, and credit will always be given (apropos credit, this file is largely inspired from https://github.com/audreyfeldroy/cookiecutter-pypackage/blob/master/CONTRIBUTING.rst, thanks for the amazing work!).
 
 You can contribute in many ways:
 
@@ -9,7 +9,7 @@ You can contribute in many ways:
 
 ### Report Bugs
 
-Report bugs at URL.
+Report bugs at https://github.com/Fraunhofer-IESE/badgers/issues.
 
 If you are reporting a bug, please include:
 
@@ -52,7 +52,7 @@ Ready to contribute? Here's how to set up `badgers` for local development.
 2. Clone your fork locally
 
 ```
-    $ git clone GITURL
+    $ git clone https://github.com/Fraunhofer-IESE/badgers
 ```
 
 3. Install dependencies and start your virtualenv:
@@ -95,7 +95,6 @@ Before you submit a pull request, check that it meets these guidelines:
    your new functionality into a function with a docstring, and add the
    feature to the list in README.md.
 3. The pull request should work for Python PYTHON-VERSION and for PyPy. Check
-   URL
-   and make sure that the tests pass for all supported Python versions.
+   https://github.com/Fraunhofer-IESE/badgers and make sure that the tests pass for all supported Python versions.
 
 
