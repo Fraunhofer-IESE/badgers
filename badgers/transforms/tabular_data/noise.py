@@ -1,5 +1,5 @@
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator, OneToOneFeatureMixin
+from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_array
 
@@ -17,7 +17,7 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
 
 
-class GaussianNoiseTransformer(NoiseTransformer, OneToOneFeatureMixin):
+class GaussianNoiseTransformer(NoiseTransformer):
     def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1):
         """
 

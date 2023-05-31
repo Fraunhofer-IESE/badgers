@@ -1,8 +1,9 @@
 site_name: Badgers Documentation
-site_url: https://github.com/siebert-julien/
+site_url: https://github.com/Fraunhofer-IESE/badgers
 
 nav:
     -   Home: index.md
+    -   Getting started: getting-started.md
     -   About: about.md
     -   Changes: changelog.md
     -   Tutorials:
@@ -31,7 +32,7 @@ plugins:
             handlers:
                 python:
                     options:
-                        show_source: false
+                        show_source: true
                     selection:
                         docstring_style: sphinx
     - mkdocs-jupyter
