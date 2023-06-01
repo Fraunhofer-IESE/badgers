@@ -1,14 +1,15 @@
+import abc
+
 import numpy as np
 import numpy.random
 import pandas as pd
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
-from sklearn.utils.validation import check_array
 
 from badgers.core.utils import normalize_proba
+from core.base import GeneratorMixin
 
 
-class MissingValueTransformer(TransformerMixin, BaseEstimator):
+class MissingValueTransformer(GeneratorMixin):
     """
     Base class for missing values transformer
     """
@@ -24,6 +25,10 @@ class MissingValueTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
         self.missing_values_indices_ = None
 
+    @abc.abstractmethod
+    def generate(self, X, y=None, **params):
+        pass
+
 
 class MissingCompletelyAtRandom(MissingValueTransformer):
 
@@ -37,15 +42,13 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    def transform(self, X):
+    def generate(self, X, y, **params):
         """
         Computes indices of missing values using a uniform distribution.
 
         :param X:
         :return:
         """
-        X = check_array(X, accept_sparse=False)
-
         # compute number of missing values per column
         nb_missing = int(X.shape[0] * self.percentage_missing / 100)
         # generate missing values indices
@@ -56,7 +59,7 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
             # generate missing values
             X[rows, col] = np.nan
 
-        return X
+        return X, y
 
 
 class DummyMissingAtRandom(MissingValueTransformer):
@@ -72,15 +75,13 @@ class DummyMissingAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    def transform(self, X):
+    def generate(self, X, y, **params):
         """
 
         :param self:
         :param X:
         :return:
         """
-        X = check_array(X)
-
         if isinstance(X, pd.DataFrame):
             X = X.to_numpy()
         # initialize probability with zeros
@@ -106,7 +107,7 @@ class DummyMissingAtRandom(MissingValueTransformer):
             # generate missing values
             X[rows, col] = np.nan
 
-        return X
+        return X, y
 
 
 class DummyMissingNotAtRandom(MissingValueTransformer):
@@ -119,13 +120,12 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    def transform(self, X):
+    def generate(self, X, y, **params):
         """
 
         :param X:
         :return:
         """
-        X = check_array(X)
 
         if isinstance(X, pd.DataFrame):
             X = X.to_numpy()
@@ -144,4 +144,4 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
             # generate missing values
             X[rows, col] = np.nan
 
-        return X
+        return X, y

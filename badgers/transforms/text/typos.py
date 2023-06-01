@@ -1,10 +1,12 @@
-from typing import List
+import abc
+from typing import List, Tuple
 
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
+
+from core.base import GeneratorMixin
 
 
-class TyposTransformer(TransformerMixin, BaseEstimator):
+class TyposTransformer(GeneratorMixin):
     """
     Base class for transformers creating typos in a list of words
     """
@@ -16,6 +18,10 @@ class TyposTransformer(TransformerMixin, BaseEstimator):
             A random generator
         """
         self.random_generator = random_generator
+
+    @abc.abstractmethod
+    def generate(self, X, y=None, **params) -> Tuple:
+        pass
 
 
 class SwitchLettersTransformer(TyposTransformer):
@@ -36,7 +42,7 @@ class SwitchLettersTransformer(TyposTransformer):
         super().__init__(random_generator)
         self.switching_proba = switching_proba
 
-    def transform(self, X: List[str]) -> List[str]:
+    def generate(self, X, y=None, **params) -> Tuple:
         """
         For each word with a length greater than 3, apply a single switch with probability `self.switching_proba`
         Where the switch happens is determined randomly
@@ -55,4 +61,4 @@ class SwitchLettersTransformer(TyposTransformer):
                 # save the word with switched letters as string
                 X[i] = ''.join(word)
 
-        return X
+        return X, None

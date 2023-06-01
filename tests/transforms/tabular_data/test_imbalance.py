@@ -30,7 +30,7 @@ class TestRandomSamplingClassesTransformer(TestCase):
             Xt = transformer.fit_transform(X.copy(), y)
             # assert arrays have same size
             self.assertEqual(Xt.shape[1], X.shape[1])
-            self.assertEqual(Xt.shape[0], len(transformer.labels_))
+            self.assertEqual(Xt.shape[0], len(transformer.transformed_labels_))
 
 
 class TestRandomSamplingFeaturesTransformer(TestCase):

@@ -1,10 +1,13 @@
+import abc
+
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils import check_array
 
 
-class NoiseTransformer(TransformerMixin, BaseEstimator):
+from core.base import GeneratorMixin
+
+
+class NoiseTransformer(GeneratorMixin):
     """
     Base class for transformers that add noise to tabular data
     """
@@ -15,6 +18,10 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
             A random generator
         """
         self.random_generator = random_generator
+
+    @abc.abstractmethod
+    def generate(self, X, y=None, **params):
+        pass
 
 
 class GaussianNoiseTransformer(NoiseTransformer):
@@ -29,7 +36,7 @@ class GaussianNoiseTransformer(NoiseTransformer):
         super().__init__(random_generator=random_generator)
         self.signal_to_noise_ratio = noise_std
 
-    def transform(self, X):
+    def generate(self, X, y, **params):
         """
         Add Gaussian white noise to the data.
         The data is first standardized (each column has a mean = 0 and variance = 1).
@@ -39,7 +46,6 @@ class GaussianNoiseTransformer(NoiseTransformer):
         :param X:
         :return:
         """
-        X = check_array(X)
         # standardize data
         scaler = StandardScaler()
         # fit, transform
@@ -48,4 +54,4 @@ class GaussianNoiseTransformer(NoiseTransformer):
         # add noise
         Xt = Xt + self.random_generator.normal(loc=0, scale=self.signal_to_noise_ratio, size=Xt.shape)
         # inverse pca
-        return scaler.inverse_transform(Xt)
+        return scaler.inverse_transform(Xt), y

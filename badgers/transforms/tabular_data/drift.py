@@ -1,15 +1,20 @@
+import abc
+
 import numpy as np
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
+
+from core.base import GeneratorMixin
 
 
-class DriftTransformer(TransformerMixin, BaseEstimator):
+class DriftTransformer(GeneratorMixin):
     """
     Base class for transformers that add noise to tabular data
     """
+
+    @abc.abstractmethod
+    def generate(self, X, y=None, **params):
+        pass
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
@@ -29,23 +34,23 @@ class RandomShiftTransformer(DriftTransformer):
     def __init__(self, random_generator=default_rng(seed=0), shift_std: float = 0.1):
         """
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
-        :param shift_std: float, default 0.1
-            The standard deviation of the amount of shift applied (shift is chosen from a normal distribution)
+        :param random_generator: A random generator
+        :param shift_std: The standard deviation of the amount of shift applied (shift is chosen from a normal distribution)
         """
         super().__init__(random_generator=random_generator)
         self.shift_std = shift_std
 
-    def transform(self, X):
+    def generate(self, X, y=None, **params):
         """
+        Randomly shift (geometrical translation) values of each column independently of one another.
+        Data are first standardized (mean = 0, var = 1) and a random number is added to each column.
+        The ith columns is simply translated: `$x_i \left arrow x_i + \epsilon_i$`
 
         :param X:
+        :param y:
+        :param params:
         :return:
         """
-        # input validation
-        X = check_array(X)
-        self.n_features_in_ = X.shape[1]
         # normalize data
         scaler = StandardScaler()
         scaler.fit(X)
@@ -55,7 +60,7 @@ class RandomShiftTransformer(DriftTransformer):
         # add shift
         Xt += shift
         # inverse transform
-        return scaler.inverse_transform(Xt)
+        return scaler.inverse_transform(Xt), y
 
 
 class RandomShiftClassesTransformer(DriftTransformer):
@@ -68,37 +73,20 @@ class RandomShiftClassesTransformer(DriftTransformer):
     def __init__(self, random_generator=default_rng(seed=0), shift_std: float = 0.1):
         """
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
-        :param shift_std: float, default 0.1
-            The standard deviation of the amount of shift applied (shift is chosen from a normal distribution)
+        :param random_generator: A random generator
+        :param shift_std: The standard deviation of the amount of shift applied (shift is chosen from a normal distribution)
         """
         super().__init__(random_generator=random_generator)
         self.shift_std = shift_std
 
-    def fit(self, X, y):
+    def generate(self, X, y):
         """
-
-        :param X:
-        :param y:
-        :return:
+        Randomly shift (geometrical translation) values of each class independently of one another.
+        Data are first standardized (mean = 0, var = 1) and
+        for each class a random number is added to all instances.
         """
-        X = check_array(X)
-        self.original_labels_ = y
-        return self
-
-    def transform(self, X):
-        """
-
-        :param X:
-        :return:
-        """
-        # input validation
-        check_is_fitted(self, ['original_labels_'])
-        X = check_array(X)
-        self.n_features_in_ = X.shape[1]
         # extract unique labels
-        classes = np.unique(self.original_labels_)
+        classes = np.unique(y)
         # normalize data
         scaler = StandardScaler()
         scaler.fit(X)
@@ -107,6 +95,6 @@ class RandomShiftClassesTransformer(DriftTransformer):
         shifts = self.random_generator.normal(loc=0, scale=self.shift_std, size=len(classes))
         # add shift
         for c, s in zip(classes, shifts):
-            Xt[self.original_labels_ == c] += s
+            Xt[y == c] += s
         # inverse transform
-        return scaler.inverse_transform(Xt)
+        return scaler.inverse_transform(Xt), y
