@@ -17,6 +17,6 @@ trf = GaussianNoiseTransformer(noise_std=0.5)
 Xt = trf.transform(X)
 ```
 
-More examples are available in the [tutorials](tutorials/Imbalance-Tabular-Data/) section.
+More examples are available in the [tutorials](https://fraunhofer-iese.github.io/badgers/tutorials/Imbalance-Tabular-Data/) section.
 
-The API documentation is also available in the [API](reference/badgers/) section.
+The API documentation is also available in the [API](https://fraunhofer-iese.github.io/badgers/reference/badgers/) section.
