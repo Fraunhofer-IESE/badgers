@@ -219,7 +219,7 @@ class DecompositionAndSamplingTransformer(GeneratorMixin):
         self.decomposition_transformer = decomposition_transformer
         if hasattr(self.decomposition_transformer, 'fit_inverse_transform'):
             setattr(self.decomposition_transformer, 'fit_inverse_transform', True)
-        self.outlier_transformer = outlier_transformer
+        self.outlier_generator = outlier_transformer
 
     def generate(self, X, y=None, **params):
         """
@@ -242,6 +242,6 @@ class DecompositionAndSamplingTransformer(GeneratorMixin):
         )
         Xt = pipeline.fit_transform(X)
         # add outliers using the zscore_transformer
-        Xt = self.outlier_transformer.transform(Xt)
+        Xt, _ = self.outlier_generator.generate(Xt, y)
         # inverse the manifold and standardization transformations
         return pipeline.inverse_transform(Xt), y

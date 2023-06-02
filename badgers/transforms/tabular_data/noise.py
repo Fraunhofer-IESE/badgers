@@ -23,7 +23,7 @@ class NoiseTransformer(GeneratorMixin):
         pass
 
 
-class GaussianNoiseTransformer(NoiseTransformer):
+class GaussianNoiseGenerator(NoiseTransformer):
     def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1):
         """
 
