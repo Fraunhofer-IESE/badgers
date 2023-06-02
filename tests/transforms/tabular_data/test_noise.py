@@ -4,7 +4,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.noise import NoiseTransformer
+from badgers.generators.tabular_data.noise import NoiseTransformer
 from tests.transforms.tabular_data import generate_test_data_only_features
 
 

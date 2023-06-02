@@ -14,7 +14,7 @@ Import badgers as any other library and start using it:
 
 ```python
 from sklearn.datasets import make_blobs
-from badgers.transforms.tabular_data.noise import GaussianNoiseGenerator
+from badgers.generators.tabular_data.noise import GaussianNoiseGenerator
 
 X, y = make_blobs()
 trf = GaussianNoiseGenerator(noise_std=0.5)

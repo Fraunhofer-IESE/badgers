@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from numpy.random import default_rng
 
-from badgers.transforms.text.typos import SwitchLettersTransformer
+from badgers.generators.text.typos import SwitchLettersTransformer
 
 
 class TestSwitchLettersTransformer(unittest.TestCase):

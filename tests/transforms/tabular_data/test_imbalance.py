@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.utils import normalize_proba
-from badgers.transforms.tabular_data.imbalance import RandomSamplingFeaturesGenerator, \
+from badgers.generators.tabular_data.imbalance import RandomSamplingFeaturesGenerator, \
     RandomSamplingClassesGenerator, RandomSamplingTargetsGenerator
 from tests.transforms.tabular_data import generate_test_data_with_classification_labels, \
     generate_test_data_with_regression_targets

@@ -2,7 +2,7 @@ from unittest import TestCase
 
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.drift import DriftTransformer
+from badgers.generators.tabular_data.drift import DriftTransformer
 from tests.transforms.tabular_data import generate_test_data_with_classification_labels, \
     generate_test_data_only_features
 
