@@ -14,7 +14,7 @@ from badgers.transforms.tabular_data.noise import GaussianNoiseGenerator
 
 X, y = make_blobs()
 trf = GaussianNoiseGenerator(noise_std=0.5)
-Xt = trf.transform(X)
+Xt, yt = trf.generate(X, y)
 ```
 
 More examples are available in the [tutorials](https://fraunhofer-iese.github.io/badgers/tutorials/Imbalance-Tabular-Data/) section.
