@@ -5,8 +5,8 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.utils import normalize_proba
-from badgers.transforms.tabular_data.imbalance import RandomSamplingFeaturesTransformer, \
-    RandomSamplingClassesTransformer, RandomSamplingTargetsTransformer
+from badgers.transforms.tabular_data.imbalance import RandomSamplingFeaturesGenerator, \
+    RandomSamplingClassesGenerator, RandomSamplingTargetsGenerator
 from tests.transforms.tabular_data import generate_test_data_with_classification_labels, \
     generate_test_data_with_regression_targets
 
@@ -16,7 +16,7 @@ class TestRandomSamplingClassesTransformer(TestCase):
         self.rng = default_rng(0)
         self.input_test_data = generate_test_data_with_classification_labels(rng=self.rng)
 
-    def test_transform(self):
+    def test_generate(self):
 
         for input_type, (X, y) in self.input_test_data.items():
             if input_type in ['numpy_1D', 'pandas_1D']:
@@ -25,12 +25,15 @@ class TestRandomSamplingClassesTransformer(TestCase):
                 proportion_classes = {0: 0.5, 1: 0.2, 2: 0.1, 3: 0.1, 4: 0.1}
             else:
                 self.fail()
-            transformer = RandomSamplingClassesTransformer(proportion_classes=proportion_classes)
+            transformer = RandomSamplingClassesGenerator(proportion_classes=proportion_classes)
 
-            Xt = transformer.fit_transform(X.copy(), y)
+            Xt, yt = transformer.generate(X.copy(), y)
             # assert arrays have same size
             self.assertEqual(Xt.shape[1], X.shape[1])
-            self.assertEqual(Xt.shape[0], len(transformer.transformed_labels_))
+            self.assertEqual(Xt.shape[0], len(yt))
+            # assert pandas DataFrame get the same columns before and after the call to generate function
+            if input_type in ['pandas_1D', 'pandas_2D']:
+                self.assertListEqual(list(X.columns), list(Xt.columns))
 
 
 class TestRandomSamplingFeaturesTransformer(TestCase):
@@ -38,21 +41,24 @@ class TestRandomSamplingFeaturesTransformer(TestCase):
         self.rng = default_rng(0)
         self.input_test_data = generate_test_data_with_classification_labels(rng=self.rng)
 
-    def test_all_transformers(self):
+    def test_generate(self):
         def proba_func(X):
             feature = X[:, 0]
             return normalize_proba(
                 (np.max(feature) - feature) / (np.max(feature) - np.min(feature))
             )
 
-        transformer = RandomSamplingFeaturesTransformer(sampling_proba_func=proba_func)
+        transformer = RandomSamplingFeaturesGenerator(sampling_proba_func=proba_func)
 
         for input_type, (X, y) in self.input_test_data.items():
             with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                Xt = transformer.transform(X.copy())
+                Xt, _ = transformer.generate(X.copy(), y)
                 # assert arrays have same size
                 self.assertEqual(Xt.shape[1], X.shape[1])
                 self.assertEqual(Xt.shape[0], X.shape[0])
+                # assert pandas DataFrame get the same columns before and after the call to generate function
+                if input_type in ['pandas_1D', 'pandas_2D']:
+                    self.assertListEqual(list(X.columns), list(Xt.columns))
 
 
 class TestRandomSamplingTargetsTransformer(TestCase):
@@ -60,20 +66,23 @@ class TestRandomSamplingTargetsTransformer(TestCase):
         self.rng = default_rng(0)
         self.input_test_data = generate_test_data_with_regression_targets(rng=self.rng)
 
-    def test_all_transformers(self):
+    def test_generate(self):
         def proba_func(y):
             return normalize_proba(
                 (np.max(y) - y) / (np.max(y) - np.min(y))
             )
 
-        transformer = RandomSamplingTargetsTransformer(sampling_proba_func=proba_func)
+        transformer = RandomSamplingTargetsGenerator(sampling_proba_func=proba_func)
 
         for input_type, (X, y) in self.input_test_data.items():
             with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                Xt = transformer.fit_transform(X.copy(), y)
+                Xt, _ = transformer.generate(X.copy(), y)
                 # assert arrays have same size
                 self.assertEqual(Xt.shape[1], X.shape[1])
                 self.assertEqual(Xt.shape[0], X.shape[0])
+                # assert pandas DataFrame get the same columns before and after the call to generate function
+                if input_type in ['pandas_1D', 'pandas_2D']:
+                    self.assertListEqual(list(X.columns), list(Xt.columns))
 
 
 if __name__ == '__main__':

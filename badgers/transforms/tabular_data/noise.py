@@ -3,8 +3,7 @@ import abc
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
-
-from core.base import GeneratorMixin
+from badgers.core.base import GeneratorMixin
 
 
 class NoiseTransformer(GeneratorMixin):

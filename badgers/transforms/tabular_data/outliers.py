@@ -7,8 +7,8 @@ from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from badgers.core.base import GeneratorMixin
 from badgers.core.utils import random_sign, random_spherical_coordinate
-from core.base import GeneratorMixin
 
 
 class OutliersTransformer(GeneratorMixin):
@@ -77,7 +77,7 @@ class ZScoreSampling(OutliersTransformer):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        return scaler.inverse_transform(outliers), None
+        return scaler.inverse_transform(outliers), y
 
 
 class HypersphereSampling(OutliersTransformer):
@@ -128,7 +128,7 @@ class HypersphereSampling(OutliersTransformer):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        return scaler.inverse_transform(outliers), None
+        return scaler.inverse_transform(outliers), y
 
 
 class HistogramSampling(OutliersTransformer):
@@ -198,7 +198,7 @@ class HistogramSampling(OutliersTransformer):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        return scaler.inverse_transform(outliers), None
+        return scaler.inverse_transform(outliers), y
 
 
 class DecompositionAndSamplingTransformer(GeneratorMixin):
@@ -244,4 +244,4 @@ class DecompositionAndSamplingTransformer(GeneratorMixin):
         # add outliers using the zscore_transformer
         Xt = self.outlier_transformer.transform(Xt)
         # inverse the manifold and standardization transformations
-        return pipeline.inverse_transform(Xt), None
+        return pipeline.inverse_transform(Xt), y

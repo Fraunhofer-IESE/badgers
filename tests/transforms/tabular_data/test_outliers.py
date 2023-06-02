@@ -26,10 +26,10 @@ class TestOutliersTransformer(TestCase):
             for input_type, X in self.input_test_data.items():
                 if X.shape[1] > 5 and transformer.__class__ is HistogramSampling:
                     with self.assertRaises(NotImplementedError):
-                        _ = transformer.transform(X.copy())
+                        _, _ = transformer.generate(X.copy(), y=None)
                 else:
                     with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                        outliers = transformer.transform(X.copy())
+                        outliers, _ = transformer.generate(X.copy(), y=None)
                         # assert number of outliers
                         self.assertEqual(outliers.shape[0], int(transformer.percentage_extreme_values * X.shape[0] / 100))
                         # assert shape
@@ -50,7 +50,7 @@ class TestZScoreTransformer(TestCase):
         # compute means and stds for checking z-score
         means = np.mean(X, axis=0)
         stds = np.std(X, axis=0)
-        outliers = self.transformer.transform(X.copy())
+        outliers, _ = self.transformer.generate(X.copy(), y=None)
         # assert z-score > 3
         for row in range(outliers.shape[0]):
             values = outliers[row, :]

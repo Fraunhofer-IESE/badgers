@@ -5,11 +5,12 @@ import numpy.random
 import pandas as pd
 from numpy.random import default_rng
 
+from badgers.core.base import GeneratorMixin
+from badgers.core.decorators import numpy_API
 from badgers.core.utils import normalize_proba
-from core.base import GeneratorMixin
 
 
-class MissingValueTransformer(GeneratorMixin):
+class MissingValueGenerator(GeneratorMixin):
     """
     Base class for missing values transformer
     """
@@ -26,11 +27,11 @@ class MissingValueTransformer(GeneratorMixin):
         self.missing_values_indices_ = None
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params):
+    def generate(self, X, y, **params):
         pass
 
 
-class MissingCompletelyAtRandom(MissingValueTransformer):
+class MissingCompletelyAtRandom(MissingValueGenerator):
 
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """ A transformer that removes values completely at random (MCAR [1]) (uniform distribution over all data).
@@ -42,6 +43,7 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
+    @numpy_API
     def generate(self, X, y, **params):
         """
         Computes indices of missing values using a uniform distribution.
@@ -62,7 +64,7 @@ class MissingCompletelyAtRandom(MissingValueTransformer):
         return X, y
 
 
-class DummyMissingAtRandom(MissingValueTransformer):
+class DummyMissingAtRandom(MissingValueGenerator):
     """
 
     """
@@ -75,6 +77,7 @@ class DummyMissingAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
+    @numpy_API
     def generate(self, X, y, **params):
         """
 
@@ -110,7 +113,7 @@ class DummyMissingAtRandom(MissingValueTransformer):
         return X, y
 
 
-class DummyMissingNotAtRandom(MissingValueTransformer):
+class DummyMissingNotAtRandom(MissingValueGenerator):
 
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """
@@ -120,6 +123,7 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
+    @numpy_API
     def generate(self, X, y, **params):
         """
 
@@ -127,8 +131,6 @@ class DummyMissingNotAtRandom(MissingValueTransformer):
         :return:
         """
 
-        if isinstance(X, pd.DataFrame):
-            X = X.to_numpy()
         # normalize values between 0 and 1
         p = (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
         # make the sum of each column = 1

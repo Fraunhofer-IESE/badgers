@@ -3,11 +3,12 @@ import abc
 import numpy as np
 from numpy.random import default_rng
 
+from badgers.core.base import GeneratorMixin
+from badgers.core.decorators import numpy_API
 from badgers.core.utils import normalize_proba
-from core.base import GeneratorMixin
 
 
-class ImbalanceTransformer(GeneratorMixin):
+class ImbalanceGenerator(GeneratorMixin):
     """
     Base class for transformers that makes tabular data imbalanced
     """
@@ -23,7 +24,7 @@ class ImbalanceTransformer(GeneratorMixin):
         pass
 
 
-class RandomSamplingFeaturesTransformer(ImbalanceTransformer):
+class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0), sampling_proba_func=lambda X: normalize_proba(X[:, 0])):
         """
@@ -34,6 +35,7 @@ class RandomSamplingFeaturesTransformer(ImbalanceTransformer):
         super().__init__(random_generator=random_generator)
         self.sampling_proba_func = sampling_proba_func
 
+    @numpy_API
     def generate(self, X, y=None, **params):
         """
         Randomly samples instances based on the features values in X
@@ -51,7 +53,7 @@ class RandomSamplingFeaturesTransformer(ImbalanceTransformer):
         return Xt, yt
 
 
-class RandomSamplingClassesTransformer(ImbalanceTransformer):
+class RandomSamplingClassesGenerator(ImbalanceGenerator):
     """
     Randomly samples data points within predefined classes
     """
@@ -67,6 +69,7 @@ class RandomSamplingClassesTransformer(ImbalanceTransformer):
         self.transformed_labels_ = None
         self.proportion_classes = proportion_classes
 
+    @numpy_API
     def generate(self, X, y, **params):
         """
         Randomly samples instances for each classes
@@ -91,7 +94,7 @@ class RandomSamplingClassesTransformer(ImbalanceTransformer):
         return Xt, yt
 
 
-class RandomSamplingTargetsTransformer(ImbalanceTransformer):
+class RandomSamplingTargetsGenerator(ImbalanceGenerator):
     """
     Randomly samples data points
     """
@@ -106,6 +109,7 @@ class RandomSamplingTargetsTransformer(ImbalanceTransformer):
         self.transformed_labels_ = None
         self.sampling_proba_func = sampling_proba_func
 
+    @numpy_API
     def generate(self, X, y, **params):
         """
         Randomly samples instances for each classes
@@ -118,7 +122,7 @@ class RandomSamplingTargetsTransformer(ImbalanceTransformer):
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_probabilities_, size=X.shape[0],
                                                      replace=True)
 
-        Xt = X[sampling_mask]
+        Xt = X[sampling_mask, :]
         yt = y[sampling_mask]
 
         return Xt, yt

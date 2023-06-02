@@ -4,7 +4,7 @@ from typing import Tuple
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
-from core.base import GeneratorMixin
+from badgers.core.base import GeneratorMixin
 
 
 class NoiseTransformer(GeneratorMixin):
@@ -20,7 +20,7 @@ class NoiseTransformer(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, y, **params) -> Tuple:
         pass
 
 
@@ -36,7 +36,7 @@ class GaussianNoiseTransformer(NoiseTransformer):
         super().__init__(random_generator=random_generator)
         self.signal_to_noise_ratio = signal_to_noise_ratio
 
-    def generate(self, X, y=None, **params):
+    def generate(self, X, y, **params):
         """
         Add Gaussian white noise to the data.
         The data is first standardized (each column has a mean = 0 and variance = 1).

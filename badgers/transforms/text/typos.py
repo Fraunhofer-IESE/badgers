@@ -1,9 +1,9 @@
 import abc
-from typing import List, Tuple
+from typing import Tuple
 
 from numpy.random import default_rng
 
-from core.base import GeneratorMixin
+from badgers.core.base import GeneratorMixin
 
 
 class TyposTransformer(GeneratorMixin):
@@ -20,7 +20,7 @@ class TyposTransformer(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, y, **params) -> Tuple:
         pass
 
 
@@ -42,7 +42,7 @@ class SwitchLettersTransformer(TyposTransformer):
         super().__init__(random_generator)
         self.switching_proba = switching_proba
 
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, y, **params) -> Tuple:
         """
         For each word with a length greater than 3, apply a single switch with probability `self.switching_proba`
         Where the switch happens is determined randomly

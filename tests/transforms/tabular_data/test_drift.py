@@ -3,7 +3,8 @@ from unittest import TestCase
 from numpy.random import default_rng
 
 from badgers.transforms.tabular_data.drift import DriftTransformer
-from tests.transforms.tabular_data import generate_test_data_with_classification_labels, generate_test_data_only_features
+from tests.transforms.tabular_data import generate_test_data_with_classification_labels, \
+    generate_test_data_only_features
 
 
 class TestDriftTransformer(TestCase):
@@ -24,7 +25,7 @@ class TestDriftTransformer(TestCase):
             transformer = cls()
             for input_type, X in self.input_data_without_labels.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                    Xt = transformer.transform(X.copy())
+                    Xt, _ = transformer.generate(X.copy(), None)
                     # assert arrays have same size
                     self.assertEqual(X.shape, Xt.shape)
 
@@ -32,6 +33,6 @@ class TestDriftTransformer(TestCase):
             transformer = cls()
             for input_type, (X, y) in self.input_data_with_labels.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                    Xt = transformer.fit_transform(X.copy(), y)
+                    Xt, yt = transformer.generate(X.copy(), y)
                     # assert arrays have same size
                     self.assertEqual(Xt.shape, X.shape)

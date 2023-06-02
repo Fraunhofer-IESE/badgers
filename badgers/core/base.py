@@ -5,7 +5,7 @@ from typing import Tuple
 class GeneratorMixin:
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, y, **params) -> Tuple:
         """
 
         :param X: the input
