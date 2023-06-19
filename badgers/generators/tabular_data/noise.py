@@ -1,10 +1,12 @@
+import abc
+
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils import check_array
+
+from badgers.core.base import GeneratorMixin
 
 
-class NoiseTransformer(TransformerMixin, BaseEstimator):
+class NoiseTransformer(GeneratorMixin):
     """
     Base class for transformers that add noise to tabular data
     """
@@ -16,20 +18,24 @@ class NoiseTransformer(TransformerMixin, BaseEstimator):
         """
         self.random_generator = random_generator
 
+    @abc.abstractmethod
+    def generate(self, X, y=None, **params):
+        pass
 
-class GaussianNoiseTransformer(NoiseTransformer):
-    def __init__(self, random_generator=default_rng(seed=0), signal_to_noise_ratio: float = 0.1):
+
+class GaussianNoiseGenerator(NoiseTransformer):
+    def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1):
         """
 
         :param random_generator: numpy.random.Generator, default default_rng(seed=0)
             A random generator
-        :param signal_to_noise_ratio: float, default 0.1
+        :param noise_std: float, default 0.1
             The standard deviation of the noise to be added
         """
         super().__init__(random_generator=random_generator)
-        self.signal_to_noise_ratio = signal_to_noise_ratio
+        self.signal_to_noise_ratio = noise_std
 
-    def transform(self, X):
+    def generate(self, X, y, **params):
         """
         Add Gaussian white noise to the data.
         The data is first standardized (each column has a mean = 0 and variance = 1).
@@ -39,9 +45,7 @@ class GaussianNoiseTransformer(NoiseTransformer):
         :param X:
         :return:
         """
-        X = check_array(X, accept_sparse=False)
-        self.n_features_in_ = X.shape[1]
-        #
+        # standardize data
         scaler = StandardScaler()
         # fit, transform
         scaler.fit(X)
@@ -49,4 +53,4 @@ class GaussianNoiseTransformer(NoiseTransformer):
         # add noise
         Xt = Xt + self.random_generator.normal(loc=0, scale=self.signal_to_noise_ratio, size=Xt.shape)
         # inverse pca
-        return scaler.inverse_transform(Xt)
+        return scaler.inverse_transform(Xt), y

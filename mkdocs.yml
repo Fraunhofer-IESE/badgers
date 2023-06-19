@@ -7,11 +7,13 @@ nav:
     -   About: about.md
     -   Changes: changelog.md
     -   Tutorials:
-            - Tabular Data:
-                -   Generating Imbalanced Data: tutorials/Imbalance-Tabular-Data.ipynb
-                -   Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
-                -   Generating Noise: tutorials/Noise-Tabular-Data.ipynb
-                -   Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
+            -   Tabular Data:
+                    -   Generating Imbalanced Data: tutorials/Imbalance-Tabular-Data.ipynb
+                    -   Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
+                    -   Generating Noise: tutorials/Noise-Tabular-Data.ipynb
+                    -   Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
+            -   Pipelines:
+                    -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
     -   API: reference/
 
 theme:

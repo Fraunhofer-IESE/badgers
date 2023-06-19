@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from numpy.random import default_rng
 
-from badgers.transforms.text.typos import SwitchLettersTransformer
+from badgers.generators.text.typos import SwitchLettersTransformer
 
 
 class TestSwitchLettersTransformer(unittest.TestCase):
@@ -27,17 +27,17 @@ class TestSwitchLettersTransformer(unittest.TestCase):
             'a'
         ]
 
-        X_transformed = trf.transform(deepcopy(X))
+        Xt, _ = trf.generate(deepcopy(X), None)
 
         for i in range(len(X)):
             if len(X[i]) > 3:
-                self.assertNotEqual(X_transformed[i], X[i])
-                self.assertEqual(X_transformed[i][0], X[i][0])
-                self.assertEqual(X_transformed[i][-1], X[i][-1])
-                self.assertEqual(len(X_transformed[i]), len(X[i]))
-                self.assertEqual(set(X_transformed[i]), set(X[i]))
+                self.assertNotEqual(Xt[i], X[i])
+                self.assertEqual(Xt[i][0], X[i][0])
+                self.assertEqual(Xt[i][-1], X[i][-1])
+                self.assertEqual(len(Xt[i]), len(X[i]))
+                self.assertEqual(set(Xt[i]), set(X[i]))
             else:
-                self.assertEqual(X_transformed[i], X[i])
+                self.assertEqual(Xt[i], X[i])
 
 
 if __name__ == '__main__':

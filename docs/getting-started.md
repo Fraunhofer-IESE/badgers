@@ -10,11 +10,11 @@ Import badgers as any other library and start using it:
 
 ```python
 from sklearn.datasets import make_blobs
-from badgers.transforms.tabular_data.noise import GaussianNoiseTransformer
+from badgers.generators.tabular_data.noise import GaussianNoiseGenerator
 
 X, y = make_blobs()
-trf = GaussianNoiseTransformer(noise_std=0.5)
-Xt = trf.transform(X)
+trf = GaussianNoiseGenerator(noise_std=0.5)
+Xt, yt = trf.generate(X, y)
 ```
 
 More examples are available in the [tutorials](../tutorials/Imbalance-Tabular-Data/) section.

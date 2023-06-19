@@ -1,10 +1,8 @@
 # Welcome to Badgers
 
-Badgers is a python library for generating bad data (more precisely to augment existing data with data quality deficits such as outliers, missing values, noise, etc.).
+[Badgers](https://github.com/Fraunhofer-IESE/badgers) is a python library for generating bad data - more precisely: to augment existing data with data quality deficits such as outliers, missing values, noise, etc.
 
-
-
-It is based upon the scikit-learn API. Most objects provided by badgers are transformers (i.e., they provide a `transform()` and/or a `fit_transform()` function) and should be compatible with any framework that supports or use the scikit-learn API.
+As a basic principle, [badgers](https://github.com/Fraunhofer-IESE/badgers) provide a set of objects (called generators) that follow a simple API: each generator provides a `generator(X,y)` function that takes as argument `X` (the input features) and `y` (the class labels, the regression target, or None) and returns the transformed `Xt` and `yt`.
 
 
 Why would you generate bad data? you might ask (and you should! isn't that honestly a strange idea?).

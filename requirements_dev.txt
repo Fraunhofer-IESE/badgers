@@ -8,3 +8,5 @@ mkdocs-gen-files
 mkdocs-material~=9.1.12
 mkdocs-literate-nav~=0.6.0
 mkdocs-jupyter~=0.24.1
+jupyterlab
+matplotlib

@@ -4,7 +4,7 @@ from unittest import TestCase
 import numpy as np
 from numpy.random import default_rng
 
-from badgers.transforms.tabular_data.noise import NoiseTransformer
+from badgers.generators.tabular_data.noise import NoiseTransformer
 from tests.transforms.tabular_data import generate_test_data_only_features
 
 
@@ -27,7 +27,7 @@ class TestNoiseTransformer(TestCase):
             transformer = cls()
             for input_type, X in self.input_test_data.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                    Xt = transformer.transform(X.copy())
+                    Xt, _ = transformer.generate(X.copy(), None)
                     # assert arrays have same size
                     self.assertEqual(X.shape, Xt.shape)
                     # assert variance is greater after the transformation

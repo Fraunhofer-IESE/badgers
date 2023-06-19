@@ -1,7 +1,6 @@
 from numpy.random import default_rng
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
 
 from badgers.core.utils import random_sign
 

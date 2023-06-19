@@ -1,15 +1,17 @@
 import abc
+from typing import Tuple
 
 import numpy
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
-from sklearn.utils.validation import check_is_fitted
+
+from core.base import GeneratorMixin
 
 
-class MissingNodesTransformer(TransformerMixin, BaseEstimator):
+class MissingNodesTransformer(GeneratorMixin):
     """
     Base class for missing nodes transformer
     """
+
     def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
         """
 
@@ -22,13 +24,6 @@ class MissingNodesTransformer(TransformerMixin, BaseEstimator):
         self.percentage_missing = percentage_missing
         self.random_generator = random_generator
 
-    def transform(self, X):
-        """
-
-        :param X: {array-like, sparse-matrix}, size (n_samples, n_features)
-            The input samples.
-        :return X_transformed: array, size (n_samples, n_features)
-            The array containing missing values.
-        """
-        check_is_fitted("missing_nodes_indices_")
-        raise NotImplementedError()
+    @abc.abstractmethod
+    def generate(self, X, y=None, **params) -> Tuple:
+        pass
