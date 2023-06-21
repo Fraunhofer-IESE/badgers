@@ -6,9 +6,9 @@ from sklearn.preprocessing import StandardScaler
 from badgers.core.base import GeneratorMixin
 
 
-class NoiseTransformer(GeneratorMixin):
+class NoiseGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for transformers that add noise to tabular X
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -23,7 +23,7 @@ class NoiseTransformer(GeneratorMixin):
         pass
 
 
-class GaussianNoiseGenerator(NoiseTransformer):
+class GaussianNoiseGenerator(NoiseGenerator):
     def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1):
         """
 
@@ -33,24 +33,26 @@ class GaussianNoiseGenerator(NoiseTransformer):
             The standard deviation of the noise to be added
         """
         super().__init__(random_generator=random_generator)
-        self.signal_to_noise_ratio = noise_std
+        self.noise_std = noise_std
 
     def generate(self, X, y, **params):
         """
-        Add Gaussian white noise to the data.
-        The data is first standardized (each column has a mean = 0 and variance = 1).
+        Add Gaussian white noise to the X.
+        The X is first standardized (each column has a mean = 0 and variance = 1).
         The noise is generated from a normal distribution with standard deviation = `noise_std`.
-        The noise is added to the data.
+        The noise is added to the X.
 
-        :param X:
-        :return:
+        :param X: the input
+        :param y: the target
+        :param params: optional parameters
+        :return: Xt, yt
         """
-        # standardize data
+        # standardize X
         scaler = StandardScaler()
         # fit, transform
         scaler.fit(X)
         Xt = scaler.transform(X)
         # add noise
-        Xt = Xt + self.random_generator.normal(loc=0, scale=self.signal_to_noise_ratio, size=Xt.shape)
+        Xt = Xt + self.random_generator.normal(loc=0, scale=self.noise_std, size=Xt.shape)
         # inverse pca
         return scaler.inverse_transform(Xt), y

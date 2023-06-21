@@ -5,9 +5,9 @@ from sklearn.utils import check_array
 from badgers.core.utils import random_sign
 
 
-class OutliersTransformer(TransformerMixin, BaseEstimator):
+class OutliersGenerator(TransformerMixin, BaseEstimator):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for transformers that add noise to tabular X
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -18,7 +18,7 @@ class OutliersTransformer(TransformerMixin, BaseEstimator):
         self.outliers_indices_ = None
 
 
-class LocalZScoreTransformer(OutliersTransformer):
+class LocalZScoreGenerator(OutliersGenerator):
     """
     Randomly generates extreme values
     """
@@ -29,7 +29,7 @@ class LocalZScoreTransformer(OutliersTransformer):
 
         :param random_generator: a random number generator
         :param percentage_extreme_values: the percentage of extreme values to generate
-        :param  local_window_size: the width (number of data points) of the local window to compute local Z-Score
+        :param  local_window_size: the width (number of X points) of the local window to compute local Z-Score
         """
         super().__init__(random_generator=random_generator)
         assert 0 <= percentage_extreme_values <= 100

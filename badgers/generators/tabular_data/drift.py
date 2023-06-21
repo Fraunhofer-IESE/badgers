@@ -9,7 +9,7 @@ from badgers.core.base import GeneratorMixin
 
 class DriftTransformer(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for transformers that add noise to tabular X
     """
 
     @abc.abstractmethod
@@ -51,7 +51,7 @@ class RandomShiftTransformer(DriftTransformer):
         :param params:
         :return:
         """
-        # normalize data
+        # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
@@ -87,7 +87,7 @@ class RandomShiftClassesTransformer(DriftTransformer):
         """
         # extract unique labels
         classes = np.unique(y)
-        # normalize data
+        # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)

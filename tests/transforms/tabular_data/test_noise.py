@@ -4,14 +4,14 @@ from unittest import TestCase
 import numpy as np
 from numpy.random import default_rng
 
-from badgers.generators.tabular_data.noise import NoiseTransformer
+from badgers.generators.tabular_data.noise import NoiseGenerator
 from tests.transforms.tabular_data import generate_test_data_only_features
 
 
 class TestNoiseTransformer(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.transformers_classes = NoiseTransformer.__subclasses__()
+        self.transformers_classes = NoiseGenerator.__subclasses__()
         self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def assertIncreaseVariance(self, X, Xt):

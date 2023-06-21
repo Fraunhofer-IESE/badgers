@@ -7,9 +7,9 @@ from sklearn.preprocessing import StandardScaler
 from badgers.core.base import GeneratorMixin
 
 
-class NoiseTransformer(GeneratorMixin):
+class NoiseGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for transformers that add noise to tabular X
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -24,7 +24,7 @@ class NoiseTransformer(GeneratorMixin):
         pass
 
 
-class GaussianNoiseTransformer(NoiseTransformer):
+class GaussianNoiseGenerator(NoiseGenerator):
     def __init__(self, random_generator=default_rng(seed=0), signal_to_noise_ratio: float = 0.1):
         """
 
@@ -38,10 +38,10 @@ class GaussianNoiseTransformer(NoiseTransformer):
 
     def generate(self, X, y, **params):
         """
-        Add Gaussian white noise to the data.
-        The data is first standardized (each column has a mean = 0 and variance = 1).
+        Add Gaussian white noise to the X.
+        The X is first standardized (each column has a mean = 0 and variance = 1).
         The noise is generated from a normal distribution with standard deviation = `noise_std`.
-        The noise is added to the data.
+        The noise is added to the X.
 
         :param X:
         :return:

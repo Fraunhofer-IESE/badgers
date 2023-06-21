@@ -1,3 +1,3 @@
 """
-Module containing all the transformers that accept image data as input
+Module containing all the transformers that accept image X as input
 """

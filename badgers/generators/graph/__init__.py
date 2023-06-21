@@ -1,3 +1,3 @@
 """
-Module containing all the transformers that accept graph data as input
+Module containing all the transformers that accept graph X as input
 """

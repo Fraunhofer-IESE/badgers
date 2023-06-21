@@ -28,6 +28,6 @@ dependencies = [
   "scikit-learn",
 ]
 [project.urls]
-"Homepage" = ""
-"Bug Tracker" = ""
+"Homepage" = "https://github.com/Fraunhofer-IESE/badgers"
+"Bug Tracker" = "https://github.com/Fraunhofer-IESE/badgers/issues"
 

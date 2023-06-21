@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from numpy.random import default_rng
 
-from badgers.generators.text.typos import SwitchLettersTransformer
+from badgers.generators.text.typos import SwapLettersGenerator
 
 
 class TestSwitchLettersTransformer(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestSwitchLettersTransformer(unittest.TestCase):
         For smaller words (length lower than or equal to 3):
         - no change occurs
         """
-        trf = SwitchLettersTransformer(random_generator=default_rng(0), switching_proba=1)
+        trf = SwapLettersGenerator(random_generator=default_rng(0), swap_proba=1)
         X = [
             'abcdef',
             'abcde',

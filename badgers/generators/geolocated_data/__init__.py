@@ -1,3 +1,3 @@
 """
-Module containing all the transformers that accept geolocated data as input
+Module containing all the transformers that accept geolocated X as input
 """
