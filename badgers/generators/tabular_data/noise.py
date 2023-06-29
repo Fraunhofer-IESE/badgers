@@ -37,10 +37,10 @@ class GaussianNoiseGenerator(NoiseGenerator):
 
     def generate(self, X, y, **params):
         """
-        Add Gaussian white noise to the X.
-        The X is first standardized (each column has a mean = 0 and variance = 1).
+        Add Gaussian white noise to te data.
+        te data is first standardized (each column has a mean = 0 and variance = 1).
         The noise is generated from a normal distribution with standard deviation = `noise_std`.
-        The noise is added to the X.
+        The noise is added to te data.
 
         :param X: the input
         :param y: the target
