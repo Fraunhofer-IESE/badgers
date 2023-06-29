@@ -45,7 +45,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         """
         Randomly generates outliers as data points with a z-score > 3.
 
-        1. Standardize the input X (mean = 0, variance = 1)
+        1. Standardize the input data (mean = 0, variance = 1)
         3. Generate outliers as follows:
             - the sign is randomly chosen
             - for each dimension: the value is equal to 3 + a random number following an exponential distribution function
@@ -97,7 +97,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         """
         Randomly generates outliers as data points with a z-score > 3.
 
-        1. Standardize the input X (mean = 0, variance = 1)
+        1. Standardize the input data (mean = 0, variance = 1)
         3. Generate outliers on a hypersphere (see https://en.wikipedia.org/wiki/N-sphere#Spherical_coordinates):
             - angles are chosen uniformly at random
             - radius is = 3 + a random number following an exponential distribution function with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
@@ -165,7 +165,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         """
         Randomly generates outliers from low density regions. Low density regions are estimated through histograms
 
-        1. Standardize the input X (mean = 0, variance = 1)
+        1. Standardize the input data (mean = 0, variance = 1)
         2. Compute and normalize histogram for te data
         3. Sample datapoint uniformly at random within bins of low density
         4. Inverse the standardization transformation
@@ -308,7 +308,7 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
         Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)
         and a outlier transformer.
 
-        1. Standardize the input X (mean = 0, variance = 1)
+        1. Standardize the input data (mean = 0, variance = 1)
         2. Apply the dimensionality reduction transformer
         3. Generates outliers by applying the outlier transformer
         4. Inverse the dimensionality reduction and the standardization transformations
