@@ -6,7 +6,7 @@ from numpy.random import default_rng
 from badgers.generators.text.typos import SwapLettersGenerator
 
 
-class TestSwitchLettersTransformer(unittest.TestCase):
+class TestSwapLettersGenerator(unittest.TestCase):
     def test_transform(self):
         """
         For all words with a length strictly greater than 3:

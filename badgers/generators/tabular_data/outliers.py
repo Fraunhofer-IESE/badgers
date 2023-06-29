@@ -1,10 +1,11 @@
 import abc
+import warnings
 
 import numpy as np
 import sklearn.base
 from numpy.random import default_rng
 from sklearn.decomposition import PCA
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import KernelDensity
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -12,49 +13,7 @@ from badgers.core.base import GeneratorMixin
 from badgers.core.utils import random_sign, random_spherical_coordinate
 
 
-def find_low_density_points(X, density_threshold_percentile=25,
-                            density_estimator=NearestNeighbors(n_neighbors=5)):
-    """
-    Finds the points belonging to low density regions in a given dataset.
-
-    :param X: The input dataset
-    :param density_threshold_percentile: The percentile value used as the density threshold.
-      Points with density scores below this threshold are considered as low density points.
-    :param density_estimator: The density estimation algorithm to use. Supported options are
-      'kdtree', 'balltree', 'dbscan', or 'gmm'. Default is 'kdtree'.
-    :return low_density_points: The low density points found in the dataset.
-
-    :raises ValueError: If an invalid density_estimator is provided.
-
-    Example usage:
-    >>> X = np.array([[1, 2], [3, 4], [5, 6]])
-    >>> low_density_points = find_low_density_points(X, density_threshold_percentile=20, n_neighbors=3)
-
-    """
-    # fit the density estimator
-    density_estimator.fit(X)
-
-    # get density approximations for all data points
-    if hasattr(density_estimator, 'score_samples'):
-        density_scores = density_estimator.score_samples(X)
-    elif hasattr(density_estimator, 'kneighbors'):
-        _, density_scores = density_estimator.kneighbors(X)
-        density_scores = np.mean(density_scores, axis=1)
-    else:
-        raise ValueError(
-            "Invalid density_estimator. It should either have a score_samples() or a kneighbors() function")
-
-    # compute a low density threshold
-    threshold = np.percentile(density_scores, density_threshold_percentile)
-
-    # filter low density data points
-    low_density_indices = np.where(density_scores < threshold)[0]
-    low_density_points = X[low_density_indices]
-
-    return low_density_points
-
-
-class OutliersTransformer(GeneratorMixin):
+class OutliersGenerator(GeneratorMixin):
     """
     Base class for transformers that add outliers to tabular X
     """
@@ -74,7 +33,7 @@ class OutliersTransformer(GeneratorMixin):
         pass
 
 
-class ZScoreSamplingGenerator(OutliersTransformer):
+class ZScoreSamplingGenerator(OutliersGenerator):
     """
     Randomly generates outliers as X points with a z-score > 3.
     """
@@ -126,7 +85,7 @@ class ZScoreSamplingGenerator(OutliersTransformer):
         return scaler.inverse_transform(outliers), yt
 
 
-class HypersphereSamplingGenerator(OutliersTransformer):
+class HypersphereSamplingGenerator(OutliersGenerator):
     """
     Generates outliers by sampling points from a hypersphere with radius at least 3 sigma
     """
@@ -180,7 +139,7 @@ class HypersphereSamplingGenerator(OutliersTransformer):
         return scaler.inverse_transform(outliers), yt
 
 
-class HistogramSamplingGenerator(OutliersTransformer):
+class HistogramSamplingGenerator(OutliersGenerator):
     """
     Randomly generates outliers from low density regions. Low density regions are estimated through histograms
 
@@ -215,7 +174,7 @@ class HistogramSamplingGenerator(OutliersTransformer):
         :return:
         """
         if X.shape[1] > 5:
-            raise NotImplementedError('So far this transformer only supports tabular X with at most 5 columns')
+            raise NotImplementedError('So far this generator only supports tabular X with at most 5 columns')
         # standardize X
         scaler = StandardScaler()
         # fit, transform
@@ -253,14 +212,83 @@ class HistogramSamplingGenerator(OutliersTransformer):
         return scaler.inverse_transform(outliers), yt
 
 
+class LowDensitySamplingGenerator(OutliersGenerator):
+
+    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
+        super().__init__(random_generator=random_generator, percentage_outliers=percentage_outliers)
+        self.density_estimator = KernelDensity(bandwidth="scott")
+
+    def generate(self, X, y=None, **params):
+        """
+        Generate data points belonging to low density regions.
+
+        Pseudo code:
+        - Standardize the data X
+        - Estimate the density based upon the original data X
+        - Computes a threshold for determining low density (so far 10th percentile)
+        - Sample uniformly at random within the hypercube [min, max]
+        - Estimate the density of the new points and filter out the ones with a density that is above the threshold
+
+        :param X: the input features
+        :param y: not used
+        :param params:
+        :return:
+        """
+        # standardize X
+        scaler = StandardScaler()
+        # fit, transform
+        scaler.fit(X)
+        Xt = scaler.transform(X)
+        # fit density estimator
+        self.density_estimator = self.density_estimator.fit(Xt)
+        low_density_threshold = np.percentile(self.density_estimator.score_samples(Xt), 0.1)
+
+        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
+
+        if params.get('max_samples') is not None:
+            max_samples = params['max_samples']
+        else:
+            max_samples = n_outliers * 100
+
+        outliers = np.array([
+            x
+            for x in self.random_generator.uniform(
+                low=np.min(Xt, axis=0),
+                high=np.max(Xt, axis=0),
+                size=(max_samples, Xt.shape[1])
+            )
+            if self.density_estimator.score_samples(x.reshape(1, -1)) <= low_density_threshold
+        ])
+
+        if outliers.shape[0] < n_outliers:
+            warnings.warn(
+                f'LowDensitySamplingGenerator could not generate all {n_outliers} outliers. It only generated {len(outliers)}.')
+        else:
+            outliers = outliers[:n_outliers]
+
+        # in case we only have 1 outlier, reshape the array to match sklearn convention
+        if outliers.shape[0] == 1:
+            outliers = outliers.reshape(1, -1)
+
+        # add "outliers" as labels for outliers
+        yt = np.array(["outliers"] * len(outliers))
+
+        # in the case no outliers could be generated
+        if outliers.shape[0] == 0:
+            return outliers, yt
+
+        return scaler.inverse_transform(outliers), yt
+
+
 class DecompositionAndOutlierGenerator(GeneratorMixin):
 
     def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
-                 outlier_transformer: OutliersTransformer = ZScoreSamplingGenerator(default_rng(0), percentage_outliers=10)):
+                 outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0),
+                                                                                percentage_outliers=10)):
         """
 
         :param decomposition_transformer: The dimensionality reduction transformer to be used before the outlier transformer
-        :param outlier_transformer: The outlier transformer to be used after the dimensionality has been reduced
+        :param outlier_generator: The outlier transformer to be used after the dimensionality has been reduced
         """
         assert hasattr(
             decomposition_transformer,
@@ -269,7 +297,7 @@ class DecompositionAndOutlierGenerator(GeneratorMixin):
             f'\nUnfortunately the class {decomposition_transformer} does not'
 
         self.decomposition_transformer = decomposition_transformer
-        self.outlier_generator = outlier_transformer
+        self.outlier_generator = outlier_generator
 
     def generate(self, X, y=None, **params):
         """
@@ -295,46 +323,3 @@ class DecompositionAndOutlierGenerator(GeneratorMixin):
         Xt, _ = self.outlier_generator.generate(Xt, y)
         # inverse the manifold and standardization transformations
         return pipeline.inverse_transform(Xt), y
-
-
-class Foo(OutliersTransformer):
-
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10,
-                 density_estimator=NearestNeighbors(n_neighbors=5)):
-        super().__init__(random_generator=random_generator, percentage_outliers=percentage_outliers)
-        self.density_estimator = density_estimator
-
-    def generate(self, X, y=None, **params):
-        # standardize X
-        scaler = StandardScaler()
-        # fit, transform
-        scaler.fit(X)
-        Xt = scaler.transform(X)
-        # fit nearest neighbors
-        nbrs = NearestNeighbors(n_neighbors=5)
-        nbrs.fit(Xt)
-        # find data points that belong to low density regions
-        low_density_points = find_low_density_points(Xt, density_threshold_percentile=5,
-                                                     density_estimator=self.density_estimator)
-        # compute the distances to the nearest neighbors
-        distances, _ = nbrs.kneighbors(low_density_points)
-
-        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
-
-        outliers = np.array([
-            low_density_points[idx] + random_spherical_coordinate(
-                random_generator=self.random_generator,
-                size=X.shape[1],
-                radius=self.random_generator.uniform(0, np.mean(distances[idx]))
-            )
-            for idx in self.random_generator.choice(len(low_density_points), n_outliers, replace=True)
-        ])
-
-        # in case we only have 1 outlier, reshape the array to match sklearn convention
-        if outliers.shape[0] == 1:
-            outliers = outliers.reshape(1, -1)
-
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
-
-        return scaler.inverse_transform(outliers), yt

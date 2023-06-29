@@ -7,7 +7,7 @@ from numpy.random import default_rng
 from badgers.core.base import GeneratorMixin
 
 
-class MissingNodesTransformer(GeneratorMixin):
+class MissingNodesGenerator(GeneratorMixin):
     """
     Base class for missing nodes transformer
     """
