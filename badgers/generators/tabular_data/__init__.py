@@ -1,3 +1,3 @@
 """
-Module containing all the transformers that accept tabular X as input
+Module containing all the transformers that accept tabular data as input
 """
