@@ -36,7 +36,7 @@ class LocalZScoreGenerator(OutliersGenerator):
 
         :param random_generator: a random number generator
         :param percentage_extreme_values: the percentage of extreme values to generate
-        :param  local_window_size: the width (number of X points) of the local window to compute local Z-Score
+        :param  local_window_size: the width (number of data points) of the local window to compute local Z-Score
         """
         super().__init__(random_generator=random_generator)
         assert 0 <= percentage_extreme_values <= 100

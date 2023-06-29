@@ -55,7 +55,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
 
 class RandomSamplingClassesGenerator(ImbalanceGenerator):
     """
-    Randomly samples X points within predefined classes
+    Randomly samples data points within predefined classes
     """
 
     def __init__(self, random_generator=default_rng(seed=0), proportion_classes: dict = None):
@@ -96,7 +96,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
 
 class RandomSamplingTargetsGenerator(ImbalanceGenerator):
     """
-    Randomly samples X points
+    Randomly samples data points
     """
 
     def __init__(self, random_generator=default_rng(seed=0), sampling_proba_func=lambda y: normalize_proba(y)):

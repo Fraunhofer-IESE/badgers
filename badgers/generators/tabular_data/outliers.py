@@ -35,7 +35,7 @@ class OutliersGenerator(GeneratorMixin):
 
 class ZScoreSamplingGenerator(OutliersGenerator):
     """
-    Randomly generates outliers as X points with a z-score > 3.
+    Randomly generates outliers as data points with a z-score > 3.
     """
 
     def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
@@ -43,7 +43,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
 
     def generate(self, X, y=None, **params):
         """
-        Randomly generates outliers as X points with a z-score > 3.
+        Randomly generates outliers as data points with a z-score > 3.
 
         1. Standardize the input X (mean = 0, variance = 1)
         3. Generate outliers as follows:
@@ -95,7 +95,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
 
     def generate(self, X, y=None, **params):
         """
-        Randomly generates outliers as X points with a z-score > 3.
+        Randomly generates outliers as data points with a z-score > 3.
 
         1. Standardize the input X (mean = 0, variance = 1)
         3. Generate outliers on a hypersphere (see https://en.wikipedia.org/wiki/N-sphere#Spherical_coordinates):

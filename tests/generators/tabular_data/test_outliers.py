@@ -38,7 +38,7 @@ class TestZScoreSamplingGenerator(TestOutliersGenerator):
 
     def assert_zscore_larger_than_3(self, X, outliers):
         """
-        Asserts that, at least in one dimension, the zscore of the generated outliers X points is greater than 3
+        Asserts that, at least in one dimension, the zscore of the generated outliers data points is greater than 3
         """
         # compute means and stds for checking z-score
         means = np.mean(X, axis=0)
