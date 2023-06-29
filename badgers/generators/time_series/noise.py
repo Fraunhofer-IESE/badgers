@@ -9,7 +9,7 @@ from badgers.core.base import GeneratorMixin
 
 class NoiseGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular X
+    Base class for transformers that add noise to tabular data
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):

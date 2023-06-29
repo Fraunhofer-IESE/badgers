@@ -15,7 +15,7 @@ from badgers.core.utils import random_sign, random_spherical_coordinate
 
 class OutliersGenerator(GeneratorMixin):
     """
-    Base class for transformers that add outliers to tabular X
+    Base class for transformers that add outliers to tabular data
     """
 
     def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
@@ -174,7 +174,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         :return:
         """
         if X.shape[1] > 5:
-            raise NotImplementedError('So far this generator only supports tabular X with at most 5 columns')
+            raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns')
         # standardize X
         scaler = StandardScaler()
         # fit, transform

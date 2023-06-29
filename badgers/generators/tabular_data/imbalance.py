@@ -10,7 +10,7 @@ from badgers.core.utils import normalize_proba
 
 class ImbalanceGenerator(GeneratorMixin):
     """
-    Base class for transformers that makes tabular X imbalanced
+    Base class for transformers that makes tabular data imbalanced
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):

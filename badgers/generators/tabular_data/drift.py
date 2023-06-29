@@ -9,7 +9,7 @@ from badgers.core.base import GeneratorMixin
 
 class DriftGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular X
+    Base class for transformers that add noise to tabular data
     """
 
     @abc.abstractmethod

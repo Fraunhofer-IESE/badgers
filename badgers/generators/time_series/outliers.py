@@ -10,7 +10,7 @@ from badgers.core.utils import random_sign
 
 class OutliersGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular X
+    Base class for transformers that add noise to tabular data
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
