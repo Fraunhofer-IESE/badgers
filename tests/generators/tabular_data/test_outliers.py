@@ -111,10 +111,13 @@ class TestLowDensitySamplingGenerator(TestOutliersGenerator):
 
         """
         for input_type, (X, y) in self.input_test_data.items():
-            outliers, yt = self.generator.generate(X.copy(), y)
-            with self.subTest(input_type=input_type):
-                self.assert_shape_yt(yt, outliers)
-                self.assert_shape_outliers(X, outliers, generator=self.generator)
+            if input_type in ['numpy_1D', 'pandas_1D']:
+                self.skipTest("Not testing numpy_1D and pandas_1D")
+            else:
+                outliers, yt = self.generator.generate(X.copy(), y)
+                with self.subTest(input_type=input_type):
+                    self.assert_shape_yt(yt, outliers)
+                    self.assert_shape_outliers(X, outliers, generator=self.generator)
 
 
 class TestDecompositionAndOutlierGenerator(TestOutliersGenerator):

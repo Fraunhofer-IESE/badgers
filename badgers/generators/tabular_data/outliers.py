@@ -280,7 +280,7 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         return scaler.inverse_transform(outliers), yt
 
 
-class DecompositionAndOutlierGenerator(GeneratorMixin):
+class DecompositionAndOutlierGenerator(OutliersGenerator):
 
     def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
                  outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0),
@@ -295,6 +295,10 @@ class DecompositionAndOutlierGenerator(GeneratorMixin):
             'inverse_transform'), \
             f'the decomposition transformer class must implement the inverse_transform function.' \
             f'\nUnfortunately the class {decomposition_transformer} does not'
+        super().__init__(
+            random_generator=outlier_generator.random_generator,
+            percentage_outliers=outlier_generator.percentage_outliers
+        )
 
         self.decomposition_transformer = decomposition_transformer
         self.outlier_generator = outlier_generator
@@ -320,6 +324,6 @@ class DecompositionAndOutlierGenerator(GeneratorMixin):
         )
         Xt = pipeline.fit_transform(X)
         # add outliers using the zscore_transformer
-        Xt, _ = self.outlier_generator.generate(Xt, y)
+        Xt, yt = self.outlier_generator.generate(Xt, y)
         # inverse the manifold and standardization transformations
-        return pipeline.inverse_transform(Xt), y
+        return pipeline.inverse_transform(Xt), yt
