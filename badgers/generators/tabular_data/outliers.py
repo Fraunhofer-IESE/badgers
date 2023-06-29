@@ -143,7 +143,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
     """
     Randomly generates outliers from low density regions. Low density regions are estimated through histograms
 
-    Should only be used with low dimensionality X!
+    Should only be used with low dimensionality data!
     It will raise an error if the number of dimensions is greater than 5
     """
 
@@ -166,7 +166,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         Randomly generates outliers from low density regions. Low density regions are estimated through histograms
 
         1. Standardize the input data (mean = 0, variance = 1)
-        2. Compute and normalize histogram for te data
+        2. Compute and normalize histogram for the data
         3. Sample datapoint uniformly at random within bins of low density
         4. Inverse the standardization transformation
 
@@ -184,7 +184,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         # compute number of outliers
         n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
 
-        # compute the histogram of te data
+        # compute the histogram of the data
         hist, edges = np.histogramdd(Xt, density=False, bins=self.bins)
         # normalize
         norm_hist = hist / (np.max(hist) - np.min(hist))
@@ -317,7 +317,7 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
         :return:
         """
 
-        # standardize te data and apply the dimensionality reduction transformer
+        # standardize the data and apply the dimensionality reduction transformer
         pipeline = make_pipeline(
             StandardScaler(),
             self.decomposition_transformer,

@@ -34,7 +34,7 @@ class MissingValueGenerator(GeneratorMixin):
 class MissingCompletelyAtRandom(MissingValueGenerator):
 
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
-        """ A transformer that removes values completely at random (MCAR [1]) (uniform distribution over all X).
+        """ A transformer that removes values completely at random (MCAR [1]) (uniform distribution over all data).
 
         See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
 
