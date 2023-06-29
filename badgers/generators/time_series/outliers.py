@@ -1,11 +1,14 @@
+import abc
+from typing import Tuple
+
 from numpy.random import default_rng
-from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils import check_array
 
+from badgers.core.base import GeneratorMixin
 from badgers.core.utils import random_sign
 
 
-class OutliersTransformer(TransformerMixin, BaseEstimator):
+class OutliersGenerator(GeneratorMixin):
     """
     Base class for transformers that add noise to tabular data
     """
@@ -17,8 +20,12 @@ class OutliersTransformer(TransformerMixin, BaseEstimator):
         self.random_generator = random_generator
         self.outliers_indices_ = None
 
+    @abc.abstractmethod
+    def generate(self, X, y, **params) -> Tuple:
+        pass
 
-class LocalZScoreTransformer(OutliersTransformer):
+
+class LocalZScoreGenerator(OutliersGenerator):
     """
     Randomly generates extreme values
     """
@@ -36,7 +43,7 @@ class LocalZScoreTransformer(OutliersTransformer):
         self.percentage_extreme_values = percentage_extreme_values
         self.local_window_size = local_window_size
 
-    def transform(self, X):
+    def generate(self, X, y, **params):
         """
         Computes indices of extreme values using a uniform distribution.
         Computes the absolute values uniformly at random between mean(X) + 3 sigma(X) and mean(X) + 5 sigma(X).
@@ -45,8 +52,6 @@ class LocalZScoreTransformer(OutliersTransformer):
         :param X:
         :return: the transformed array
         """
-        X = check_array(X, accept_sparse=False)
-
         # compute number of extreme values per column
         nb_extreme_values = int(X.shape[0] * self.percentage_extreme_values / 100)
         # generate extreme values indices and values
@@ -65,4 +70,4 @@ class LocalZScoreTransformer(OutliersTransformer):
                 # updating with new outliers
                 X[row, col] = value
 
-        return self
+        return X, y

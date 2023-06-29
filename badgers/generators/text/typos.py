@@ -6,7 +6,7 @@ from numpy.random import default_rng
 from badgers.core.base import GeneratorMixin
 
 
-class TyposTransformer(GeneratorMixin):
+class TyposGenerator(GeneratorMixin):
     """
     Base class for transformers creating typos in a list of words
     """
@@ -24,31 +24,28 @@ class TyposTransformer(GeneratorMixin):
         pass
 
 
-class SwitchLettersTransformer(TyposTransformer):
+class SwapLettersGenerator(TyposGenerator):
     """
-    Switch adjacent letters in words randomly except for the first and the last letters.
+    Swap adjacent letters in words randomly except for the first and the last letters.
     Example: 'kilogram' --> 'kilogarm'
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), switching_proba=0.1):
+    def __init__(self, random_generator=default_rng(seed=0), swap_proba=0.1):
         """
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
-        :param switching_proba: float (between 0 and 1), default = 0.1
-            Each word with a length greater than 3 will have this probability to contain a switch (max one per word)
+        :param random_generator: A random generator
+        :param swap_proba: Each word with a length greater than 3 will have this probability to contain a switch (max one per word)
 
         """
         super().__init__(random_generator)
-        self.switching_proba = switching_proba
+        self.switching_proba = swap_proba
 
     def generate(self, X, y, **params) -> Tuple:
         """
-        For each word with a length greater than 3, apply a single switch with probability `self.switching_proba`
-        Where the switch happens is determined randomly
+        For each word with a length greater than 3, apply a single swap with probability `self.swap_proba`
+        Where the swap happens is determined randomly
 
-        :param X: list of words (str)
-            A list of words where we apply typos
+        :param X: A list of words where we apply typos
         :return: the transformed list of words
         """
         for i in range(len(X)):

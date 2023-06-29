@@ -7,11 +7,11 @@ from numpy.random import default_rng
 from badgers.core.utils import normalize_proba
 from badgers.generators.tabular_data.imbalance import RandomSamplingFeaturesGenerator, \
     RandomSamplingClassesGenerator, RandomSamplingTargetsGenerator
-from tests.transforms.tabular_data import generate_test_data_with_classification_labels, \
+from tests.generators.tabular_data import generate_test_data_with_classification_labels, \
     generate_test_data_with_regression_targets
 
 
-class TestRandomSamplingClassesTransformer(TestCase):
+class TestRandomSamplingClassesGenerator(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
         self.input_test_data = generate_test_data_with_classification_labels(rng=self.rng)
@@ -36,7 +36,7 @@ class TestRandomSamplingClassesTransformer(TestCase):
                 self.assertListEqual(list(X.columns), list(Xt.columns))
 
 
-class TestRandomSamplingFeaturesTransformer(TestCase):
+class TestRandomSamplingFeaturesGenerator(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
         self.input_test_data = generate_test_data_with_classification_labels(rng=self.rng)
@@ -61,7 +61,7 @@ class TestRandomSamplingFeaturesTransformer(TestCase):
                     self.assertListEqual(list(X.columns), list(Xt.columns))
 
 
-class TestRandomSamplingTargetsTransformer(TestCase):
+class TestRandomSamplingTargetsGenerator(TestCase):
     def setUp(self) -> None:
         self.rng = default_rng(0)
         self.input_test_data = generate_test_data_with_regression_targets(rng=self.rng)

@@ -30,7 +30,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         """
 
         :param random_generator: A random generator
-        :param sampling_proba_func: A function that takes as input X and returns a sampling probability
+        :param sampling_proba_func: A function that takes as input data and returns a sampling probability
         """
         super().__init__(random_generator=random_generator)
         self.sampling_proba_func = sampling_proba_func

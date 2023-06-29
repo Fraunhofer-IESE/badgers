@@ -11,16 +11,18 @@ def generate_test_data_only_features(rng: numpy.random.Generator = default_rng(0
     :return:
     """
     return {
-        'numpy_1D': rng.normal(size=10).reshape(-1, 1),
-        'numpy_2D': rng.normal(size=(100, 10)),
-        'pandas_1D': pd.DataFrame(
-            data=rng.normal(size=10).reshape(-1, 1),
-            columns=['col']
-        ),
-        'pandas_2D': pd.DataFrame(
-            data=rng.normal(size=(100, 10)),
-            columns=[f'col{i}' for i in range(10)]
-        )
+        'numpy_1D': (rng.normal(size=10).reshape(-1, 1), None),
+        'numpy_2D': (rng.normal(size=(100, 10)), None),
+        'pandas_1D': (
+            pd.DataFrame(
+                data=rng.normal(size=10).reshape(-1, 1),
+                columns=['col']
+            ), None),
+        'pandas_2D': (
+            pd.DataFrame(
+                data=rng.normal(size=(100, 10)),
+                columns=[f'col{i}' for i in range(10)]
+            ), None),
     }
 
 

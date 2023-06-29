@@ -14,11 +14,11 @@ maintainers = [
 ]
 description = "Badgers: bad data generators"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 license = {file = "LICENSE"}
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
     "Development Status :: 1 - Planning",
 ]
@@ -28,6 +28,6 @@ dependencies = [
   "scikit-learn",
 ]
 [project.urls]
-"Homepage" = ""
-"Bug Tracker" = ""
+"Homepage" = "https://github.com/Fraunhofer-IESE/badgers"
+"Bug Tracker" = "https://github.com/Fraunhofer-IESE/badgers/issues"
 

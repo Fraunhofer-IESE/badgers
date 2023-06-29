@@ -1,9 +1,11 @@
 import abc
+import warnings
 
 import numpy as np
 import sklearn.base
 from numpy.random import default_rng
 from sklearn.decomposition import PCA
+from sklearn.neighbors import KernelDensity
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -11,7 +13,7 @@ from badgers.core.base import GeneratorMixin
 from badgers.core.utils import random_sign, random_spherical_coordinate
 
 
-class OutliersTransformer(GeneratorMixin):
+class OutliersGenerator(GeneratorMixin):
     """
     Base class for transformers that add outliers to tabular data
     """
@@ -24,14 +26,14 @@ class OutliersTransformer(GeneratorMixin):
         assert 0 <= percentage_outliers <= 100
 
         self.random_generator = random_generator
-        self.percentage_extreme_values = percentage_outliers
+        self.percentage_outliers = percentage_outliers
 
     @abc.abstractmethod
     def generate(self, X, y=None, **params):
         pass
 
 
-class ZScoreSampling(OutliersTransformer):
+class ZScoreSamplingGenerator(OutliersGenerator):
     """
     Randomly generates outliers as data points with a z-score > 3.
     """
@@ -56,7 +58,7 @@ class ZScoreSampling(OutliersTransformer):
         :return:
         """
 
-        # standardize data
+        # standardize X
         scaler = StandardScaler()
 
         # fit, transform
@@ -64,7 +66,7 @@ class ZScoreSampling(OutliersTransformer):
         Xt = scaler.transform(X)
 
         # compute number of outliers
-        n_outliers = int(Xt.shape[0] * self.percentage_extreme_values / 100)
+        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
 
         # generate outliers
         outliers = np.array([
@@ -77,10 +79,13 @@ class ZScoreSampling(OutliersTransformer):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        return scaler.inverse_transform(outliers), y
+        # add "outliers" as labels for outliers
+        yt = np.array(["outliers"] * len(outliers))
+
+        return scaler.inverse_transform(outliers), yt
 
 
-class HypersphereSampling(OutliersTransformer):
+class HypersphereSamplingGenerator(OutliersGenerator):
     """
     Generates outliers by sampling points from a hypersphere with radius at least 3 sigma
     """
@@ -104,7 +109,7 @@ class HypersphereSampling(OutliersTransformer):
         :return:
         """
 
-        # standardize data
+        # standardize X
         scaler = StandardScaler()
 
         # fit, transform
@@ -112,7 +117,7 @@ class HypersphereSampling(OutliersTransformer):
         Xt = scaler.transform(X)
 
         # compute number of outliers
-        n_outliers = int(Xt.shape[0] * self.percentage_extreme_values / 100)
+        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
 
         # computing outliers
         outliers = np.array([
@@ -124,14 +129,17 @@ class HypersphereSampling(OutliersTransformer):
             for _ in range(n_outliers)
         ])
 
-        # in case we only have 1 outlier, rehspe the array to match sklearn convention
+        # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        return scaler.inverse_transform(outliers), y
+        # add "outliers" as labels for outliers
+        yt = np.array(["outliers"] * len(outliers))
+
+        return scaler.inverse_transform(outliers), yt
 
 
-class HistogramSampling(OutliersTransformer):
+class HistogramSamplingGenerator(OutliersGenerator):
     """
     Randomly generates outliers from low density regions. Low density regions are estimated through histograms
 
@@ -166,15 +174,15 @@ class HistogramSampling(OutliersTransformer):
         :return:
         """
         if X.shape[1] > 5:
-            raise NotImplementedError('So far this transformer only supports tabular data with at most 5 columns')
-        # standardize data
+            raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns')
+        # standardize X
         scaler = StandardScaler()
         # fit, transform
         scaler.fit(X)
         Xt = scaler.transform(X)
 
         # compute number of outliers
-        n_outliers = int(Xt.shape[0] * self.percentage_extreme_values / 100)
+        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
 
         # compute the histogram of the data
         hist, edges = np.histogramdd(Xt, density=False, bins=self.bins)
@@ -194,32 +202,106 @@ class HistogramSampling(OutliersTransformer):
             for h_coords in hist_coords_random
         ])
 
-        # in case we only have 1 outlier, rehspe the array to match sklearn convention
+        # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        return scaler.inverse_transform(outliers), y
+        # add "outliers" as labels for outliers
+        yt = np.array(["outliers"] * len(outliers))
+
+        return scaler.inverse_transform(outliers), yt
 
 
-class DecompositionAndSamplingTransformer(GeneratorMixin):
+class LowDensitySamplingGenerator(OutliersGenerator):
+
+    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
+        super().__init__(random_generator=random_generator, percentage_outliers=percentage_outliers)
+        self.density_estimator = KernelDensity(bandwidth="scott")
+
+    def generate(self, X, y=None, **params):
+        """
+        Generate data points belonging to low density regions.
+
+        Pseudo code:
+        - Standardize the data X
+        - Estimate the density based upon the original data X
+        - Computes a threshold for determining low density (so far 10th percentile)
+        - Sample uniformly at random within the hypercube [min, max]
+        - Estimate the density of the new points and filter out the ones with a density that is above the threshold
+
+        :param X: the input features
+        :param y: not used
+        :param params:
+        :return:
+        """
+        # standardize X
+        scaler = StandardScaler()
+        # fit, transform
+        scaler.fit(X)
+        Xt = scaler.transform(X)
+        # fit density estimator
+        self.density_estimator = self.density_estimator.fit(Xt)
+        low_density_threshold = np.percentile(self.density_estimator.score_samples(Xt), 0.1)
+
+        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
+
+        if params.get('max_samples') is not None:
+            max_samples = params['max_samples']
+        else:
+            max_samples = n_outliers * 100
+
+        outliers = np.array([
+            x
+            for x in self.random_generator.uniform(
+                low=np.min(Xt, axis=0),
+                high=np.max(Xt, axis=0),
+                size=(max_samples, Xt.shape[1])
+            )
+            if self.density_estimator.score_samples(x.reshape(1, -1)) <= low_density_threshold
+        ])
+
+        if outliers.shape[0] < n_outliers:
+            warnings.warn(
+                f'LowDensitySamplingGenerator could not generate all {n_outliers} outliers. It only generated {len(outliers)}.')
+        else:
+            outliers = outliers[:n_outliers]
+
+        # in case we only have 1 outlier, reshape the array to match sklearn convention
+        if outliers.shape[0] == 1:
+            outliers = outliers.reshape(1, -1)
+
+        # add "outliers" as labels for outliers
+        yt = np.array(["outliers"] * len(outliers))
+
+        # in the case no outliers could be generated
+        if outliers.shape[0] == 0:
+            return outliers, yt
+
+        return scaler.inverse_transform(outliers), yt
+
+
+class DecompositionAndOutlierGenerator(OutliersGenerator):
 
     def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
-                 outlier_transformer: OutliersTransformer = ZScoreSampling(default_rng(0), percentage_outliers=10)):
+                 outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0),
+                                                                                percentage_outliers=10)):
         """
 
         :param decomposition_transformer: The dimensionality reduction transformer to be used before the outlier transformer
-        :param outlier_transformer: The outlier transformer to be used after the dimensionality has been reduced
+        :param outlier_generator: The outlier transformer to be used after the dimensionality has been reduced
         """
         assert hasattr(
             decomposition_transformer,
             'inverse_transform'), \
             f'the decomposition transformer class must implement the inverse_transform function.' \
             f'\nUnfortunately the class {decomposition_transformer} does not'
+        super().__init__(
+            random_generator=outlier_generator.random_generator,
+            percentage_outliers=outlier_generator.percentage_outliers
+        )
 
         self.decomposition_transformer = decomposition_transformer
-        if hasattr(self.decomposition_transformer, 'fit_inverse_transform'):
-            setattr(self.decomposition_transformer, 'fit_inverse_transform', True)
-        self.outlier_generator = outlier_transformer
+        self.outlier_generator = outlier_generator
 
     def generate(self, X, y=None, **params):
         """
@@ -242,6 +324,6 @@ class DecompositionAndSamplingTransformer(GeneratorMixin):
         )
         Xt = pipeline.fit_transform(X)
         # add outliers using the zscore_transformer
-        Xt, _ = self.outlier_generator.generate(Xt, y)
+        Xt, yt = self.outlier_generator.generate(Xt, y)
         # inverse the manifold and standardization transformations
-        return pipeline.inverse_transform(Xt), y
+        return pipeline.inverse_transform(Xt), yt

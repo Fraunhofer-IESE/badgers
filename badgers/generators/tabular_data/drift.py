@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from badgers.core.base import GeneratorMixin
 
 
-class DriftTransformer(GeneratorMixin):
+class DriftGenerator(GeneratorMixin):
     """
     Base class for transformers that add noise to tabular data
     """
@@ -24,7 +24,7 @@ class DriftTransformer(GeneratorMixin):
         self.random_generator = random_generator
 
 
-class RandomShiftTransformer(DriftTransformer):
+class RandomShiftGenerator(DriftGenerator):
     """
     Randomly shift (geometrical translation) values of each column independently of one another.
     Data are first standardized (mean = 0, var = 1) and a random number is added to each column.
@@ -51,7 +51,7 @@ class RandomShiftTransformer(DriftTransformer):
         :param params:
         :return:
         """
-        # normalize data
+        # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
@@ -63,7 +63,7 @@ class RandomShiftTransformer(DriftTransformer):
         return scaler.inverse_transform(Xt), y
 
 
-class RandomShiftClassesTransformer(DriftTransformer):
+class RandomShiftClassesGenerator(DriftGenerator):
     """
     Randomly shift (geometrical translation) values of each class independently of one another.
     Data are first standardized (mean = 0, var = 1) and
@@ -87,7 +87,7 @@ class RandomShiftClassesTransformer(DriftTransformer):
         """
         # extract unique labels
         classes = np.unique(y)
-        # normalize data
+        # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
