@@ -1,5 +1,7 @@
 site_name: Badgers Documentation
 site_url: https://github.com/Fraunhofer-IESE/badgers
+repo_url: https://github.com/Fraunhofer-IESE/badgers
+repo_name: Fraunhofer-IESE/badgers
 
 nav:
     -   Home: index.md
