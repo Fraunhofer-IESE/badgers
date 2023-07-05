@@ -18,15 +18,13 @@ class OutliersGenerator(GeneratorMixin):
     Base class for transformers that add outliers to tabular data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10):
         """
         :param random_generator: A random generator
-        :param percentage_outliers: The percentage of outliers to generate
+        :param n_outliers: The number of outliers to generate
         """
-        assert 0 <= percentage_outliers <= 100
-
         self.random_generator = random_generator
-        self.percentage_outliers = percentage_outliers
+        self.n_outliers = n_outliers
 
     @abc.abstractmethod
     def generate(self, X, y=None, **params):
@@ -65,14 +63,11 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # compute number of outliers
-        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
-
         # generate outliers
         outliers = np.array([
             random_sign(self.random_generator, size=Xt.shape[1]) * (
                 3. + self.random_generator.exponential(size=Xt.shape[1]))
-            for _ in range(n_outliers)
+            for _ in range(self.n_outliers)
         ])
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
@@ -116,9 +111,6 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # compute number of outliers
-        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
-
         # computing outliers
         outliers = np.array([
             random_spherical_coordinate(
@@ -126,7 +118,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
                 size=Xt.shape[1],
                 radius=3. + self.random_generator.exponential()
             )
-            for _ in range(n_outliers)
+            for _ in range(self.n_outliers)
         ])
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
@@ -181,9 +173,6 @@ class HistogramSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # compute number of outliers
-        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
-
         # compute the histogram of the data
         hist, edges = np.histogramdd(Xt, density=False, bins=self.bins)
         # normalize
@@ -191,7 +180,8 @@ class HistogramSamplingGenerator(OutliersGenerator):
         # get coordinates of the histogram where the density is low (below a certain threshold)
         hist_coords_low_density = np.where(norm_hist <= self.threshold_low_density)
         # randomly pick some coordinates in the histogram where the density is low
-        hist_coords_random = self.random_generator.choice(list(zip(*hist_coords_low_density)), n_outliers, replace=True)
+        hist_coords_random = self.random_generator.choice(list(zip(*hist_coords_low_density)), self.n_outliers,
+                                                          replace=True)
 
         # computing outliers values
         outliers = np.array([
@@ -214,8 +204,8 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
 class LowDensitySamplingGenerator(OutliersGenerator):
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
-        super().__init__(random_generator=random_generator, percentage_outliers=percentage_outliers)
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10):
+        super().__init__(random_generator=random_generator, n_outliers=n_outliers)
         self.density_estimator = KernelDensity(bandwidth="scott")
 
     def generate(self, X, y=None, **params):
@@ -243,12 +233,10 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         self.density_estimator = self.density_estimator.fit(Xt)
         low_density_threshold = np.percentile(self.density_estimator.score_samples(Xt), 0.1)
 
-        n_outliers = int(Xt.shape[0] * self.percentage_outliers / 100)
-
         if params.get('max_samples') is not None:
             max_samples = params['max_samples']
         else:
-            max_samples = n_outliers * 100
+            max_samples = self.n_outliers * 100
 
         outliers = np.array([
             x
@@ -260,11 +248,11 @@ class LowDensitySamplingGenerator(OutliersGenerator):
             if self.density_estimator.score_samples(x.reshape(1, -1)) <= low_density_threshold
         ])
 
-        if outliers.shape[0] < n_outliers:
+        if outliers.shape[0] < self.n_outliers:
             warnings.warn(
-                f'LowDensitySamplingGenerator could not generate all {n_outliers} outliers. It only generated {len(outliers)}.')
+                f'LowDensitySamplingGenerator could not generate all {self.n_outliers} outliers. It only generated {len(outliers)}.')
         else:
-            outliers = outliers[:n_outliers]
+            outliers = outliers[:self.n_outliers]
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
@@ -295,10 +283,8 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
             'inverse_transform'), \
             f'the decomposition transformer class must implement the inverse_transform function.' \
             f'\nUnfortunately the class {decomposition_transformer} does not'
-        super().__init__(
-            random_generator=outlier_generator.random_generator,
-            percentage_outliers=outlier_generator.percentage_outliers
-        )
+        super().__init__(random_generator=outlier_generator.random_generator,
+                         n_outliers=outlier_generator.n_outliers)
 
         self.decomposition_transformer = decomposition_transformer
         self.outlier_generator = outlier_generator
