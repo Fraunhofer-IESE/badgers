@@ -26,7 +26,7 @@ class TestOutliersGenerator(TestCase):
         asserts that the correct number of outliers have been produced
         with the correct number of features
         """
-        self.assertEqual(outliers.shape[0], int(generator.percentage_outliers * X.shape[0] / 100))
+        self.assertEqual(outliers.shape[0], int(generator.n_outliers))
         self.assertEqual(outliers.shape[1], X.shape[1])
 
 
@@ -103,7 +103,7 @@ class TestHypersphereSamplingGenerator(TestOutliersGenerator):
 class TestLowDensitySamplingGenerator(TestOutliersGenerator):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.generator = LowDensitySamplingGenerator(random_generator=self.rng, percentage_outliers=10)
+        self.generator = LowDensitySamplingGenerator(random_generator=self.rng, n_outliers=10)
         self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def test_generator(self):
