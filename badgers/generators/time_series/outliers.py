@@ -30,18 +30,18 @@ class LocalZScoreGenerator(OutliersGenerator):
     Randomly generates extreme values
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_extreme_values: int = 10,
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10,
                  local_window_size: int = 10):
         """
 
         :param random_generator: a random number generator
-        :param percentage_extreme_values: the percentage of extreme values to generate
+        :param n_outliers: the percentage of extreme values to generate
         :param  local_window_size: the width (number of data points) of the local window to compute local Z-Score
         """
         super().__init__(random_generator=random_generator)
-        assert 0 <= percentage_extreme_values <= 100
-        self.percentage_extreme_values = percentage_extreme_values
+        self.n_outliers = n_outliers
         self.local_window_size = local_window_size
+        self.outliers_indices_ = []
 
     def generate(self, X, y, **params):
         """
@@ -52,22 +52,25 @@ class LocalZScoreGenerator(OutliersGenerator):
         :param X:
         :return: the transformed array
         """
-        # compute number of extreme values per column
-        nb_extreme_values = int(X.shape[0] * self.percentage_extreme_values / 100)
+        # TODO input validation!
+        if X.ndim < 2:
+            raise ValueError(
+                "Expected 2D array. "
+                "Reshape your data either using array.reshape(-1, 1) if "
+                "your data has a single feature or array.reshape(1, -1) "
+                "if it contains a single sample."
+            )
         # generate extreme values indices and values
-        self.outliers_indices_ = dict()
-        for col in range(X.shape[1]):
-            rows = self.random_generator.choice(X.shape[0], size=nb_extreme_values, replace=False, p=None)
-            # keeping track of the outliers indices
-            self.outliers_indices_ += [(row, col) for row in rows]
-            for row in rows:
-                local_window = X[row - int(self.local_window_size / 2):row + int(self.local_window_size / 2), col]
-                local_mean = local_window.mean()
-                local_var = local_window.var()
-                value = local_mean + random_sign(self.random_generator, 1) * self.random_generator.uniform(
-                    low=3. * local_var[col], high=5 * local_mean[col]
-                )
-                # updating with new outliers
-                X[row, col] = value
+        self.outliers_indices_ = []
+
+        self.outliers_indices_ = self.random_generator.choice(X.shape[0], size=self.n_outliers, replace=False, p=None)
+        # keeping track of the outliers indices
+        for idx in self.outliers_indices_:
+            local_window = X[idx - int(self.local_window_size / 2):idx + int(self.local_window_size / 2), :]
+            local_mean = local_window.mean(axis=0)
+            local_std = local_window.std(axis=0)
+            value = local_mean + random_sign(self.random_generator, size=X.shape[1]) * (3. * local_std + self.random_generator.exponential(size=X.shape[1]))
+            # updating with new outliers
+            X[idx, :] = value
 
         return X, y
