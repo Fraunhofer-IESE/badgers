@@ -14,8 +14,7 @@ class NoiseGenerator(GeneratorMixin):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        :param random_generator: A random generator
         """
         self.random_generator = random_generator
 
@@ -25,16 +24,14 @@ class NoiseGenerator(GeneratorMixin):
 
 
 class GaussianNoiseGenerator(NoiseGenerator):
-    def __init__(self, random_generator=default_rng(seed=0), signal_to_noise_ratio: float = 0.1):
+    def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1):
         """
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
-        :param signal_to_noise_ratio: float, default 0.1
-            The standard deviation of the noise to be added
+        :param random_generator: A random generator
+        :param noise_std: The standard deviation of the noise to be added
         """
         super().__init__(random_generator=random_generator)
-        self.signal_to_noise_ratio = signal_to_noise_ratio
+        self.noise_std = noise_std
 
     def generate(self, X, y, **params):
         """
@@ -51,6 +48,6 @@ class GaussianNoiseGenerator(NoiseGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
         # add noise
-        Xt = Xt + self.random_generator.normal(loc=0, scale=self.signal_to_noise_ratio, size=Xt.shape)
+        Xt = Xt + self.random_generator.normal(loc=0, scale=self.noise_std, size=Xt.shape)
         # inverse pca
         return scaler.inverse_transform(Xt), y
