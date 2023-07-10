@@ -33,7 +33,7 @@ class TestOutliersGenerator(TestCase):
 class TestZScoreSamplingGenerator(TestOutliersGenerator):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.generator = ZScoreSamplingGenerator(random_generator=self.rng, percentage_outliers=10)
+        self.generator = ZScoreSamplingGenerator(random_generator=self.rng, n_outliers=10)
         self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def assert_zscore_larger_than_3(self, X, outliers):
@@ -65,7 +65,7 @@ class TestZScoreSamplingGenerator(TestOutliersGenerator):
 class TestHistogramSamplingGenerator(TestOutliersGenerator):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.generator = HistogramSamplingGenerator(random_generator=self.rng, percentage_outliers=10)
+        self.generator = HistogramSamplingGenerator(random_generator=self.rng, n_outliers=10)
         self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def test_generator(self):
@@ -86,7 +86,7 @@ class TestHistogramSamplingGenerator(TestOutliersGenerator):
 class TestHypersphereSamplingGenerator(TestOutliersGenerator):
     def setUp(self) -> None:
         self.rng = default_rng(0)
-        self.generator = HypersphereSamplingGenerator(random_generator=self.rng, percentage_outliers=10)
+        self.generator = HypersphereSamplingGenerator(random_generator=self.rng, n_outliers=10)
         self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def test_generator(self):
