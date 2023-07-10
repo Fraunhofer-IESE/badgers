@@ -36,8 +36,13 @@ class ZScoreSamplingGenerator(OutliersGenerator):
     Randomly generates outliers as data points with a z-score > 3.
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
-        super().__init__(random_generator, percentage_outliers)
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10):
+        """
+
+        :param random_generator: A random generator
+        :param n_outliers: The number of outliers to generate
+        """
+        super().__init__(random_generator, n_outliers)
 
     def generate(self, X, y=None, **params):
         """
@@ -85,8 +90,13 @@ class HypersphereSamplingGenerator(OutliersGenerator):
     Generates outliers by sampling points from a hypersphere with radius at least 3 sigma
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10):
-        super().__init__(random_generator, percentage_outliers)
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10):
+        """
+
+        :param random_generator: A random generator
+        :param n_outliers: The number of outliers to generate
+        """
+        super().__init__(random_generator, n_outliers)
 
     def generate(self, X, y=None, **params):
         """
@@ -139,17 +149,17 @@ class HistogramSamplingGenerator(OutliersGenerator):
     It will raise an error if the number of dimensions is greater than 5
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), percentage_outliers: int = 10,
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10,
                  threshold_low_density: float = 0.1, bins: int = 10):
         """
 
         :param random_generator: A random generator
-        :param percentage_outliers: The percentage of outliers to generate
+        :param n_outliers: The number of outliers to generate
         :param threshold_low_density: the threshold that defines a low density region (must be between 0 and 1)
         :param bins: number of bins for the histogram
         """
         assert 0 < threshold_low_density < 1
-        super().__init__(random_generator, percentage_outliers)
+        super().__init__(random_generator, n_outliers)
         self.threshold_low_density = threshold_low_density
         self.bins = bins
 
@@ -204,9 +214,16 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
 class LowDensitySamplingGenerator(OutliersGenerator):
 
-    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10):
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10, threshold_low_density: float=0.1):
+        """
+
+        :param random_generator: A random generator
+        :param n_outliers: The number of outliers to generate
+        :param threshold_low_density: the threshold that defines a low density region (must be between 0 and 1)
+        """
         super().__init__(random_generator=random_generator, n_outliers=n_outliers)
         self.density_estimator = KernelDensity(bandwidth="scott")
+        self.threshold_low_density = threshold_low_density
 
     def generate(self, X, y=None, **params):
         """
@@ -231,7 +248,7 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         Xt = scaler.transform(X)
         # fit density estimator
         self.density_estimator = self.density_estimator.fit(Xt)
-        low_density_threshold = np.percentile(self.density_estimator.score_samples(Xt), 0.1)
+        low_density_threshold = np.percentile(self.density_estimator.score_samples(Xt), self.threshold_low_density)
 
         if params.get('max_samples') is not None:
             max_samples = params['max_samples']
@@ -272,7 +289,7 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
 
     def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
                  outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0),
-                                                                                percentage_outliers=10)):
+                                                                                n_outliers=10)):
         """
 
         :param decomposition_transformer: The dimensionality reduction transformer to be used before the outlier transformer
