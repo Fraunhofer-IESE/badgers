@@ -16,9 +16,10 @@ class TestNodesMissingCompletelyAtRandom(TestCase):
         Xt, _ = generator.generate(self.graph, None)
         self.assertEqual(len(Xt), len(self.graph) - 10)
 
-        Xt, yt = generator.generate(self.graph, [0]*len(self.graph))
+        Xt, yt = generator.generate(self.graph, [0] * len(self.graph))
         self.assertEqual(len(Xt), len(self.graph) - 10)
         self.assertEqual(len(yt), len(self.graph) - 10)
+
 
 class TestEdgesMissingCompletelyAtRandom(TestCase):
     def setUp(self) -> None:
