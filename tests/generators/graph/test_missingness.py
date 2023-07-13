@@ -30,5 +30,5 @@ class TestEdgesMissingCompletelyAtRandom(TestCase):
         generator = EdgesMissingCompletelyAtRandom(percentage_missing=10, random_generator=self.rng)
 
         Xt, _ = generator.generate(self.graph, None)
-        self.assertEqual(len(Xt), len(self.graph))
-        self.assertEqual(len(Xt.edges()), int(len(self.graph.edges()) * 0.9))
+        self.assertEqual(Xt.number_of_nodes() , self.graph.number_of_nodes())
+        self.assertEqual(Xt.number_of_edges(), len(self.graph.edges())- int(self.graph.number_of_edges() * generator.percentage_missing / 100))
