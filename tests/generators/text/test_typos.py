@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from numpy.random import default_rng
 
-from badgers.generators.text.typos import SwapLettersGenerator
+from badgers.generators.text.typos import SwapLettersGenerator, LeetSpeakGenerator
 
 
 class TestSwapLettersGenerator(unittest.TestCase):
@@ -38,6 +38,15 @@ class TestSwapLettersGenerator(unittest.TestCase):
                 self.assertEqual(set(Xt[i]), set(X[i]))
             else:
                 self.assertEqual(Xt[i], X[i])
+
+
+class TestLeetSpeakGenerator(unittest.TestCase):
+
+    def test_generate(self):
+        X = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'fox']
+        trf = LeetSpeakGenerator()
+        Xt, _ = trf.generate(X, None)
+        self.assertEqual(len(X), len(Xt))
 
 
 if __name__ == '__main__':

@@ -58,4 +58,68 @@ class SwapLettersGenerator(TyposGenerator):
                 # save the word with switched letters as string
                 X[i] = ''.join(word)
 
-        return X, None
+        return X, y
+
+
+class LeetSpeakGenerator(TyposGenerator):
+
+    def __init__(self, random_generator=default_rng(seed=0), replacement_proba: float = 0.1):
+        """
+
+        :param random_generator: a random number generator
+        :param replacement_proba: the probability of replacing a letter with its leet counterpart
+        """
+        super().__init__(random_generator=random_generator)
+        assert 0 <= replacement_proba <= 1
+        self.replacement_proba = replacement_proba
+        self.leet_speak_mapping = {
+            "A": ["4", "/\\", "@", "/-\\", "^", "(L", "\u0414"],
+            "B": ["I3", "8", "13", "|3", "\u00df", "!3", "(3", "/3", ")3", "|-]", "j3"],
+            "C": ["[", "\u00a2", "<", "(", "\u00a9"],
+            "D": [")", "|)", "(|", "[)", "I>", "|>", "?", "T)", "I7", "cl", "|}", "|]"],
+            "E": ["3", "&", "\u00a3", "\u20ac", "[-", "|=-"],
+            "F": ["|=", "\u0192", "|#", "ph", "/=", "v"],
+            "G": ["6", "&", "(_+", "9", "C-", "gee", "(?,", "[,", "{,", "<-", "(."],
+            "H": ["#", "/-/", "\\-\\", "[-]", "]-[", ")-(", "(-)", ":-:", "|~|", "|-|", "]~[", "}{", "!-!", "1-1",
+                  "\\-/", "I+I", "?"],
+            "I": ["1", "|", "][", "!", "eye", "3y3"],
+            "J": [",_|", "_|", "._|", "._]", "_]", ",_]", "]"],
+            "K": [">|", "|<", "1<", "|c", "|(7<"],
+            "L": ["1", "2", "\u00a3", "7", "|_", "|"],
+            "M": ["/\\/\\", "/V\\", "[V]", "|\\/|", "^^", "<\\/>", "{V}", "(v)", "(V)", "|\\|\\", "]\\/[", "nn", "11"],
+            "N": ["^/", "|\\|", "/\\/", "[\\]", "<\\>", "{\\}", "/V", "^", "\u0e17", "\u0418"],
+            "O": ["0", "()", "oh", "[]", "p", "<>", "\u00d8"],
+            "P": ["|*", "|o", "|\u00ba", "?", "|^", "|>", "|\"", "9", "[]D", "|\u00b0", "|7"],
+            "Q": ["(_,)", "()_", "2", "0_", "<|", "&", "9", "\u00b6", "\u204b", "\u2117"],
+            "R": ["I2", "9", "|`", "|~", "|?", "/2", "|^", "lz", "7", "2", "12", "\u00ae", "[z", "\u042f", ".-", "|2",
+                  "|-", "3"],
+            "S": ["5", "$", "z", "\u00a7", "ehs", "es", "2"],
+            "T": ["7", "+", "-|-", "']['", "\u2020", "\u00ab|\u00bb", "~|~"],
+            "U": ["(_)", "|_|", "v", "L|", "\u0e1a"],
+            "V": ["\\/", "|/", "\\|"],
+            "W": ["\\/\\/", "vv", "\\N", "'//", "\\\\'", "\\^/", "\\/\\/", "(n)", "\\V/", "\\X/", "\\|/", "\\_|_/",
+                  "\\_:_/", "uu", "2u", "\\\\//\\\\//", "\u0e1e", "\u20a9"],
+            "X": ["><", "}{", "ecks", "\u00d7", "?", "}{", ")(", "]["],
+            "Y": ["j", "`/", "\\|/", "\u00a5", "\\//"],
+            "Z": ["2", "7_", "-/_", "%", ">_", "s", "~/_", "-\\_", "-|_"]
+        }
+
+    def randomly_replace_letter(self, letter):
+        """
+        Randomly replace a letter with its leet counterpart
+        :param letter:
+        :return:
+        """
+        if self.random_generator.random() < self.replacement_proba:
+            return self.random_generator.choice(self.leet_speak_mapping[letter.upper()])
+        else:
+            return letter
+
+    def generate(self, X, y, **params) -> Tuple:
+
+        Xt = [
+            ''.join([self.randomly_replace_letter(l) for l in word])
+            for word in X
+        ]
+
+        return Xt, y

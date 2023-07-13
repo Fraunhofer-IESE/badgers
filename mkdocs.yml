@@ -14,6 +14,8 @@ nav:
                     -   Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
                     -   Generating Noise: tutorials/Noise-Tabular-Data.ipynb
                     -   Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
+            -   Text Data:
+                    -   Generating Typos: tutorials/Typos-Text.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
     -   API: reference/
