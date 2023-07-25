@@ -16,6 +16,8 @@ nav:
                     -   Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
             -   Text Data:
                     -   Generating Typos: tutorials/Typos-Text.ipynb
+            -   Time Series Data:
+                    - Generating Outliers: tutorials/Outliers-Time-Series.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
     -   API: reference/
