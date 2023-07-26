@@ -6,7 +6,8 @@ from sklearn.datasets import make_blobs
 from sklearn.decomposition import PCA
 
 from badgers.generators.tabular_data.outliers import ZScoreSamplingGenerator, HistogramSamplingGenerator, \
-    HypersphereSamplingGenerator, LowDensitySamplingGenerator, DecompositionAndOutlierGenerator
+    HypersphereSamplingGenerator, LowDensitySamplingGenerator, DecompositionAndOutlierGenerator, \
+    IndependentHistogramsGenerator
 from tests.generators.tabular_data import generate_test_data_only_features
 
 
@@ -118,6 +119,24 @@ class TestLowDensitySamplingGenerator(TestOutliersGenerator):
                 with self.subTest(input_type=input_type):
                     self.assert_shape_yt(yt, outliers)
                     self.assert_shape_outliers(X, outliers, generator=self.generator)
+
+
+class TestIndependentHistogramsGenerator(TestOutliersGenerator):
+
+    def setUp(self) -> None:
+        self.rng = default_rng(0)
+        self.generator = IndependentHistogramsGenerator(random_generator=self.rng, n_outliers=10, bins=3)
+        self.input_test_data = generate_test_data_only_features(rng=self.rng)
+
+    def test_generator(self):
+        """
+
+        """
+        for input_type, (X, y) in self.input_test_data.items():
+            outliers, yt = self.generator.generate(X.copy(), y)
+            with self.subTest(input_type=input_type):
+                self.assert_shape_yt(yt, outliers)
+                self.assert_shape_outliers(X, outliers, generator=self.generator)
 
 
 class TestDecompositionAndOutlierGenerator(TestOutliersGenerator):

@@ -10,6 +10,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
+from badgers.core.decorators import numpy_API
 from badgers.core.utils import random_sign, random_spherical_coordinate
 
 
@@ -55,8 +56,8 @@ class ZScoreSamplingGenerator(OutliersGenerator):
             with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
         4. Inverse the standardization transformation
 
-        :param X:
-        :param y:
+        :param X: the input features
+        :param y: not used
         :param params:
         :return:
         """
@@ -108,8 +109,8 @@ class HypersphereSamplingGenerator(OutliersGenerator):
             - radius is = 3 + a random number following an exponential distribution function with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
         4. Inverse the standardization transformation
 
-        :param X:
-        :param y:
+        :param X: the input features
+        :param y: not used
         :param params:
         :return:
         """
@@ -141,12 +142,78 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         return scaler.inverse_transform(outliers), yt
 
 
+class IndependentHistogramsGenerator(OutliersGenerator):
+    """
+    Randomly generates outliers from low density regions.
+    Low density regions are estimated through several independent histograms (one for each feature).
+
+    For each feature (column), a histogram is computed (it approximates the marginal distribution).
+    Values are generated from bins with a low number of data points.
+
+    All values generated for each feature are simply concatenated (independence hypothesis!).
+    """
+
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10, bins: int = 10):
+        super().__init__(random_generator=random_generator, n_outliers=n_outliers)
+        self.bins = bins
+
+    @numpy_API
+    def generate(self, X, y=None, **params):
+        """
+        Randomly generates outliers from low density regions.
+        Low density regions are estimated through several independent histograms (one for each feature).
+
+        For each feature (column), a histogram is computed (it approximates the marginal distribution).
+        Values are generated from bins with a low number of data points.
+
+        All values generated for each feature are simply concatenated (independence hypothesis!).
+
+        :param X: the input features
+        :param y: not used
+        :param params:
+        :return:
+        """
+        outliers = []
+
+        # loop over all features (columns)
+        for col in range(X.shape[1]):
+            # create an empty array for storing the generated values for this column
+            values = np.zeros(self.n_outliers)
+            # compute histogram of the current feature
+            hist, bin_edges = np.histogram(X[:, col], bins=self.bins)
+            # compute inverse density
+            inv_density = 1 - hist / np.max(hist)
+            # the sampling probability is proportional to the inverse density
+            p = inv_density / np.sum(inv_density)
+            # generate values:
+            # first, choose randomly from which bin the value must be sampled
+            indices = self.random_generator.choice(self.bins, p=p, size=self.n_outliers, replace=True)
+            # second, sample uniformly at random from the selected bin
+            values = [self.random_generator.uniform(low=bin_edges[i], high=bin_edges[i + 1]) for i in indices]
+            # append the values for the current feature
+            outliers.append(values)
+        # cast as a numpy array
+        outliers = np.array(outliers).T
+
+        # add "outliers" as labels for outliers
+        yt = np.array(["outliers"] * len(outliers))
+
+        return outliers, yt
+
+
 class HistogramSamplingGenerator(OutliersGenerator):
     """
-    Randomly generates outliers from low density regions. Low density regions are estimated through histograms
+    Randomly generates outliers from low density regions.
+    Low density regions are estimated through a histogram.
 
+    -----------------------------------------
+    WARNING:
+    This computes a full histogram in d-dimensions (d = nb features / columns), which is O(d²).
     Should only be used with low dimensionality data!
-    It will raise an error if the number of dimensions is greater than 5
+    It will raise an error if the number of dimensions is greater than 5.
+    -----------------------------------------
+
+    TODO: this works but is very inefficient, better strategies are welcome!
     """
 
     def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10,
@@ -172,7 +239,9 @@ class HistogramSamplingGenerator(OutliersGenerator):
         3. Sample datapoint uniformly at random within bins of low density
         4. Inverse the standardization transformation
 
-        :param X:
+        :param X: the input features
+        :param y: not used
+        :param params:
         :return:
         """
         if X.shape[1] > 5:
@@ -213,8 +282,15 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
 
 class LowDensitySamplingGenerator(OutliersGenerator):
+    """
+    Randomly generates outliers from low density regions.
+    Low density regions are estimated using a KernelDensity estimator.
+    Points are sampled uniformly at random and filtered out if they do not belong to a low density region
 
-    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10, threshold_low_density: float=0.1):
+    TODO: this works but might not be efficient, a better sampling strategy is welcome
+    """
+
+    def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10, threshold_low_density: float = 0.1):
         """
 
         :param random_generator: A random generator
@@ -309,14 +385,16 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
     def generate(self, X, y=None, **params):
         """
         Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)
-        and a outlier transformer.
+        and an outlier transformer.
 
         1. Standardize the input data (mean = 0, variance = 1)
         2. Apply the dimensionality reduction transformer
         3. Generates outliers by applying the outlier transformer
         4. Inverse the dimensionality reduction and the standardization transformations
 
-        :param X:
+        :param X: the input features
+        :param y: the regression target, class labels, or None
+        :param params:
         :return:
         """
 
