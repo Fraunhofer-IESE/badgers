@@ -2,7 +2,6 @@ import abc
 from typing import Tuple
 
 from numpy.random import default_rng
-from sklearn.utils import check_array
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.utils import random_sign
@@ -10,7 +9,7 @@ from badgers.core.utils import random_sign
 
 class OutliersGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for transformers that generate point outliers in time-series data
     """
 
     def __init__(self, random_generator=default_rng(seed=0), n_outliers: int = 10):
@@ -25,6 +24,7 @@ class OutliersGenerator(GeneratorMixin):
     @abc.abstractmethod
     def generate(self, X, y, **params) -> Tuple:
         pass
+
 
 class RandomZerosGenerator(OutliersGenerator):
     """
@@ -62,6 +62,7 @@ class RandomZerosGenerator(OutliersGenerator):
             X[idx, :] = 0
 
         return X, y
+
 
 class LocalZScoreGenerator(OutliersGenerator):
     """
@@ -104,7 +105,8 @@ class LocalZScoreGenerator(OutliersGenerator):
             local_window = X[idx - int(self.local_window_size / 2):idx + int(self.local_window_size / 2), :]
             local_mean = local_window.mean(axis=0)
             local_std = local_window.std(axis=0)
-            value = local_mean + random_sign(self.random_generator, size=X.shape[1]) * (3. * local_std + self.random_generator.exponential(size=X.shape[1]))
+            value = local_mean + random_sign(self.random_generator, size=X.shape[1]) * (
+                3. * local_std + self.random_generator.exponential(size=X.shape[1]))
             # updating with new outliers
             X[idx, :] = value
 

@@ -17,7 +17,8 @@ nav:
             -   Text Data:
                     -   Generating Typos: tutorials/Typos-Text.ipynb
             -   Time Series Data:
-                    - Generating Outliers: tutorials/Outliers-Time-Series.ipynb
+                    - Generating Point Outliers: tutorials/Outliers-Time-Series.ipynb
+                    - Generating Patterns: tutorials/Patterns-Time-Series.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
     -   API: reference/
