@@ -32,11 +32,14 @@ class MissingValueGenerator(GeneratorMixin):
 
 
 class MissingCompletelyAtRandom(MissingValueGenerator):
+    """
+    A generator that removes values completely at random (MCAR [1]) (uniform distribution over all data).
+
+    See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
+    """
 
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
-        """ A transformer that removes values completely at random (MCAR [1]) (uniform distribution over all data).
-
-        See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
+        """
 
         :param percentage_missing: The percentage of missing values (int value between 0 and 100 included)
         :param random_generator: A random generator
@@ -48,8 +51,9 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         """
         Computes indices of missing values using a uniform distribution.
 
-        :param X:
-        :return:
+        :param X: the input features
+        :param y: the target
+        :return: Xt, yt
         """
         # compute number of missing values per column
         nb_missing = int(X.shape[0] * self.percentage_missing / 100)
@@ -66,7 +70,11 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
 
 class DummyMissingAtRandom(MissingValueGenerator):
     """
+    A generator that removes values at random (MAR [1]),
+    where the probability of a data instance X[_,i] missing depends upon another feature X[_,j],
+    where j is randomly chosen.
 
+    See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
     """
 
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
@@ -81,12 +89,10 @@ class DummyMissingAtRandom(MissingValueGenerator):
     def generate(self, X, y, **params):
         """
 
-        :param self:
-        :param X:
-        :return:
+        :param X: the input features
+        :param y: the target
+        :return: Xt, yt
         """
-        if isinstance(X, pd.DataFrame):
-            X = X.to_numpy()
         # initialize probability with zeros
         p = np.zeros_like(X)
         # normalize values between 0 and 1
@@ -114,6 +120,12 @@ class DummyMissingAtRandom(MissingValueGenerator):
 
 
 class DummyMissingNotAtRandom(MissingValueGenerator):
+    """
+    A generator that removes values not at random (MNAR [1]),
+    where the probability of a data instance X[i,j] missing depends linearly upon its own value.
+    A data point X[i,j] = max(X[:,j]) has a missing probability of 1.
+    A data point X[i,j] = min(X[:,j]) has a missing probability of 0.
+    """
 
     def __init__(self, percentage_missing: int = 10, random_generator=default_rng(seed=0)):
         """
@@ -127,8 +139,9 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
     def generate(self, X, y, **params):
         """
 
-        :param X:
-        :return:
+        :param X: the input features
+        :param y: the target
+        :return: Xt, yt
         """
 
         # normalize values between 0 and 1

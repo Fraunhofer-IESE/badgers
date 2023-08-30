@@ -9,7 +9,7 @@ from badgers.core.base import GeneratorMixin
 
 class NoiseGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for generators that add noise to tabular data
     """
 
     def __init__(self, random_generator=default_rng(seed=0), repeat=1):
@@ -27,6 +27,10 @@ class NoiseGenerator(GeneratorMixin):
 
 
 class GaussianNoiseGenerator(NoiseGenerator):
+    """
+    A generator that adds Gaussian white noise to the tabular data
+    """
+
     def __init__(self, random_generator=default_rng(seed=0), noise_std: float = 0.1, repeat=1):
         """
 
@@ -38,8 +42,8 @@ class GaussianNoiseGenerator(NoiseGenerator):
 
     def generate(self, X, y, **params):
         """
-        Add Gaussian white noise to the data.
-        the data is first standardized (each column has a mean = 0 and variance = 1).
+        Adds Gaussian white noise to the data.
+        The data is first standardized (each column has a mean = 0 and variance = 1).
         The noise is generated from a normal distribution with standard deviation = `noise_std`.
         The noise is added to the data.
 
@@ -69,6 +73,10 @@ class GaussianNoiseGenerator(NoiseGenerator):
 
 
 class GaussianNoiseClassesGenerator(NoiseGenerator):
+    """
+    A generator that adds Gaussian white noise to each class separately.
+    """
+
     def __init__(self, random_generator=default_rng(seed=0), repeat=1, noise_std_per_class: dict = None):
         """
 
@@ -103,16 +111,15 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         for label, noise_std in self.noise_std_per_class.items():
             data_class = np.array(Xt[y == label])
             noisy_data_class = np.concatenate(
-                    [
-                        data_class + self.random_generator.normal(loc=0, scale=noise_std, size=data_class.shape)
-                        for _ in range(self.repeat)
-                    ],
-                    axis=0
-                )
+                [
+                    data_class + self.random_generator.normal(loc=0, scale=noise_std, size=data_class.shape)
+                    for _ in range(self.repeat)
+                ],
+                axis=0
+            )
             labels = [label] * self.repeat * data_class.shape[0]
             tmp_Xt.append(noisy_data_class.copy())
             tmp_yt.append(labels)
-
 
         Xt = np.concatenate(tmp_Xt, axis=0)
         yt = np.concatenate(tmp_yt, axis=0)

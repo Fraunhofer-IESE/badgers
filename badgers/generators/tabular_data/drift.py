@@ -12,16 +12,16 @@ class DriftGenerator(GeneratorMixin):
     Base class for transformers that add noise to tabular data
     """
 
-    @abc.abstractmethod
-    def generate(self, X, y=None, **params):
-        pass
-
     def __init__(self, random_generator=default_rng(seed=0)):
         """
         :param random_generator: numpy.random.Generator, default default_rng(seed=0)
             A random generator
         """
         self.random_generator = random_generator
+
+    @abc.abstractmethod
+    def generate(self, X, y, **params):
+        pass
 
 
 class RandomShiftGenerator(DriftGenerator):
@@ -79,7 +79,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
         self.shift_std = shift_std
 
-    def generate(self, X, y):
+    def generate(self, X, y, **params):
         """
         Randomly shift (geometrical translation) values of each class independently of one another.
         Data are first standardized (mean = 0, var = 1) and
