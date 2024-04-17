@@ -6,7 +6,7 @@ from numpy.random import default_rng
 from badgers.core.base import GeneratorMixin
 
 
-class ChangePointGenerator(GeneratorMixin):
+class ChangePointsGenerator(GeneratorMixin):
     """
     Base class for generators that generate changepoints in time-series data
     """
@@ -25,7 +25,7 @@ class ChangePointGenerator(GeneratorMixin):
         pass
 
 
-class RandomChangeInMeanGenerator(ChangePointGenerator):
+class RandomChangeInMeanGenerator(ChangePointsGenerator):
     """
     Generate randomly change in mean changepoints
     """

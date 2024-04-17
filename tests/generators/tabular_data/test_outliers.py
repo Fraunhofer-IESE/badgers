@@ -11,6 +11,8 @@ from badgers.generators.tabular_data.outliers import ZScoreSamplingGenerator, Hi
 from tests.generators.tabular_data import generate_test_data_only_features
 
 
+
+
 class TestOutliersGenerator(TestCase):
     """
     Implements generic tests for all OutliersGenerator objects

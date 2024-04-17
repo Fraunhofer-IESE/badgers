@@ -24,6 +24,7 @@ class DriftGenerator(GeneratorMixin):
         pass
 
 
+
 class RandomShiftGenerator(DriftGenerator):
     """
     Randomly shift (geometrical translation) values of each column independently of one another.

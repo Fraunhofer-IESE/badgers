@@ -1,7 +1,7 @@
 import unittest
 from numpy.random import default_rng
 
-from badgers.generators.time_series.changepoints import ChangePointGenerator, RandomChangeInMeanGenerator
+from badgers.generators.time_series.changepoints import ChangePointsGenerator, RandomChangeInMeanGenerator
 
 
 class TestChangePointGenerator(unittest.TestCase):
@@ -12,7 +12,7 @@ class TestChangePointGenerator(unittest.TestCase):
         self.max_change = 5
 
     def test_ChangePointGenerator_init(self):
-        generator = ChangePointGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints)
+        generator = ChangePointsGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints)
         self.assertEqual(generator.random_generator, self.random_generator)
         self.assertEqual(generator.n_changepoints, self.n_changepoints)
         self.assertEqual(generator.changepoints, None)

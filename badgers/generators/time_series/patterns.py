@@ -3,8 +3,31 @@ from typing import Tuple
 
 import numpy as np
 from numpy.random import default_rng
+from scipy.interpolate import CubicSpline
 
 from badgers.core.base import GeneratorMixin
+
+
+def add_offset(values: np.array, offset: float = 0.) -> np.array:
+    return values + offset
+
+
+def add_linear_trend(values: np.array, start_value: float = 0., end_value: float = 1.) -> np.array:
+    return values + np.linspace(start_value - values[0], end_value - values[-1], len(values))
+
+
+def scale(values: np.array, scaling_factor: float = 1.) -> np.array:
+    return values * scaling_factor
+
+
+class Pattern:
+
+    def __init__(self, values: np.array):
+        self.values = values
+        self.interpolation_function = CubicSpline(np.linspace(0, 1, len(values)), values, bc_type='natural')
+
+    def resample(self, nb_point: int) -> np.array:
+        return self.interpolation_function(np.linspace(0, 1, nb_point))
 
 
 class PatternsGenerator(GeneratorMixin):
@@ -82,6 +105,6 @@ class RandomLinearPatterns(PatternsGenerator):
 
         for (start, end) in self.patterns_indices_:
             for col in range(X.shape[1]):
-                X[start:end, col] = np.linspace(X[start,col],X[end,col], end - start)
+                X[start:end, col] = np.linspace(X[start, col], X[end, col], end - start)
 
         return X, y
