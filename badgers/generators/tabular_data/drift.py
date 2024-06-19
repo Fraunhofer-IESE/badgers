@@ -5,6 +5,7 @@ from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
+from badgers.core.decorators import preprocess_inputs
 
 
 class DriftGenerator(GeneratorMixin):
@@ -41,6 +42,7 @@ class RandomShiftGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
         self.shift_std = shift_std
 
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly shift (geometrical translation) values of each column independently of one another.
@@ -80,6 +82,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
         self.shift_std = shift_std
 
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Randomly shift (geometrical translation) values of each class independently of one another.

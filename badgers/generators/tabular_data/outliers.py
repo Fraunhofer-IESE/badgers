@@ -10,7 +10,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
-from badgers.core.decorators import numpy_API
+from badgers.core.decorators import preprocess_inputs
 from badgers.core.utils import random_sign, random_spherical_coordinate
 
 
@@ -45,6 +45,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         """
         super().__init__(random_generator, n_outliers)
 
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly generates outliers as data points with a z-score > 3.
@@ -99,6 +100,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         """
         super().__init__(random_generator, n_outliers)
 
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly generates outliers as data points with a z-score > 3.
@@ -157,7 +159,7 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         super().__init__(random_generator=random_generator, n_outliers=n_outliers)
         self.bins = bins
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly generates outliers from low density regions.
@@ -180,7 +182,7 @@ class IndependentHistogramsGenerator(OutliersGenerator):
             # create an empty array for storing the generated values for this column
             values = np.zeros(self.n_outliers)
             # compute histogram of the current feature
-            hist, bin_edges = np.histogram(X[:, col], bins=self.bins)
+            hist, bin_edges = np.histogram(X.iloc[:, col], bins=self.bins)
             # compute inverse density
             inv_density = 1 - hist / np.max(hist)
             # the sampling probability is proportional to the inverse density
@@ -230,6 +232,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         self.threshold_low_density = threshold_low_density
         self.bins = bins
 
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly generates outliers from low density regions. Low density regions are estimated through histograms
@@ -301,6 +304,7 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         self.density_estimator = KernelDensity(bandwidth="scott")
         self.threshold_low_density = threshold_low_density
 
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Generate data points belonging to low density regions.
@@ -382,6 +386,7 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
         self.decomposition_transformer = decomposition_transformer
         self.outlier_generator = outlier_generator
 
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)

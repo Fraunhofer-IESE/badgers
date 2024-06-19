@@ -17,8 +17,9 @@ class TestPattern(TestCase):
 
     def test_add_offset(self):
         pattern = Pattern(np.array([1, 2, 3, 4, 5]))
+        expected_pattern = np.array([3, 4, 5, 6, 7]).reshape(-1, 1)
         transformed_pattern = add_offset(pattern.values, 2)
-        self.assertListEqual(transformed_pattern.tolist(), [3, 4, 5, 6, 7])
+        self.assertListEqual(transformed_pattern.tolist(), expected_pattern.tolist())
 
     def test_add_linear_trend(self):
         pattern = Pattern(np.array([1, 2, 3, 4, 5]))
@@ -29,32 +30,38 @@ class TestPattern(TestCase):
 
     def test_scale(self):
         pattern = Pattern(np.array([1, 2, 3, 4, 5]))
+        expected_pattern = np.array([2, 4, 6, 8, 10]).reshape(-1, 1)
         transformed_pattern = scale(pattern.values, scaling_factor=2)
-        self.assertListEqual(transformed_pattern.tolist(), [2, 4, 6, 8, 10])
+        self.assertListEqual(transformed_pattern.tolist(), expected_pattern.tolist())
 
 
 class TestRandomlySpacedPatterns(TestCase):
 
     def test_generate_1D(self):
+        n_patterns = 3
         X = np.zeros(shape=100).reshape(-1,1)
         pattern = Pattern(values=np.array([0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0]))
-        generator = RandomlySpacedPatterns(n_patterns=3, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
+        generator = RandomlySpacedPatterns(n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
         Xt, _ = generator.generate(X, None)
         # assert that the correct number of patterns have been injected
         self.assertEqual(generator.n_patterns, len(generator.patterns_indices_))
         # assert that no pattern overlap
-        self.fail('Implement Test!')
+        for i in range(n_patterns - 1):
+            self.assertLess(generator.patterns_indices_[i][1], generator.patterns_indices_[i+1][0])
+
 
     def test_generate_2D(self):
+        n_patterns = 3
         X = np.zeros(shape=(100, 2))
         pattern = Pattern(
             values=np.array([[0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0], [0, -1, -2, -3, -4, -5, -4, -3, -2, -1, 0]]).T)
-        generator = RandomlySpacedPatterns(n_patterns=3, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
+        generator = RandomlySpacedPatterns(n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
         Xt, _ = generator.generate(X, None)
         # assert that the correct number of patterns have been injected
         self.assertEqual(generator.n_patterns, len(generator.patterns_indices_))
         # assert that no pattern overlap
-        self.fail('Implement Test!')
+        for i in range(n_patterns - 1):
+            self.assertLess(generator.patterns_indices_[i][1], generator.patterns_indices_[i+1][0])
 
 
 class TestRandomlySpacedConstantPatterns(TestCase):

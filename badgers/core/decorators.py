@@ -1,36 +1,59 @@
 import functools
-from enum import Enum
 
+import numpy as np
 import pandas as pd
 
 
-class TabularDataType(Enum):
-    NUMPY_ARRAY = 1
-    PANDAS_DATAFRAME = 2
 
 
-def numpy_API(generate_func):
+
+def preprocess_inputs(generate_func):
     """
-    Ensures X can be worked on using the numpy API (useful for indexing!).
-    If X is an object that does not strictly follow the numpy API (like pandas.DataFrame),
-    then it internally stores the metadata (like columns), casts X to a numpy array, calls the generate function,
-    and finally restore and restores the original type.
+    Validates and convert X and y for tabular data generators
+
+    Preprocessing:
+    X is converted to a pandas DataFrame
+    y is converted to a pandas Series
+
+    Postprocessing
 
     @TODO check y too!
     """
 
     @functools.wraps(generate_func)
-    def wrapper(self, X, y, **params):
-        X_data_type = None
-        if isinstance(X, pd.DataFrame):
-            # when X is a pandas DataFrame, then locally save the columns and make X a numpy array
-            X_data_type = TabularDataType.PANDAS_DATAFRAME
-            columns = X.columns
-            X = X.to_numpy()
-        # call to generate function
-        Xt, yt = generate_func(self, X, y, **params)
-        if X_data_type == TabularDataType.PANDAS_DATAFRAME:
-            Xt = pd.DataFrame(Xt, columns=columns)
-        return Xt, yt
+    def wrapper(self, X, y, **kwargs):
+        # Validate and preprocess X
+        if isinstance(X, list):
+            X = pd.DataFrame(X)
+        elif isinstance(X, np.ndarray):
+            # if it is a numpy array first check the dimensionality, if dimension is 1 then reshape, if the dimension > 2 then raise error
+            if X.ndim == 1:
+                X = X.reshape(-1, 1)
+            if X.ndim > 2:
+                raise ValueError(
+                    "X has more than 2 dimensions where it is expected to have either 1 or 2!"
+                )
+            X = pd.DataFrame(data=X)
+        elif isinstance(X, pd.Series):
+            X = X.to_frame()
+        elif isinstance(X, pd.DataFrame):
+            # do nothing here
+            pass
+        else:
+            raise ValueError(f"X must be a list, numpy array, pandas Series, or pandas DataFrame\nX is: {type(X)}")
+
+        # Validate and preprocess y
+        if y is not None:
+            if isinstance(y, list):
+                y = pd.Series(y)
+            elif isinstance(y, np.ndarray):
+                y = pd.Series(y)
+            elif isinstance(y, pd.Series):
+                pass
+            else:
+                raise ValueError("y must be a list, numpy array, or pandas Series")
+
+        # Call the original function with the preprocessed inputs
+        return generate_func(self, X, y, **kwargs)
 
     return wrapper

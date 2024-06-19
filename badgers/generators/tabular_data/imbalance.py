@@ -1,10 +1,11 @@
 import abc
 
 import numpy as np
+import pandas as pd
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
-from badgers.core.decorators import numpy_API
+from badgers.core.decorators import preprocess_inputs
 from badgers.core.utils import normalize_proba
 
 
@@ -35,7 +36,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         super().__init__(random_generator=random_generator)
         self.sampling_proba_func = sampling_proba_func
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y=None, **params):
         """
         Randomly samples instances based on the features values in X
@@ -48,7 +49,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         # sampling
         sampling_proba = self.sampling_proba_func(X)
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_proba, size=X.shape[0], replace=True)
-        Xt = X[sampling_mask]
+        Xt = X.iloc[sampling_mask,:]
         yt = y[sampling_mask] if y is not None else y
         return Xt, yt
 
@@ -69,7 +70,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         self.transformed_labels_ = None
         self.proportion_classes = proportion_classes
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Randomly samples instances for each classes
@@ -88,8 +89,12 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
             Xt.append(self.random_generator.choice(X[y == label], size=size, replace=True))
             transformed_labels += [label] * size
 
-        Xt = np.vstack(Xt)
-        yt = np.array(transformed_labels)
+        Xt = pd.DataFrame(
+            data=np.vstack(Xt),
+            columns=X.columns
+        )
+
+        yt = pd.Series(data=transformed_labels)
 
         return Xt, yt
 
@@ -109,7 +114,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         self.transformed_labels_ = None
         self.sampling_proba_func = sampling_proba_func
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Randomly samples instances for each classes
@@ -122,7 +127,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_probabilities_, size=X.shape[0],
                                                      replace=True)
 
-        Xt = X[sampling_mask, :]
+        Xt = X.iloc[sampling_mask, :]
         yt = y[sampling_mask]
 
         return Xt, yt

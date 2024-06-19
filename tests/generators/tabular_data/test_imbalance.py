@@ -43,7 +43,7 @@ class TestRandomSamplingFeaturesGenerator(TestCase):
 
     def test_generate(self):
         def proba_func(X):
-            feature = X[:, 0]
+            feature = X.iloc[:, 0]
             return normalize_proba(
                 (np.max(feature) - feature) / (np.max(feature) - np.min(feature))
             )

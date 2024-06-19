@@ -6,7 +6,7 @@ import pandas as pd
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
-from badgers.core.decorators import numpy_API
+from badgers.core.decorators import preprocess_inputs
 from badgers.core.utils import normalize_proba
 
 
@@ -46,7 +46,7 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Computes indices of missing values using a uniform distribution.
@@ -63,7 +63,7 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
             rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=None)
             self.missing_values_indices_ += [(row, col) for row in rows]
             # generate missing values
-            X[rows, col] = np.nan
+            X.iloc[rows, col] = np.nan
 
         return X, y
 
@@ -85,7 +85,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
 
@@ -96,7 +96,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
         # initialize probability with zeros
         p = np.zeros_like(X)
         # normalize values between 0 and 1
-        X_norm = (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
+        X_norm = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))).values
         # make columns i depends on all the other
         if X.shape[1] > 1:
             for i in range(X.shape[1]):
@@ -114,7 +114,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
             rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:, col])
             self.missing_values_indices_ += [(row, col) for row in rows]
             # generate missing values
-            X[rows, col] = np.nan
+            X.iloc[rows, col] = np.nan
 
         return X, y
 
@@ -135,7 +135,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         """
         super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
 
-    @numpy_API
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
 
@@ -145,7 +145,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         """
 
         # normalize values between 0 and 1
-        p = (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
+        p = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))).values
         # make the sum of each column = 1
         p = normalize_proba(p)
 
@@ -157,6 +157,6 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
             rows = self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:, col])
             self.missing_values_indices_ += [(row, col) for row in rows]
             # generate missing values
-            X[rows, col] = np.nan
+            X.iloc[rows, col] = np.nan
 
         return X, y

@@ -5,6 +5,7 @@ from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
+from badgers.core.decorators import preprocess_inputs
 
 
 class NoiseGenerator(GeneratorMixin):
@@ -22,7 +23,7 @@ class NoiseGenerator(GeneratorMixin):
         self.repeat = repeat
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params):
+    def generate(self, X, y, **params):
         pass
 
 
@@ -40,6 +41,7 @@ class GaussianNoiseGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator, repeat=repeat)
         self.noise_std = noise_std
 
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Adds Gaussian white noise to the data.
@@ -87,6 +89,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator, repeat=repeat)
         self.noise_std_per_class = noise_std_per_class
 
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Add Gaussian white noise to the data.
