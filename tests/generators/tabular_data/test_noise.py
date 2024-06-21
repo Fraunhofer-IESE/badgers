@@ -25,7 +25,7 @@ class TestGaussianNoiseGenerator(TestCase):
                 Xt, _ = generator.generate(X.copy(), y=None, noise_std=1)
                 # assert arrays have same size
                 self.assertEqual(len(X), len(Xt))
-                self.assertTrue((np.var(Xt) > np.var(X)).all())
+                self.assertTrue((np.var(Xt, axis=0) > np.var(X, axis=0)).all())
 
 
 class TestGaussianNoiseClassesGenerator(TestCase):
