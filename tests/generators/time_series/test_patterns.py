@@ -68,7 +68,7 @@ class TestRandomlySpacedConstantPatterns(TestCase):
 
     def setUp(self) -> None:
         t = np.linspace(1, 10, 101)
-        self.X = (np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1)
+        self.X = pd.DataFrame(data=(np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1))
 
     def test_generate(self):
         generator = RandomlySpacedConstantPatterns(n_patterns=3, min_width_pattern=5, max_width_patterns=10,
@@ -78,7 +78,7 @@ class TestRandomlySpacedConstantPatterns(TestCase):
         self.assertEqual(generator.n_patterns, len(generator.patterns_indices_))
         # assert that all patterns are constant = 0
         for start, end in generator.patterns_indices_:
-            self.assertListEqual(Xt[start:end, :].tolist(), np.zeros((end - start, self.X.shape[1])).tolist())
+            self.assertListEqual(Xt.iloc[start:end, :].values.tolist(), np.zeros((end - start, self.X.shape[1])).tolist())
 
 
 class TestRandomlySpacedLinearPatterns(TestCase):
@@ -92,5 +92,5 @@ class TestRandomlySpacedLinearPatterns(TestCase):
         Xt, _ = generator.generate(self.X, None)
         for (start, end) in generator.patterns_indices_:
             for col in range(self.X.shape[1]):
-                self.assertListEqual(Xt[start:end, col].tolist(),
-                                     np.linspace(self.X[start, col], self.X[end, col], end - start).tolist())
+                self.assertListEqual(Xt.iloc[start:end, col].tolist(),
+                                     np.linspace(self.X.iloc[start, col], self.X.iloc[end, col], end - start).tolist())

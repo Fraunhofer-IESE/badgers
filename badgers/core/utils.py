@@ -48,7 +48,6 @@ def random_spherical_coordinate(random_generator: numpy.random.Generator = defau
     :return: an array of shape (`size`,) containing the values of the point generated
     """
     assert size > 0
-    x = None
     if size == 1:
         x = random_sign(random_generator, size=(1,)) * radius
     elif size == 2:

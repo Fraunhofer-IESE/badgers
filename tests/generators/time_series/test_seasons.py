@@ -25,7 +25,7 @@ class TestSeasonsGenerator(unittest.TestCase):
         season = np.sin(t * 2 * np.pi / expected_period)
         Xt_expected = X + season
 
-        self.assertListEqual(Xt_expected.tolist(), Xt.tolist())
+        self.assertListEqual(Xt_expected.tolist(), Xt.values.tolist())
         self.assertEqual(y, yt)
 
 

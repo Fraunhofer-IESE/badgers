@@ -1,8 +1,11 @@
 import unittest
+
+import numpy as np
+import pandas as pd
 from numpy.random import default_rng
 
 from badgers.generators.time_series.changepoints import ChangePointsGenerator, RandomChangeInMeanGenerator
-
+from pandas.testing import assert_frame_equal
 
 class TestChangePointGenerator(unittest.TestCase):
     def setUp(self):
@@ -26,12 +29,12 @@ class TestChangePointGenerator(unittest.TestCase):
         self.assertEqual(generator.changepoints, None)
 
     def test_RandomChangeInMeanGenerator_generate(self):
-        cp_generator = RandomChangeInMeanGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints, min_change=self.min_change, max_change=self.max_change)
-        X = [1, 2, 3, 4, 5]
+        generator = RandomChangeInMeanGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints, min_change=self.min_change, max_change=self.max_change)
+        X = pd.DataFrame(data=np.zeros(100), columns=['dimension_0'], dtype=float)
         y = None
 
-        Xt, _ = cp_generator.generate(X, y)
-        self.assertNotEqual(Xt, X)
+        Xt, _ = generator.generate(X.copy(), y)
+        self.assertTrue(any(X != Xt))
         self.assertEqual(y, y)
 
 

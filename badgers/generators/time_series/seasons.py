@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
-
+from badgers.core.decorators.time_series import preprocess_inputs
 
 class SeasonsGenerator(GeneratorMixin):
     """
@@ -32,6 +32,7 @@ class GlobalAdditiveSinusoidalSeasonGenerator(SeasonsGenerator):
         super().__init__(random_generator=random_generator)
         self.period = period
 
+    @preprocess_inputs
     def generate(self, X, y, **params) -> Tuple:
         """
 
@@ -42,5 +43,5 @@ class GlobalAdditiveSinusoidalSeasonGenerator(SeasonsGenerator):
         """
         t = np.arange(len(X))
         season = np.sin(t*2*np.pi/self.period)
-        Xt = X + season
+        Xt = X.add(season, axis=0)
         return Xt, y

@@ -4,9 +4,6 @@ import numpy as np
 import pandas as pd
 
 
-
-
-
 def preprocess_inputs(generate_func):
     """
     Validates and convert X and y for tabular data generators
@@ -14,10 +11,6 @@ def preprocess_inputs(generate_func):
     Preprocessing:
     X is converted to a pandas DataFrame
     y is converted to a pandas Series
-
-    Postprocessing
-
-    @TODO check y too!
     """
 
     @functools.wraps(generate_func)

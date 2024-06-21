@@ -2,10 +2,12 @@ import abc
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 from numpy.random import default_rng
 from scipy.interpolate import CubicSpline
 
 from badgers.core.base import GeneratorMixin
+from badgers.core.decorators.time_series import preprocess_inputs
 from badgers.generators.time_series.utils import generate_random_patterns_indices
 
 
@@ -59,34 +61,38 @@ class PatternsGenerator(GeneratorMixin):
     def generate(self, X, y, **params) -> Tuple:
         pass
 
-    def _inject_pattern(self, X: np.array, p: Pattern, start_index: int, end_index: int, scaling_factor: float = None):
+    def _inject_pattern(self, X: pd.DataFrame, p: Pattern, start_index: int, end_index: int,
+                        scaling_factor: float = 'auto'):
         """
         Utility function to inject a predefined pattern `p` into a signal `X`
         :param X: the signal to inject the pattern
         :param p: the pattern to be injected
         :param start_index:
         :param end_index:
-        :param scaling_factor:
+        :param scaling_factor: float | None | "auto" (default "auto")
         :return: the transformed signal where the pattern has been injected
         """
 
         # start and end values
-        v_start = X[start_index]
-        v_end = X[start_index]
+        v_start = X.iloc[start_index, :].values
+        v_end = X.iloc[start_index, :].values
 
         # number of points needed for resampling
         nb_points = end_index - start_index + 1
 
-        if scaling_factor is None:
+        if scaling_factor == 'auto':
             # compute a scaling factor to make the pattern looks realistic
             scaling_factor = (np.max(X[start_index:end_index + 1]) - np.min(X[start_index:end_index + 1])) / (
                 np.max(p.values) - np.min(p.values)) * self.random_generator.normal(1, 0.2)
+        elif scaling_factor is None:
+            # default to 1
+            scaling_factor = 1.0
 
         transformed_pattern = p.resample(nb_point=nb_points)
         transformed_pattern = scale(transformed_pattern, scaling_factor=scaling_factor)
         transformed_pattern = add_linear_trend(start_value=v_start, end_value=v_end, values=transformed_pattern)
 
-        X[start_index:end_index + 1, :] = transformed_pattern
+        X.iloc[start_index:end_index + 1, :] = transformed_pattern
         return X
 
 
@@ -103,15 +109,8 @@ class RandomlySpacedPatterns(PatternsGenerator):
         self.max_width_patterns = max_width_patterns
         self.pattern = pattern
 
+    @preprocess_inputs
     def generate(self, X, y, **params) -> Tuple:
-        # TODO input validation!
-        if X.ndim != 2:
-            raise ValueError(
-                "Expected 2D array. "
-                "Reshape your data either using array.reshape(-1, 1) if "
-                "your data has a single feature or array.reshape(1, -1) "
-                "if it contains a single sample."
-            )
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
@@ -139,15 +138,8 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
         self.max_width_patterns = max_width_patterns
         self.constant_value = constant_value
 
+    @preprocess_inputs
     def generate(self, X, y, **params) -> Tuple:
-        # TODO input validation!
-        if X.ndim < 2:
-            raise ValueError(
-                "Expected 2D array. "
-                "Reshape your data either using array.reshape(-1, 1) if "
-                "your data has a single feature or array.reshape(1, -1) "
-                "if it contains a single sample."
-            )
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
@@ -157,7 +149,7 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
             max_width_patterns=self.max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
-            X[start:end, :] = self.constant_value
+            X.iloc[start:end, :] = self.constant_value
 
         return X, y
 
@@ -173,15 +165,8 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
         self.min_width_pattern = min_width_pattern
         self.max_width_patterns = max_width_patterns
 
+    @preprocess_inputs
     def generate(self, X, y, **params) -> Tuple:
-        # TODO input validation!
-        if X.ndim < 2:
-            raise ValueError(
-                "Expected 2D array. "
-                "Reshape your data either using array.reshape(-1, 1) if "
-                "your data has a single feature or array.reshape(1, -1) "
-                "if it contains a single sample."
-            )
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
@@ -192,6 +177,6 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
 
         for (start, end) in self.patterns_indices_:
             for col in range(X.shape[1]):
-                X[start:end, col] = np.linspace(X[start, col], X[end, col], end - start)
+                X.iloc[start:end, col] = np.linspace(X.iloc[start, col], X.iloc[end, col], end - start)
 
         return X, y

@@ -5,7 +5,7 @@ from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.utils import random_sign
-
+from badgers.core.decorators.time_series import preprocess_inputs
 
 class OutliersGenerator(GeneratorMixin):
     """
@@ -39,6 +39,7 @@ class RandomZerosGenerator(OutliersGenerator):
         """
         super().__init__(random_generator=random_generator, n_outliers=n_outliers)
 
+    @preprocess_inputs
     def generate(self, X, y, **params) -> Tuple:
         """
         Randomly set values to zero
@@ -47,19 +48,11 @@ class RandomZerosGenerator(OutliersGenerator):
         :param params:
         :return:
         """
-        # TODO input validation!
-        if X.ndim < 2:
-            raise ValueError(
-                "Expected 2D array. "
-                "Reshape your data either using array.reshape(-1, 1) if "
-                "your data has a single feature or array.reshape(1, -1) "
-                "if it contains a single sample."
-            )
         # generate extreme values indices and values
         self.outliers_indices_ = self.random_generator.choice(X.shape[0], size=self.n_outliers, replace=False, p=None)
 
         for idx in self.outliers_indices_:
-            X[idx, :] = 0
+            X.iloc[idx, :] = 0
 
         return X, y
 
@@ -81,6 +74,7 @@ class LocalZScoreGenerator(OutliersGenerator):
         super().__init__(random_generator=random_generator, n_outliers=n_outliers)
         self.local_window_size = local_window_size
 
+    @preprocess_inputs
     def generate(self, X, y, **params):
         """
         Computes indices of extreme values using a uniform distribution.
@@ -90,24 +84,16 @@ class LocalZScoreGenerator(OutliersGenerator):
         :param X:
         :return: the transformed array
         """
-        # TODO input validation!
-        if X.ndim < 2:
-            raise ValueError(
-                "Expected 2D array. "
-                "Reshape your data either using array.reshape(-1, 1) if "
-                "your data has a single feature or array.reshape(1, -1) "
-                "if it contains a single sample."
-            )
         # generate extreme values indices and values
         self.outliers_indices_ = self.random_generator.choice(X.shape[0], size=self.n_outliers, replace=False, p=None)
 
         for idx in self.outliers_indices_:
-            local_window = X[idx - int(self.local_window_size / 2):idx + int(self.local_window_size / 2), :]
+            local_window = X.iloc[idx - int(self.local_window_size / 2):idx + int(self.local_window_size / 2), :]
             local_mean = local_window.mean(axis=0)
             local_std = local_window.std(axis=0)
             value = local_mean + random_sign(self.random_generator, size=X.shape[1]) * (
                 3. * local_std + self.random_generator.exponential(size=X.shape[1]))
             # updating with new outliers
-            X[idx, :] = value
+            X.iloc[idx, :] = value
 
         return X, y

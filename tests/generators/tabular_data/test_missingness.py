@@ -15,16 +15,31 @@ class TestMissingValueGenerator(TestCase):
         self.input_test_data = generate_test_data_only_features(rng=self.rng)
 
     def test_all_generators(self):
+        percentage_missing = 0.1
         for cls in self.generators_classes:
             transformer = cls()
             for input_type, (X, y) in self.input_test_data.items():
                 with self.subTest(transformer=transformer.__class__, input_type=input_type):
-                    Xt, _ = transformer.generate(X.copy(), y)
+                    Xt, _ = transformer.generate(X.copy(), y, percentage_missing=percentage_missing)
                     # assert arrays have same size
-                    self.assertEqual(X.shape, Xt.shape)
+                    # assert arrays have same size
+                    if input_type[-2:] == '1D':
+                        self.assertEqual(Xt.shape[1], 1)
+                    else:
+                        self.assertEqual(Xt.shape[1], 10)
+
                     # assert that the right number of nans have been generated
-                    self.assertEqual(np.sum(np.isnan(Xt).sum()),
-                                     transformer.percentage_missing / 100. * X.shape[0] * X.shape[1])
+                    if input_type[-2:] == '1D':
+                        self.assertEqual(
+                            np.sum(np.isnan(Xt).sum()),
+                            int(percentage_missing * 100)
+                        )
+                    else:
+                        self.assertEqual(
+                            np.sum(np.isnan(Xt).sum()),
+                            int(percentage_missing * 1000)
+                        )
+
 
 
 if __name__ == '__main__':

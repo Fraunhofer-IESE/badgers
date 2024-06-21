@@ -4,6 +4,7 @@ from typing import Tuple
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
+from badgers.core.decorators.time_series import preprocess_inputs
 
 
 class ChangePointsGenerator(GeneratorMixin):
@@ -14,7 +15,7 @@ class ChangePointsGenerator(GeneratorMixin):
     def __init__(self, random_generator=default_rng(seed=0), n_changepoints: int = 10):
         """
         :param random_generator: a random number generator
-        :param n_outliers: the number of outliers to generate
+        :param n_changepoints:
         """
         self.random_generator = random_generator
         self.n_changepoints = n_changepoints
@@ -36,6 +37,7 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
         self.min_change = min_change
         self.max_change = max_change
 
+    @preprocess_inputs
     def generate(self, X, y, **params) -> Tuple:
         """
 
