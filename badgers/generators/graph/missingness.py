@@ -15,14 +15,11 @@ class MissingGenerator(GeneratorMixin):
     Base class for missing nodes transformer
     """
 
-    def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
         """
 
-        :param percentage_missing: The percentage of missing nodes (int value between 0 and 100 included)
         :param random_generator: A random generator
         """
-        assert 0 <= percentage_missing <= 100
-        self.percentage_missing = percentage_missing
         self.random_generator = random_generator
 
     @abc.abstractmethod
@@ -35,16 +32,24 @@ class NodesMissingCompletelyAtRandom(MissingGenerator):
     Removes nodes from the graph uniformly at random.
     """
 
-    def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
-        super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
+    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+        super().__init__(random_generator=random_generator)
 
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, y=None, percentage_missing: float = 0.1) -> Tuple:
+        """
+
+        :param X:
+        :param y:
+        :param percentage_missing: The percentage of missing nodes (float value between 0 and 1 excluded)
+        :return:
+        """
+        assert 0 < percentage_missing < 1
         if not isinstance(X, nx.Graph):
             raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
 
         nodes_to_be_removed = self.random_generator.choice(
             X.nodes(),
-            int(X.number_of_nodes() * self.percentage_missing / 100),
+            int(X.number_of_nodes() * percentage_missing),
             replace=False
         )
 
@@ -64,16 +69,24 @@ class EdgesMissingCompletelyAtRandom(MissingGenerator):
     Removes edges from the graph uniformly at random.
     """
 
-    def __init__(self, percentage_missing: int = 10, random_generator: numpy.random.Generator = default_rng(seed=0)):
-        super().__init__(percentage_missing=percentage_missing, random_generator=random_generator)
+    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+        super().__init__(random_generator=random_generator)
 
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, y=None, percentage_missing: float = 0.1) -> Tuple:
+        """
+
+        :param X:
+        :param y:
+        :param percentage_missing: The percentage of missing nodes (float value between 0 and 1 excluded)
+        :return:
+        """
+        assert 0 < percentage_missing < 1
         if not isinstance(X, nx.Graph):
             raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
 
         edges_to_be_removed = self.random_generator.choice(
             X.edges(),
-            int(X.number_of_edges() * self.percentage_missing / 100),
+            int(X.number_of_edges() * percentage_missing),
             replace=False
         )
 
