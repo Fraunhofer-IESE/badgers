@@ -17,7 +17,7 @@ class TestSwapLettersGenerator(unittest.TestCase):
         For smaller words (length lower than or equal to 3):
         - no change occurs
         """
-        trf = SwapLettersGenerator(random_generator=default_rng(0), swap_proba=1)
+        trf = SwapLettersGenerator(random_generator=default_rng(0))
         X = [
             'abcdef',
             'abcde',
@@ -27,7 +27,7 @@ class TestSwapLettersGenerator(unittest.TestCase):
             'a'
         ]
 
-        Xt, _ = trf.generate(deepcopy(X), None)
+        Xt, _ = trf.generate(X=deepcopy(X), y=None, swap_proba=1)
 
         for i in range(len(X)):
             if len(X[i]) > 3:
