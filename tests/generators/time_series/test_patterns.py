@@ -1,6 +1,8 @@
+import unittest
 from unittest import TestCase
 
 import numpy as np
+import pandas as pd
 
 from badgers.generators.time_series.patterns import Pattern, add_offset, \
     add_linear_trend, scale, RandomlySpacedConstantPatterns, RandomlySpacedLinearPatterns, RandomlySpacedPatterns
@@ -41,10 +43,10 @@ class TestRandomlySpacedPatterns(TestCase):
         n_patterns = 3
         X = np.zeros(shape=100).reshape(-1,1)
         pattern = Pattern(values=np.array([0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0]))
-        generator = RandomlySpacedPatterns(n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
-        Xt, _ = generator.generate(X, None)
+        generator = RandomlySpacedPatterns()
+        Xt, _ = generator.generate(X=X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
         # assert that the correct number of patterns have been injected
-        self.assertEqual(generator.n_patterns, len(generator.patterns_indices_))
+        self.assertEqual(n_patterns, len(generator.patterns_indices_))
         # assert that no pattern overlap
         for i in range(n_patterns - 1):
             self.assertLess(generator.patterns_indices_[i][1], generator.patterns_indices_[i+1][0])
@@ -55,10 +57,10 @@ class TestRandomlySpacedPatterns(TestCase):
         X = np.zeros(shape=(100, 2))
         pattern = Pattern(
             values=np.array([[0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0], [0, -1, -2, -3, -4, -5, -4, -3, -2, -1, 0]]).T)
-        generator = RandomlySpacedPatterns(n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
-        Xt, _ = generator.generate(X, None)
+        generator = RandomlySpacedPatterns()
+        Xt, _ = generator.generate(X=X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
         # assert that the correct number of patterns have been injected
-        self.assertEqual(generator.n_patterns, len(generator.patterns_indices_))
+        self.assertEqual(n_patterns, len(generator.patterns_indices_))
         # assert that no pattern overlap
         for i in range(n_patterns - 1):
             self.assertLess(generator.patterns_indices_[i][1], generator.patterns_indices_[i+1][0])
@@ -71,11 +73,12 @@ class TestRandomlySpacedConstantPatterns(TestCase):
         self.X = pd.DataFrame(data=(np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1))
 
     def test_generate(self):
-        generator = RandomlySpacedConstantPatterns(n_patterns=3, min_width_pattern=5, max_width_patterns=10,
+        n_patterns = 3
+        generator = RandomlySpacedConstantPatterns()
+        Xt, _ = generator.generate(X=self.X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10,
                                                    constant_value=0)
-        Xt, _ = generator.generate(self.X, None)
         # assert that the correct number of patterns have been injected
-        self.assertEqual(generator.n_patterns, len(generator.patterns_indices_))
+        self.assertEqual(n_patterns, len(generator.patterns_indices_))
         # assert that all patterns are constant = 0
         for start, end in generator.patterns_indices_:
             self.assertListEqual(Xt.iloc[start:end, :].values.tolist(), np.zeros((end - start, self.X.shape[1])).tolist())
@@ -85,12 +88,16 @@ class TestRandomlySpacedLinearPatterns(TestCase):
 
     def setUp(self) -> None:
         t = np.linspace(1, 10, 101)
-        self.X = (np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1)
+        self.X = pd.DataFrame(data=(np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1))
 
     def test_generate(self):
-        generator = RandomlySpacedLinearPatterns(n_patterns=3, min_width_pattern=5, max_width_patterns=10)
-        Xt, _ = generator.generate(self.X, None)
+        generator = RandomlySpacedLinearPatterns()
+        Xt, _ = generator.generate(X=self.X, y=None, n_patterns=3, min_width_pattern=5, max_width_patterns=10)
         for (start, end) in generator.patterns_indices_:
             for col in range(self.X.shape[1]):
                 self.assertListEqual(Xt.iloc[start:end, col].tolist(),
                                      np.linspace(self.X.iloc[start, col], self.X.iloc[end, col], end - start).tolist())
+
+
+if __name__ == '__main__':
+    unittest.main()

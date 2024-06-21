@@ -1,5 +1,5 @@
 import abc
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -48,13 +48,12 @@ class PatternsGenerator(GeneratorMixin):
     Base class for transformers that generate patterns in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), n_patterns: int = 10):
+    def __init__(self, random_generator=default_rng(seed=0)):
         """
         :param random_generator: a random number generator
         :param n_patterns: the number of patterns to generate
         """
         self.random_generator = random_generator
-        self.n_patterns = n_patterns
         self.patterns_indices_ = []
 
     @abc.abstractmethod
@@ -62,7 +61,7 @@ class PatternsGenerator(GeneratorMixin):
         pass
 
     def _inject_pattern(self, X: pd.DataFrame, p: Pattern, start_index: int, end_index: int,
-                        scaling_factor: float = 'auto'):
+                        scaling_factor: Union[float,str] = 'auto'):
         """
         Utility function to inject a predefined pattern `p` into a signal `X`
         :param X: the signal to inject the pattern
@@ -101,26 +100,23 @@ class RandomlySpacedPatterns(PatternsGenerator):
     Inject given patterns with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), n_patterns: int = 10, min_width_pattern: int = 5,
-                 max_width_patterns: int = 10,
-                 pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0]))):
-        super().__init__(random_generator=random_generator, n_patterns=n_patterns)
-        self.min_width_pattern = min_width_pattern
-        self.max_width_patterns = max_width_patterns
-        self.pattern = pattern
+    def __init__(self, random_generator=default_rng(seed=0)):
+        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
+                 max_width_patterns: int = 10,
+                 pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0]))) -> Tuple:
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
-            n_patterns=self.n_patterns,
+            n_patterns=n_patterns,
             signal_size=len(X),
-            min_width_pattern=self.min_width_pattern,
-            max_width_patterns=self.max_width_patterns)
+            min_width_pattern=min_width_pattern,
+            max_width_patterns=max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
-            X = self._inject_pattern(X, p=self.pattern, start_index=start, end_index=end, scaling_factor=None)
+            X = self._inject_pattern(X, p=pattern, start_index=start, end_index=end, scaling_factor='auto')
 
         return X, y
 
@@ -130,26 +126,23 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
     Generates constant patterns of constant value with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), n_patterns: int = 10, min_width_pattern: int = 5,
-                 max_width_patterns: int = 10,
-                 constant_value: float = 0):
-        super().__init__(random_generator=random_generator, n_patterns=n_patterns)
-        self.min_width_pattern = min_width_pattern
-        self.max_width_patterns = max_width_patterns
-        self.constant_value = constant_value
+    def __init__(self, random_generator=default_rng(seed=0)):
+        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
+                 max_width_patterns: int = 10,
+                 constant_value: float = 0) -> Tuple:
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
-            n_patterns=self.n_patterns,
+            n_patterns=n_patterns,
             signal_size=len(X),
-            min_width_pattern=self.min_width_pattern,
-            max_width_patterns=self.max_width_patterns)
+            min_width_pattern=min_width_pattern,
+            max_width_patterns=max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
-            X.iloc[start:end, :] = self.constant_value
+            X.iloc[start:end, :] = constant_value
 
         return X, y
 
@@ -159,21 +152,19 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
     Generates patterns of constant slope (linear) with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), n_patterns: int = 10, min_width_pattern: int = 5,
-                 max_width_patterns: int = 10):
-        super().__init__(random_generator=random_generator, n_patterns=n_patterns)
-        self.min_width_pattern = min_width_pattern
-        self.max_width_patterns = max_width_patterns
+    def __init__(self, random_generator=default_rng(seed=0)):
+        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
+                 max_width_patterns: int = 10) -> Tuple:
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
-            n_patterns=self.n_patterns,
+            n_patterns=n_patterns,
             signal_size=len(X),
-            min_width_pattern=self.min_width_pattern,
-            max_width_patterns=self.max_width_patterns)
+            min_width_pattern=min_width_pattern,
+            max_width_patterns=max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
             for col in range(X.shape[1]):
