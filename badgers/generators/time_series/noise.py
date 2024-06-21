@@ -2,6 +2,7 @@ import abc
 from typing import Tuple
 
 import pandas as pd
+from badgers.generators.time_series.utils import generate_random_patterns_indices
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
@@ -31,13 +32,15 @@ class LocalGaussianNoiseGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_patterns: int = 10, patterns_width: int = 10,
+    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5, max_width_patterns: int=10,
                  noise_std: float = 0.1) -> Tuple:
         # generate extreme values indices and values
-        self.patterns_indices_ = [(x, x + patterns_width) for x in
-                                  self.random_generator.choice(X.shape[0] - patterns_width,
-                                                               size=n_patterns,
-                                                               replace=False, p=None)]
+        self.patterns_indices_ = generate_random_patterns_indices(
+            random_generator=self.random_generator,
+            n_patterns=n_patterns,
+            signal_size=len(X),
+            min_width_pattern=min_width_pattern,
+            max_width_patterns=max_width_patterns)
 
         scaler = StandardScaler()
         # fit, transform
@@ -45,7 +48,7 @@ class LocalGaussianNoiseGenerator(NoiseGenerator):
         Xt = scaler.transform(X)
 
         for (start, end) in self.patterns_indices_:
-            Xt[start:end, :] += self.random_generator.normal(loc=0, scale=noise_std, size=(patterns_width, Xt.shape[1]))
+            Xt[start:end, :] += self.random_generator.normal(loc=0, scale=noise_std, size=(end-start, Xt.shape[1]))
 
         # inverse standardization
         return pd.DataFrame(data=scaler.inverse_transform(Xt), columns=X.columns, index=X.index), y

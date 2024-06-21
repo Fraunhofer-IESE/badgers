@@ -54,10 +54,9 @@ class GaussianNoiseGenerator(NoiseGenerator):
         # standardize X
         scaler = StandardScaler()
         # fit, transform
-        scaler.fit(X)
-        Xt = scaler.transform(X)
+        Xt = scaler.fit_transform(X)
         # add noise
-        Xt + self.random_generator.normal(loc=0, scale=noise_std, size=Xt.shape)
+        Xt += self.random_generator.normal(loc=0, scale=noise_std, size=Xt.shape)
         # inverse standardization
         Xt = scaler.inverse_transform(Xt)
         return pd.DataFrame(data=Xt, columns=X.columns, index=X.index), y

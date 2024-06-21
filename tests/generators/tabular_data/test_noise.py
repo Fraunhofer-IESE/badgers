@@ -22,9 +22,10 @@ class TestGaussianNoiseGenerator(TestCase):
         generator = GaussianNoiseGenerator()
         for input_type, (X, y) in self.input_test_data.items():
             with self.subTest(transformer=generator.__class__, input_type=input_type):
-                Xt, _ = generator.generate(X.copy(), y=None, noise_std=0.1)
+                Xt, _ = generator.generate(X.copy(), y=None, noise_std=1)
                 # assert arrays have same size
                 self.assertEqual(len(X), len(Xt))
+                self.assertTrue((np.var(Xt) > np.var(X)).all())
 
 
 class TestGaussianNoiseClassesGenerator(TestCase):
