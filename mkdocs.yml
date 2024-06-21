@@ -24,6 +24,8 @@ nav:
                     -   Generating Changepoints: tutorials/Changepoints-Time-Series.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
+            -   Implementing Novel Generators:
+                    -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
     -   API: reference/
 
 theme:

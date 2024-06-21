@@ -19,10 +19,9 @@ class OutliersGenerator(GeneratorMixin):
     Base class for transformers that add outliers to tabular data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator: np.random.Generator=default_rng(seed=0)):
         """
         :param random_generator: A random generator
-        :param n_outliers: The number of outliers to generate
         """
         self.random_generator = random_generator
 
