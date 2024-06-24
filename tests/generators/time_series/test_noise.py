@@ -2,7 +2,10 @@ from unittest import TestCase
 
 import numpy as np
 
-from badgers.generators.time_series.noise import GlobalGaussianNoiseGenerator, LocalGaussianNoiseGenerator
+from badgers.generators.time_series.noise import GlobalGaussianNoiseGenerator, LocalGaussianNoiseGenerator, NoiseGenerator
+
+
+
 
 
 class TestLocalGaussianNoiseGenerator(TestCase):

@@ -30,26 +30,28 @@ class SwapLettersGenerator(TyposGenerator):
     Example: 'kilogram' --> 'kilogarm'
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), swap_proba=0.1):
+    def __init__(self, random_generator=default_rng(seed=0)):
         """
 
         :param random_generator: A random generator
-        :param swap_proba: Each word with a length greater than 3 will have this probability to contain a switch (max one per word)
+
 
         """
         super().__init__(random_generator)
-        self.switching_proba = swap_proba
 
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, y, swap_proba:float=0.1) -> Tuple:
         """
         For each word with a length greater than 3, apply a single swap with probability `self.swap_proba`
         Where the swap happens is determined randomly
 
+
         :param X: A list of words where we apply typos
+        :param y: not used
+        :param swap_proba: Each word with a length greater than 3 will have this probability to contain a switch (max one per word)
         :return: the transformed list of words
         """
         for i in range(len(X)):
-            if len(X[i]) > 3 and self.random_generator.random() <= self.switching_proba:
+            if len(X[i]) > 3 and self.random_generator.random() <= swap_proba:
                 # get the ith word in the list and make it a list of letters
                 word = list(X[i])
                 # randomly chose letters to switch
@@ -63,15 +65,12 @@ class SwapLettersGenerator(TyposGenerator):
 
 class LeetSpeakGenerator(TyposGenerator):
 
-    def __init__(self, random_generator=default_rng(seed=0), replacement_proba: float = 0.1):
+    def __init__(self, random_generator=default_rng(seed=0)):
         """
 
         :param random_generator: a random number generator
-        :param replacement_proba: the probability of replacing a letter with its leet counterpart
         """
         super().__init__(random_generator=random_generator)
-        assert 0 <= replacement_proba <= 1
-        self.replacement_proba = replacement_proba
         self.leet_speak_mapping = {
             "A": ["4", "/\\", "@", "/-\\", "^", "(L", "\u0414"],
             "B": ["I3", "8", "13", "|3", "\u00df", "!3", "(3", "/3", ")3", "|-]", "j3"],
@@ -104,21 +103,29 @@ class LeetSpeakGenerator(TyposGenerator):
             "Z": ["2", "7_", "-/_", "%", ">_", "s", "~/_", "-\\_", "-|_"]
         }
 
-    def randomly_replace_letter(self, letter):
+    def randomly_replace_letter(self, letter, replacement_proba):
         """
         Randomly replace a letter with its leet counterpart
         :param letter:
+        :param replacement_proba: the probability of replacing a letter with its leet counterpart
         :return:
         """
-        if self.random_generator.random() < self.replacement_proba:
+        if self.random_generator.random() < replacement_proba:
             return self.random_generator.choice(self.leet_speak_mapping[letter.upper()])
         else:
             return letter
 
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, y, replacement_proba: float = 0.1) -> Tuple:
+        """
 
+        :param X: A list of words where we apply leet replacement
+        :param y:
+        :param replacement_proba: the probability of replacing a letter with its leet counterpart
+        :return:
+        """
+        assert 0 <= replacement_proba <= 1
         Xt = [
-            ''.join([self.randomly_replace_letter(l) for l in word])
+            ''.join([self.randomly_replace_letter(l, replacement_proba=replacement_proba) for l in word])
             for word in X
         ]
 

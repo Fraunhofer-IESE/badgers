@@ -11,11 +11,13 @@ def generate_test_data_only_features(rng: numpy.random.Generator = default_rng(0
     :return:
     """
     return {
-        'numpy_1D': (rng.normal(size=10).reshape(-1, 1), None),
+        'list_1D': (rng.normal(size=100).tolist(), None),
+        'list_2D': (rng.normal(size=(100, 10)).tolist(), None),
+        'numpy_1D': (rng.normal(size=100).reshape(-1, 1), None),
         'numpy_2D': (rng.normal(size=(100, 10)), None),
         'pandas_1D': (
             pd.DataFrame(
-                data=rng.normal(size=10).reshape(-1, 1),
+                data=rng.normal(size=100).reshape(-1, 1),
                 columns=['col']
             ), None),
         'pandas_2D': (
@@ -33,12 +35,14 @@ def generate_test_data_with_classification_labels(rng: numpy.random.Generator = 
     :return:
     """
     return {
-        'numpy_1D': (rng.normal(size=10).reshape(-1, 1), np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1])),
+        'list_1D': (rng.normal(size=100).reshape(-1, 1).tolist(), [i % 5 for i in range(100)]),
+        'list_2D': (rng.normal(size=(100, 10)).tolist(), [0, 1, 2, 3, 4] * 20),
+        'numpy_1D': (rng.normal(size=100).reshape(-1, 1), np.array([i % 5 for i in range(100)])),
         'numpy_2D': (rng.normal(size=(100, 10)), np.array([0, 1, 2, 3, 4] * 20)),
         'pandas_1D': (
-            pd.DataFrame(data=rng.normal(size=10).reshape(-1, 1),
+            pd.DataFrame(data=rng.normal(size=100).reshape(-1, 1),
                          columns=['col']),
-            pd.Series(data=[0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+            pd.Series(data=[i % 5 for i in range(100)])
         ),
         'pandas_2D': (
             pd.DataFrame(data=rng.normal(size=(100, 10)),
@@ -55,12 +59,14 @@ def generate_test_data_with_regression_targets(rng: numpy.random.Generator = def
     :return:
     """
     return {
-        'numpy_1D': (rng.normal(size=10).reshape(-1, 1), rng.normal(size=10)),
+        'list_1D': (rng.normal(size=100).reshape(-1, 1).tolist(), rng.normal(size=100).tolist()),
+        'list_2D': (rng.normal(size=(100, 10)).tolist(), rng.normal(size=100).tolist()),
+        'numpy_1D': (rng.normal(size=100).reshape(-1, 1), rng.normal(size=100)),
         'numpy_2D': (rng.normal(size=(100, 10)), rng.normal(size=100)),
         'pandas_1D': (
-            pd.DataFrame(data=rng.normal(size=10).reshape(-1, 1),
+            pd.DataFrame(data=rng.normal(size=100).reshape(-1, 1),
                          columns=['col']),
-            pd.Series(data=rng.normal(size=10))
+            pd.Series(data=rng.normal(size=100))
         ),
         'pandas_2D': (
             pd.DataFrame(data=rng.normal(size=(100, 10)),

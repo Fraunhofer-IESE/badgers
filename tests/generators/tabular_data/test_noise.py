@@ -19,20 +19,13 @@ class TestGaussianNoiseGenerator(TestCase):
         - checks that the transformed array has the same size as the input array
         - checks that the variance of the transformed array is greater than the one of the input array
         """
-        generator = GaussianNoiseGenerator(repeat=1)
+        generator = GaussianNoiseGenerator()
         for input_type, (X, y) in self.input_test_data.items():
             with self.subTest(transformer=generator.__class__, input_type=input_type):
-                Xt, _ = generator.generate(X.copy(), None)
+                Xt, _ = generator.generate(X.copy(), y=None, noise_std=1)
                 # assert arrays have same size
-                self.assertEqual(X.shape, Xt.shape)
-
-        generator = GaussianNoiseGenerator(repeat=5)
-        for input_type, (X, y) in self.input_test_data.items():
-            with self.subTest(transformer=generator.__class__, input_type=input_type):
-                Xt, _ = generator.generate(X.copy(), None)
-                # assert shapes increase with repeat > 1
-                self.assertEqual(X.shape[0] * 5, Xt.shape[0])
-                self.assertEqual(X.shape[1], Xt.shape[1])
+                self.assertEqual(len(X), len(Xt))
+                self.assertTrue((np.var(Xt, axis=0) > np.var(X, axis=0)).all())
 
 
 class TestGaussianNoiseClassesGenerator(TestCase):
@@ -48,22 +41,12 @@ class TestGaussianNoiseClassesGenerator(TestCase):
 
         for input_type, (X, y) in self.input_test_data.items():
             noise_std_per_class = {label: 0.1 for label in np.unique(y)}
-            generator = GaussianNoiseClassesGenerator(repeat=1, noise_std_per_class=noise_std_per_class)
+            generator = GaussianNoiseClassesGenerator()
             with self.subTest(transformer=generator.__class__, input_type=input_type):
-                Xt, yt = generator.generate(X.copy(), y)
+                Xt, yt = generator.generate(X.copy(), y, noise_std_per_class=noise_std_per_class)
                 # assert arrays have same size
-                self.assertEqual(X.shape, Xt.shape)
+                self.assertEqual(len(X), len(Xt))
                 self.assertEqual(len(y), len(yt))
-
-        for input_type, (X, y) in self.input_test_data.items():
-            noise_std_per_class = {label: 0.1 for label in np.unique(y)}
-            generator = GaussianNoiseClassesGenerator(repeat=5, noise_std_per_class=noise_std_per_class)
-            with self.subTest(transformer=generator.__class__, input_type=input_type):
-                Xt, yt = generator.generate(X.copy(), y)
-                # assert shapes increase with repeat > 1
-                self.assertEqual(X.shape[0] * 5, Xt.shape[0])
-                self.assertEqual(len(y) * 5, len(yt))
-                self.assertEqual(X.shape[1], Xt.shape[1])
 
 
 if __name__ == '__main__':

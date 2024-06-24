@@ -16,16 +16,15 @@ class TestSeasonsGenerator(unittest.TestCase):
         # Test the generate method of GlobalAdditiveSinusoidalSeasonGenerator
         X = np.zeros(shape=100)
         y = None
-        expected_period = 100
-        generator = GlobalAdditiveSinusoidalSeasonGenerator(random_generator=self.random_generator,
-                                                            period=expected_period)
-        Xt, yt = generator.generate(X, y)
+        period = 10
+        generator = GlobalAdditiveSinusoidalSeasonGenerator(random_generator=self.random_generator)
+        Xt, yt = generator.generate(X=X, y=y, period=period)
 
         t = np.arange(100)
-        season = np.sin(t * 2 * np.pi / expected_period)
+        season = np.sin(t * 2 * np.pi / period)
         Xt_expected = X + season
 
-        self.assertListEqual(Xt_expected.tolist(), Xt.tolist())
+        self.assertListEqual(Xt_expected.reshape(-1,1).tolist(), Xt.values.tolist())
         self.assertEqual(y, yt)
 
 

@@ -5,6 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
+from badgers.core.decorators.time_series import preprocess_inputs
 
 
 class TrendsGenerator(GeneratorMixin):
@@ -28,18 +29,20 @@ class GlobalAdditiveLinearTrendGenerator(TrendsGenerator):
     Add a linear trend to the input time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), slope: float = 0.1):
+    def __init__(self, random_generator=default_rng(seed=0)):
         super().__init__(random_generator=random_generator)
-        self.slope = slope
 
-    def generate(self, X, y, **params) -> Tuple:
+    @preprocess_inputs
+    def generate(self, X, y, slope) -> Tuple:
         """
 
         :param X:
         :param y:
-        :param params:
+        :param slope:
         :return:
         """
-        trend = self.slope * np.linspace(0, 1, len(X))
-        Xt = X + trend
+
+        t = np.linspace(0, 1, len(X))
+        trend = t[:, np.newaxis] * slope
+        Xt = X.add(trend, axis=0)
         return Xt, y

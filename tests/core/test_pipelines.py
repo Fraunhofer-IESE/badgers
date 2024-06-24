@@ -13,15 +13,15 @@ class MyTestCase(unittest.TestCase):
         random_generator = default_rng(0)
         X, y = make_blobs(centers=3, random_state=0)
         generators = {
-            'imbalance': RandomSamplingClassesGenerator(
-                random_generator=random_generator,
-                proportion_classes={0: 0.5, 1: 0.25, 2: 0.25}),
-            'noise': GaussianNoiseGenerator(
-                random_generator=random_generator,
-                noise_std=0.5)
+            'imbalance': RandomSamplingClassesGenerator(random_generator=random_generator),
+            'noise': GaussianNoiseGenerator(random_generator=random_generator)
         }
         pipeline = Pipeline(generators=generators)
-        Xt, yt = pipeline.generate(X, y)
+        params = {
+            'imbalance': {'proportion_classes': {0: 0.5, 1: 0.25, 2: 0.25}},
+            'noise': {'noise_std':0.5}
+        }
+        Xt, yt = pipeline.generate(X=X, y=y, params=params)
 
 
 if __name__ == '__main__':

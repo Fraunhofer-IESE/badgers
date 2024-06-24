@@ -1,7 +1,5 @@
 from typing import Dict
 
-from badgers.core.base import GeneratorMixin
-
 
 class Pipeline:
     """
@@ -24,7 +22,8 @@ class Pipeline:
 
         :param X: the input features
         :param y: the class labels, regression targets, or None
-        :param params: a dictionary containing as key the generator names and as values the parameters for each corresponding generate function
+        :param params: a dictionary containing as key: the generator names and
+        as values: the parameters for each corresponding generate function
         :return: Xt, yt
         """
         if params is None:

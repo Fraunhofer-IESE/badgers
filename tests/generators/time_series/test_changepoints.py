@@ -1,7 +1,10 @@
 import unittest
+
+import numpy as np
+import pandas as pd
 from numpy.random import default_rng
 
-from badgers.generators.time_series.changepoints import ChangePointGenerator, RandomChangeInMeanGenerator
+from badgers.generators.time_series.changepoints import RandomChangeInMeanGenerator
 
 
 class TestChangePointGenerator(unittest.TestCase):
@@ -11,27 +14,14 @@ class TestChangePointGenerator(unittest.TestCase):
         self.min_change = -5
         self.max_change = 5
 
-    def test_ChangePointGenerator_init(self):
-        generator = ChangePointGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints)
-        self.assertEqual(generator.random_generator, self.random_generator)
-        self.assertEqual(generator.n_changepoints, self.n_changepoints)
-        self.assertEqual(generator.changepoints, None)
-
-    def test_RandomChangeInMeanGenerator_init(self):
-        generator = RandomChangeInMeanGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints, min_change=self.min_change, max_change=self.max_change)
-        self.assertEqual(generator.random_generator, self.random_generator)
-        self.assertEqual(generator.n_changepoints, self.n_changepoints)
-        self.assertEqual(generator.min_change, self.min_change)
-        self.assertEqual(generator.max_change, self.max_change)
-        self.assertEqual(generator.changepoints, None)
-
     def test_RandomChangeInMeanGenerator_generate(self):
-        cp_generator = RandomChangeInMeanGenerator(random_generator=self.random_generator, n_changepoints=self.n_changepoints, min_change=self.min_change, max_change=self.max_change)
-        X = [1, 2, 3, 4, 5]
+        generator = RandomChangeInMeanGenerator(random_generator=self.random_generator)
+        X = pd.DataFrame(data=np.zeros(100), columns=['dimension_0'], dtype=float)
         y = None
 
-        Xt, _ = cp_generator.generate(X, y)
-        self.assertNotEqual(Xt, X)
+        Xt, _ = generator.generate(X.copy(), y, n_changepoints=self.n_changepoints, min_change=self.min_change,
+                                   max_change=self.max_change)
+        self.assertTrue(any(X != Xt))
         self.assertEqual(y, y)
 
 

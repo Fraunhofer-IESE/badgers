@@ -1,5 +1,7 @@
 # About
 
+## Thanks to:
+
 The development of [badgers](https://github.com/Fraunhofer-IESE/badgers) was initially driven by Julien Siebert at the Data Science Department of the Fraunhofer Institute for Experimental Software Engineering ([IESE](https://www.iese.fraunhofer.de/)) in Kaiserslautern, Germany.
 
 The original idea came during internal discussions with Patricia Kelbert, Adam Trendowicz, and Michael Kläs.
@@ -25,7 +27,7 @@ Julien Siebert, Daniel Seifert, Patricia Kelbert, Michael Kläs, Adam Trendowicz
 
 ## Contributing to Badgers
 
-Every contribution is welcome, please have a look at [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md) for more info.
+Every contribution is welcome, please have a look at [dev-tutorials](../dev/Create-New-Tabular-Generators/) section and [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md) for more info.
 
 
 
