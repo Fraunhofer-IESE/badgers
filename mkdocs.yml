@@ -19,6 +19,7 @@ nav:
             -   Time Series Data:
                     -   Generating Point Outliers: tutorials/time-series/Outliers-Time-Series.ipynb
                     -   Generating Missing Data: tutorials/time-series/Missingness-Time-Series.ipynb
+                    -   Generating Noise: tutorials/time-series/Noise-Time-Series.ipynb
                     -   Generating Patterns: tutorials/time-series/Patterns-Time-Series.ipynb
                     -   Generating Trends: tutorials/time-series/Trends-Time-Series.ipynb
                     -   Generating Seasons: tutorials/time-series/Seasons-Time-Series.ipynb
