@@ -30,7 +30,7 @@ class TestUtils(TestCase):
                     np.all(X == np.abs(Xt))
                 )
                 if X.shape != (1,):
-                    self.assertNotEquals(
+                    self.assertNotEqual(
                         np.sum(X == 1), np.sum(Xt == 1)
                     )
 

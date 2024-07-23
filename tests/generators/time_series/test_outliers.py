@@ -29,6 +29,7 @@ class TestLocalZScoreGenerator(unittest.TestCase):
         Xt, _ = generator.generate(X=self.X, y=None, n_outliers=n_outliers)
         self.assertEqual(Xt.shape, self.X.shape)
         self.assertEqual(len(generator.outliers_indices_), n_outliers)
+        self.assertFalse(Xt.isna().any()[0])
 
 
 

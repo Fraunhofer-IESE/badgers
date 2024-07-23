@@ -1,11 +1,13 @@
 import abc
 from typing import Tuple
 
+import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
-from badgers.core.utils import random_sign
 from badgers.core.decorators.time_series import preprocess_inputs
+from badgers.core.utils import random_sign
+
 
 class OutliersGenerator(GeneratorMixin):
     """
@@ -48,10 +50,13 @@ class RandomZerosGenerator(OutliersGenerator):
         :return:
         """
         # generate extreme values indices and values
-        self.outliers_indices_ = self.random_generator.choice(X.shape[0], size=n_outliers, replace=False, p=None)
+        rows = self.random_generator.choice(X.shape[0], size=n_outliers, replace=False, p=None)
+        cols = self.random_generator.integers(low=0, high=X.shape[1], size=n_outliers)
 
-        for idx in self.outliers_indices_:
-            X.iloc[idx, :] = 0
+        self.outliers_indices_ = list(zip(rows, cols))
+
+        for r, c in self.outliers_indices_:
+            X.iloc[r, c] = 0
 
         return X, y
 
@@ -84,15 +89,21 @@ class LocalZScoreGenerator(OutliersGenerator):
         :return: the transformed array
         """
         # generate extreme values indices and values
-        self.outliers_indices_ = self.random_generator.choice(X.shape[0], size=n_outliers, replace=False, p=None)
+        delta = int(local_window_size / 2)
 
-        for idx in self.outliers_indices_:
-            local_window = X.iloc[idx - int(local_window_size / 2):idx + int(local_window_size / 2), :]
+        rows = self.random_generator.choice(
+            np.arange(delta, X.shape[0] - delta, dtype=int), size=n_outliers, replace=False, p=None)
+        cols = self.random_generator.integers(low=0, high=X.shape[1], size=n_outliers)
+
+        self.outliers_indices_ = list(zip(rows, cols))
+
+        for r, c in self.outliers_indices_:
+            local_window = X.iloc[r - delta:r + delta, c]
             local_mean = local_window.mean(axis=0)
             local_std = local_window.std(axis=0)
-            value = local_mean + random_sign(self.random_generator, size=X.shape[1]) * (
-                3. * local_std + self.random_generator.exponential(size=X.shape[1]))
+            value = local_mean + random_sign(self.random_generator) * (
+                3. * local_std + self.random_generator.exponential())
             # updating with new outliers
-            X.iloc[idx, :] = value
+            X.iloc[r, c] = value
 
         return X, y
