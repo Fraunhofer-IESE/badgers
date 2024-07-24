@@ -10,18 +10,20 @@ nav:
     -   Changes: changelog.md
     -   Tutorials:
             -   Tabular Data:
-                    -   Generating Imbalanced Data: tutorials/Imbalance-Tabular-Data.ipynb
-                    -   Generating Missing Data: tutorials/Missingness-Tabular-Data.ipynb
-                    -   Generating Noise: tutorials/Noise-Tabular-Data.ipynb
-                    -   Generating Outliers: tutorials/Outliers-Tabular-Data.ipynb
+                    -   Generating Imbalanced Data: tutorials/tabular-data/Imbalance-Tabular-Data.ipynb
+                    -   Generating Missing Data: tutorials/tabular-data/Missingness-Tabular-Data.ipynb
+                    -   Generating Noise: tutorials/tabular-data/Noise-Tabular-Data.ipynb
+                    -   Generating Outliers: tutorials/tabular-data/Outliers-Tabular-Data.ipynb
             -   Text Data:
-                    -   Generating Typos: tutorials/Typos-Text.ipynb
+                    -   Generating Typos: tutorials/text/Typos-Text.ipynb
             -   Time Series Data:
-                    -   Generating Point Outliers: tutorials/Outliers-Time-Series.ipynb
-                    -   Generating Patterns: tutorials/Patterns-Time-Series.ipynb
-                    -   Generating Trends: tutorials/Trends-Time-Series.ipynb
-                    -   Generating Seasons: tutorials/Seasons-Time-Series.ipynb
-                    -   Generating Changepoints: tutorials/Changepoints-Time-Series.ipynb
+                    -   Generating Point Outliers: tutorials/time-series/Outliers-Time-Series.ipynb
+                    -   Generating Missing Data: tutorials/time-series/Missingness-Time-Series.ipynb
+                    -   Generating Noise: tutorials/time-series/Noise-Time-Series.ipynb
+                    -   Generating Patterns: tutorials/time-series/Patterns-Time-Series.ipynb
+                    -   Generating Trends: tutorials/time-series/Trends-Time-Series.ipynb
+                    -   Generating Seasons: tutorials/time-series/Seasons-Time-Series.ipynb
+                    -   Generating Changepoints: tutorials/time-series/Changepoints-Time-Series.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
             -   Implementing Novel Generators:
