@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "badgers"
-version = "0.0.7"
+version = "0.0.8"
 keywords = ["data quality", "bad data", "data science"]
 authors = [
     { name = "Julien Siebert", email = "julien.siebert@iese.fraunhofer.de" },

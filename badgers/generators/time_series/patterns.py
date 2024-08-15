@@ -133,6 +133,16 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
     def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10,
                  constant_value: float = 0) -> Tuple:
+        """
+
+        :param X:
+        :param y:
+        :param n_patterns:
+        :param min_width_pattern:
+        :param max_width_patterns:
+        :param constant_value:
+        :return:
+        """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
@@ -158,6 +168,15 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
     @preprocess_inputs
     def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10) -> Tuple:
+        """
+
+        :param X:
+        :param y:
+        :param n_patterns:
+        :param min_width_pattern:
+        :param max_width_patterns:
+        :return:
+        """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,

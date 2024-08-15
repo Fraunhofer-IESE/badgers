@@ -24,6 +24,7 @@ nav:
                     -   Generating Trends: tutorials/time-series/Trends-Time-Series.ipynb
                     -   Generating Seasons: tutorials/time-series/Seasons-Time-Series.ipynb
                     -   Generating Changepoints: tutorials/time-series/Changepoints-Time-Series.ipynb
+                    -   Generating "Transmissions Errors": tutorials/time-series/Transmission-Errors-Time-Series.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
             -   Implementing Novel Generators:

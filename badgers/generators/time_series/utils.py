@@ -47,3 +47,42 @@ def generate_random_patterns_indices(random_generator: np.random.Generator, sign
         end = start + patterns_sizes[i + 1]
         patterns_indices += [(start, end)]
     return patterns_indices
+
+
+def get_patterns_uniform_probability(random_generator: np.random.Generator, signal_size: int, n_patterns: int,
+                                     min_width_pattern: int, max_width_patterns: int) -> np.array:
+    """
+    Generate a probability array (sum = 1) of size `signal_size` that contains `n_patterns` segments where the probability is constant and non-zero and the rest is zero.
+
+    Useful for some events (e.g., values drop) in some region of time
+
+    Example
+    >>> get_patterns_uniform_probability(random_generator=np.random.default_rng(0), signal_size=10, n_patterns=2, min_width_pattern=2, max_width_patterns=3)
+    ... np.array([0., 0., 0.25, 0.25, 0., 0., 0.25, 0.25, 0., 0.])
+
+    :param random_generator: a random generator
+    :param signal_size: total signal size
+    :param n_patterns: total number of patterns
+    :param min_width_pattern: the minimal width of the patterns
+    :param max_width_patterns: the maximal width of the patterns
+    :return: a list of patterns indices (start index, stop index)
+    :return: a numpy array of probabilies (sum = 1)
+    """
+    # generate indices for patterns (regions where the probabilities should be constant)
+    patterns_indices = generate_random_patterns_indices(
+        random_generator=random_generator,
+        signal_size=signal_size,
+        n_patterns=n_patterns,
+        min_width_pattern=min_width_pattern,
+        max_width_patterns=max_width_patterns
+    )
+
+    # initialize probability array with zeros
+    p = np.zeros(signal_size)
+
+    # set constant values for patterns regions
+    for i, j in patterns_indices:
+        p[i:j] = 1
+
+    # normalize and return
+    return p / sum(p)
