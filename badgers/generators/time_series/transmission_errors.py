@@ -65,11 +65,10 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
 
 class RandomRepeatGenerator(TransmissionErrorGenerator):
     """
-    Repeats randomly values in given regions (patterns)
+    Repeats randomly values
 
-    For a given region [0, 3[,
     a time series x(t) = {x(0), x(1), x(2), x(3), x(4), x(5)} would be transformed to
-                 x'(t) = {x(0), x(0), x(0), x(1), x(1), x(2), x(2), x(2), x(3), x(3), x(5)}
+                 x'(t) = {x(0), x(1), x(1), x(2), x(3), x(4), x(4), x(4), x(5)}
 
     This simulates a delay in transmission where several values are repeated over time
     """
@@ -111,5 +110,41 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
             offset += l
 
         Xt = pd.DataFrame(data=Xt, columns=X.columns)
+
+        return Xt, y
+
+
+class RandomDropGenerator(TransmissionErrorGenerator):
+    """
+    Drops randomly values
+
+    a time series x(t) = {x(0), x(1), x(2), x(3), x(4), x(5)} would be transformed to
+                 x'(t) = {x(0), x(1), x(3), x(4)}
+
+    This simulates a problem in transmission where several values are randomly dropped
+    """
+
+    def __init__(self, random_generator=default_rng(seed=0)):
+        """
+
+        :param random_generator:
+
+        """
+        super().__init__(random_generator=random_generator)
+        self.drops_indices_ = None  # to store the indices of the drops
+
+    @preprocess_inputs
+    def generate(self, X, y, n_drops: int = 10) -> Tuple:
+        """
+
+        :param X:
+        :param y:
+        :param drops_indices_:
+        :return:
+        """
+        # generate indices for drops
+        self.drops_indices_ = self.random_generator.choice(len(X), size=n_drops, replace=False, shuffle=False)
+
+        Xt = X.drop(X.index[self.drops_indices_], axis=0).reset_index(drop=True)
 
         return Xt, y
