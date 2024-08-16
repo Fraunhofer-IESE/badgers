@@ -1,10 +1,11 @@
 import unittest
 
+import numpy as np
 import pandas as pd
 from numpy.random import default_rng
 
 from badgers.generators.time_series.transmission_errors import RandomTimeSwitchGenerator, RandomRepeatGenerator, \
-    RandomDropGenerator
+    RandomDropGenerator, LocalRegionsRandomDropGenerator
 
 
 class TestRandomTimeSwitchGenerator(unittest.TestCase):
@@ -80,6 +81,28 @@ class TestRandomDrop(unittest.TestCase):
         generator = RandomDropGenerator(random_generator=default_rng(0))
         Xt, _ = generator.generate(X.copy(), y=None, n_drops=1)
         self.assertEqual(X.shape[0], Xt.shape[0] + 1)
+
+class TestLocalRegionsRandomDropGenerator(unittest.TestCase):
+
+    def test_no_drop(self):
+        X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        generator = LocalRegionsRandomDropGenerator(random_generator=default_rng(0))
+        Xt, _ = generator.generate(X.copy(), y=None, n_drops=0, n_regions=0)
+        pd.testing.assert_frame_equal(X, Xt)
+
+
+    def test_single_drop(self):
+        X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        generator = LocalRegionsRandomDropGenerator(random_generator=default_rng(0))
+        Xt, _ = generator.generate(X.copy(), y=None, n_drops=1, n_regions=1, min_width_regions=2, max_width_regions=4)
+        self.assertEqual(X.shape[0], Xt.shape[0] + 1)
+
+    def test_many_drops_single_region(self):
+        X = pd.DataFrame(range(100))
+        generator = LocalRegionsRandomDropGenerator(random_generator=default_rng(0))
+        Xt, _ = generator.generate(X.copy(), y=None, n_drops=5, n_regions=1, min_width_regions=10, max_width_regions=20)
+        self.assertEqual(X.shape[0], Xt.shape[0] + 5)
+
 
 
 if __name__ == '__main__':

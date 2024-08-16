@@ -30,6 +30,7 @@ def generate_random_patterns_indices(random_generator: np.random.Generator, sign
     :param max_width_patterns: the maximal width of the patterns
     :return: a list of patterns indices (start index, stop index)
     """
+    assert n_patterns > 0, 'the number of patterns should be greater than zero'
     assert max_width_patterns * n_patterns < signal_size, 'the number of patterns * their maximum width should be smaller thant the total signal size'
     # randomly generates sizes for all patterns
     patterns_sizes = random_generator.integers(low=min_width_pattern, high=max_width_patterns, size=n_patterns)
@@ -37,15 +38,21 @@ def generate_random_patterns_indices(random_generator: np.random.Generator, sign
     segment_size = signal_size // n_patterns
     # compute patterns indices
     patterns_indices = []
-    for i in range(n_patterns - 1):
-        start = random_generator.integers(low=i * segment_size, high=(i + 1) * segment_size - patterns_sizes[i])
-        end = start + patterns_sizes[i]
+
+    if n_patterns == 1:
+        start = random_generator.integers(low=0, high=signal_size - patterns_sizes[0])
+        end = start + patterns_sizes[0]
         patterns_indices += [(start, end)]
     else:
-        # take care of the last remaining segment
-        start = random_generator.integers(low=(i + 1) * segment_size, high=signal_size - patterns_sizes[i + 1])
-        end = start + patterns_sizes[i + 1]
-        patterns_indices += [(start, end)]
+        for i in range(n_patterns - 1):
+            start = random_generator.integers(low=i * segment_size, high=(i + 1) * segment_size - patterns_sizes[i])
+            end = start + patterns_sizes[i]
+            patterns_indices += [(start, end)]
+        else:
+            # take care of the last remaining segment
+            start = random_generator.integers(low=(i + 1) * segment_size, high=signal_size - patterns_sizes[i + 1])
+            end = start + patterns_sizes[i + 1]
+            patterns_indices += [(start, end)]
     return patterns_indices
 
 
