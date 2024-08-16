@@ -1,11 +1,10 @@
 import unittest
 
-import numpy as np
 import pandas as pd
 from numpy.random import default_rng
 
 from badgers.generators.time_series.transmission_errors import RandomTimeSwitchGenerator, RandomRepeatGenerator, \
-    RandomDropGenerator, LocalRegionsRandomDropGenerator
+    RandomDropGenerator, LocalRegionsRandomDropGenerator, LocalRegionsRandomRepeatGenerator
 
 
 class TestRandomTimeSwitchGenerator(unittest.TestCase):
@@ -13,10 +12,8 @@ class TestRandomTimeSwitchGenerator(unittest.TestCase):
     def test_no_switch(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         generator = RandomTimeSwitchGenerator(random_generator=default_rng(seed=0))
-        Xt, _ = generator.generate(X.copy(), y=None, n_switches=0)
-
-        # nothing should have happened (n_switch = 0)
-        pd.testing.assert_frame_equal(X, Xt)
+        with self.assertRaises(AssertionError):
+            generator.generate(X.copy(), y=None, n_switches=0)
 
     def test_single_switch(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -57,8 +54,8 @@ class TestRandomRepeatGenerator(unittest.TestCase):
     def test_no_repeat(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         generator = RandomRepeatGenerator(random_generator=default_rng(seed=0))
-        Xt, _ = generator.generate(X.copy(), y=None, n_repeats=0, min_nb_repeats=2, max_nb_repeats=3)
-        pd.testing.assert_frame_equal(X, Xt)
+        with self.assertRaises(AssertionError):
+            generator.generate(X.copy(), y=None, n_repeats=0, min_nb_repeats=2, max_nb_repeats=3)
 
     def test_two_repeats(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -68,13 +65,46 @@ class TestRandomRepeatGenerator(unittest.TestCase):
         self.assertSetEqual(set(X[0]), set(Xt[0]))
 
 
+class TestLocalRegionsRandomRepeatGenerator(unittest.TestCase):
+
+    def test_no_repeat(self):
+        X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        generator = LocalRegionsRandomRepeatGenerator(random_generator=default_rng(seed=0))
+        with self.assertRaises(AssertionError):
+            generator.generate(X.copy(), y=None, n_repeats=0, min_nb_repeats=2, max_nb_repeats=3)
+
+    def test_single_repeat_single_region(self):
+        X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        generator = LocalRegionsRandomRepeatGenerator(random_generator=default_rng(seed=0))
+        Xt, _ = generator.generate(X.copy(), y=None, n_repeats=1, min_nb_repeats=2, max_nb_repeats=3, n_regions=1,
+                                   min_width_regions=3, max_width_regions=7)
+        self.assertEqual(Xt.shape[0], X.shape[0] + 2)
+        self.assertSetEqual(set(X[0]), set(Xt[0]))
+
+    def test_many_repeats_single_region(self):
+        X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        generator = LocalRegionsRandomRepeatGenerator(random_generator=default_rng(seed=0))
+        Xt, _ = generator.generate(X.copy(), y=None, n_repeats=3, min_nb_repeats=2, max_nb_repeats=3, n_regions=1,
+                                   min_width_regions=3, max_width_regions=7)
+        self.assertEqual(Xt.shape[0], X.shape[0] + 2 * 3)
+        self.assertSetEqual(set(X[0]), set(Xt[0]))
+
+    def test_many_repeats_many_regions(self):
+        X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        generator = LocalRegionsRandomRepeatGenerator(random_generator=default_rng(seed=0))
+        Xt, _ = generator.generate(X.copy(), y=None, n_repeats=4, min_nb_repeats=2, max_nb_repeats=3, n_regions=2,
+                                   min_width_regions=3, max_width_regions=5)
+        self.assertEqual(Xt.shape[0], X.shape[0] + 2 * 4)
+        self.assertSetEqual(set(X[0]), set(Xt[0]))
+
+
 class TestRandomDrop(unittest.TestCase):
 
     def test_no_drop(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         generator = RandomDropGenerator(random_generator=default_rng(0))
-        Xt, _ = generator.generate(X.copy(), y=None, n_drops=0)
-        pd.testing.assert_frame_equal(X, Xt)
+        with self.assertRaises(AssertionError):
+            generator.generate(X.copy(), y=None, n_drops=0)
 
     def test_single_drop(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -82,14 +112,14 @@ class TestRandomDrop(unittest.TestCase):
         Xt, _ = generator.generate(X.copy(), y=None, n_drops=1)
         self.assertEqual(X.shape[0], Xt.shape[0] + 1)
 
+
 class TestLocalRegionsRandomDropGenerator(unittest.TestCase):
 
     def test_no_drop(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
         generator = LocalRegionsRandomDropGenerator(random_generator=default_rng(0))
-        Xt, _ = generator.generate(X.copy(), y=None, n_drops=0, n_regions=0)
-        pd.testing.assert_frame_equal(X, Xt)
-
+        with self.assertRaises(AssertionError):
+            generator.generate(X.copy(), y=None, n_drops=0, n_regions=0)
 
     def test_single_drop(self):
         X = pd.DataFrame([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -102,7 +132,6 @@ class TestLocalRegionsRandomDropGenerator(unittest.TestCase):
         generator = LocalRegionsRandomDropGenerator(random_generator=default_rng(0))
         Xt, _ = generator.generate(X.copy(), y=None, n_drops=5, n_regions=1, min_width_regions=10, max_width_regions=20)
         self.assertEqual(X.shape[0], Xt.shape[0] + 5)
-
 
 
 if __name__ == '__main__':

@@ -31,7 +31,7 @@ def generate_random_patterns_indices(random_generator: np.random.Generator, sign
     :return: a list of patterns indices (start index, stop index)
     """
     assert n_patterns > 0, 'the number of patterns should be greater than zero'
-    assert max_width_patterns * n_patterns < signal_size, 'the number of patterns * their maximum width should be smaller thant the total signal size'
+    assert (max_width_patterns - 1) * n_patterns < signal_size, 'the number of patterns * their maximum width should be smaller thant the total signal size'
     # randomly generates sizes for all patterns
     patterns_sizes = random_generator.integers(low=min_width_pattern, high=max_width_patterns, size=n_patterns)
     # size of segments (for splitting the total signal length)
