@@ -34,12 +34,13 @@ class GlobalAdditiveLinearTrendGenerator(TrendsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, slope: Union[float | list]) -> Tuple:
+    def generate(self, X, y, slope) -> Tuple:
         """
 
         :param X: the input signal to be transformed
         :param y: not changed (here for API compatibility)
         :param slope: the slope of the trend (increase per time unit)
+        :type slope: Union[float | list]
         :return: the transformed signal Xt (X + linear trend), and y (not changed)
         """
 
@@ -57,13 +58,14 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, slope: Union[float | list], start: int, end: int) -> Tuple:
+    def generate(self, X, y, slope, start: int, end: int) -> Tuple:
         """
 
 
         :param X: the input signal to be transformed
         :param y: not changed (here for API compatibility)
         :param slope: (increase per time unit)
+        :type slope: Union[float | list]
         :param end:
         :param start:
         :return: the transformed signal Xt (X + linear trend), and y (not changed)
