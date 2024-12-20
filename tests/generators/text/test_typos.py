@@ -3,7 +3,7 @@ from copy import deepcopy
 
 from numpy.random import default_rng
 
-from badgers.generators.text.typos import SwapLettersGenerator, LeetSpeakGenerator
+from badgers.generators.text.typos import SwapLettersGenerator, LeetSpeakGenerator, SwapCaseGenerator
 
 
 class TestSwapLettersGenerator(unittest.TestCase):
@@ -43,10 +43,21 @@ class TestSwapLettersGenerator(unittest.TestCase):
 class TestLeetSpeakGenerator(unittest.TestCase):
 
     def test_generate(self):
-        X = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'fox']
+        X = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'fox', ' <> ']
         trf = LeetSpeakGenerator()
         Xt, _ = trf.generate(X, None)
         self.assertEqual(len(X), len(Xt))
+
+
+class TestSwapCaseGenerator(unittest.TestCase):
+
+    def test_generate(self):
+        X = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'fox', ' <> ']
+        trf = SwapCaseGenerator()
+        Xt, _ = trf.generate(X, None, swapcase_proba=1.)
+        self.assertEqual(len(X), len(Xt))
+        for w1, w2 in zip(X, Xt):
+            self.assertEqual(w1.upper(), w2)
 
 
 if __name__ == '__main__':

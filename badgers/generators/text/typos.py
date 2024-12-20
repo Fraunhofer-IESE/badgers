@@ -32,10 +32,7 @@ class SwapLettersGenerator(TyposGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-
         :param random_generator: A random generator
-
-
         """
         super().__init__(random_generator)
 
@@ -110,10 +107,11 @@ class LeetSpeakGenerator(TyposGenerator):
         :param replacement_proba: the probability of replacing a letter with its leet counterpart
         :return:
         """
-        if self.random_generator.random() < replacement_proba:
-            return self.random_generator.choice(self.leet_speak_mapping[letter.upper()])
-        else:
-            return letter
+        if letter.upper() in self.leet_speak_mapping:
+            if self.random_generator.random() < replacement_proba:
+                letter = self.random_generator.choice(self.leet_speak_mapping[letter.upper()])
+
+        return letter
 
     def generate(self, X, y, replacement_proba: float = 0.1) -> Tuple:
         """
@@ -126,6 +124,35 @@ class LeetSpeakGenerator(TyposGenerator):
         assert 0 <= replacement_proba <= 1
         Xt = [
             ''.join([self.randomly_replace_letter(l, replacement_proba=replacement_proba) for l in word])
+            for word in X
+        ]
+
+        return Xt, y
+
+class SwapCaseGenerator(TyposGenerator):
+
+    def __init__(self, random_generator=default_rng(seed=0)):
+        """
+        :param random_generator: A random generator
+        """
+        super().__init__(random_generator)
+
+    def randomly_swapcase_letter(self, letter, swapcase_proba):
+        """
+        Randomly swap case a letter
+        :param letter:
+        :param swapcase_proba: the probability of swapping case
+        :return:
+        """
+        if self.random_generator.random() < swapcase_proba:
+            letter = letter.swapcase()
+
+        return letter
+
+    def generate(self, X, y, swapcase_proba: float = 0.1) -> Tuple:
+        assert 0 <= swapcase_proba <= 1
+        Xt = [
+            ''.join([self.randomly_swapcase_letter(l, swapcase_proba=swapcase_proba) for l in word])
             for word in X
         ]
 
