@@ -1,0 +1,15 @@
+numpy~=2.2.0
+scikit-learn~=1.6.0
+networkx~=3.4.2
+pandas~=2.2.3
+scipy~=1.14.1
+tox~=4.23.2
+mkdocs~=1.4.3
+mkdocstrings~=0.25.2
+mkdocstrings-python~=1.10.9
+mkdocs-gen-files~=0.5.0
+mkdocs-material~=9.1.12
+mkdocs-literate-nav~=0.6.0
+mkdocs-jupyter~=0.24.1
+jupyterlab~=4.3.4
+matplotlib~=3.10.0
