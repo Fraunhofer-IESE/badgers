@@ -164,3 +164,4 @@ cython_debug/
 /notebooks/
 /badgers/uncertainty-main-uncertainty-generate-augmentation/
 /experiments/
+/.continue/
