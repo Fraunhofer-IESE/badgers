@@ -51,20 +51,24 @@ class PatternsGenerator(GeneratorMixin):
     def __init__(self, random_generator=default_rng(seed=0)):
         """
         :param random_generator: a random number generator
-        :param n_patterns: the number of patterns to generate
         """
         self.random_generator = random_generator
         self.patterns_indices_ = []
 
     @abc.abstractmethod
     def generate(self, X, y, **params) -> Tuple:
+        """
+        Abstract method to inject patterns in the time-series data.
+        This method should be overridden by subclasses.
+        """
         pass
 
     def _inject_pattern(self, X: pd.DataFrame, p: Pattern, start_index: int, end_index: int,
-                        scaling_factor: Union[float,str] = 'auto'):
+                        scaling_factor: Union[float,str,None] = 'auto'):
         """
         Utility function to inject a predefined pattern `p` into a signal `X`
-        :param X: the signal to inject the pattern
+
+        :param X: the signal to inject the pattern into
         :param p: the pattern to be injected
         :param start_index:
         :param end_index:
@@ -106,7 +110,19 @@ class RandomlySpacedPatterns(PatternsGenerator):
     @preprocess_inputs
     def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10,
-                 pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0]))) -> Tuple:
+                 pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0])), scaling_factor='auto') -> Tuple:
+        """
+        Inject patterns with random width and indices in the time-series data.
+
+        :param X: input time-series data
+        :param y: target data (not used in this method)
+        :param n_patterns: the number of patterns to inject
+        :param min_width_pattern: the minimal width of the pattern
+        :param max_width_patterns: the maximal width of the pattern
+        :param pattern: the pattern to inject
+        :param scaling_factor: float | None | "auto" (default "auto"), the scaling factor for the pattern
+        :return: the transformed time-series data and the unchanged target data
+        """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
             random_generator=self.random_generator,
@@ -134,14 +150,15 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
                  max_width_patterns: int = 10,
                  constant_value: float = 0) -> Tuple:
         """
+        Generate constant patterns with random width and indices in the time-series data.
 
-        :param X:
-        :param y:
-        :param n_patterns:
-        :param min_width_pattern:
-        :param max_width_patterns:
-        :param constant_value:
-        :return:
+        :param X: input time-series data
+        :param y: target data (not used in this method)
+        :param n_patterns: the number of patterns to inject
+        :param min_width_pattern: the minimal width of the pattern
+        :param max_width_patterns: the maximal width of the pattern
+        :param constant_value: the constant value of the pattern
+        :return: the transformed time-series data and the unchanged target data
         """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
@@ -169,13 +186,14 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
     def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10) -> Tuple:
         """
+        Generate linear patterns with random width and indices in the time-series data.
 
-        :param X:
-        :param y:
-        :param n_patterns:
-        :param min_width_pattern:
-        :param max_width_patterns:
-        :return:
+        :param X: input time-series data
+        :param y: target data (not used in this method)
+        :param n_patterns: the number of patterns to inject
+        :param min_width_pattern: the minimal width of the pattern
+        :param max_width_patterns: the maximal width of the pattern
+        :return: the transformed time-series data and the unchanged target data
         """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(

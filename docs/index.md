@@ -13,7 +13,5 @@ You might think of using [badgers](https://github.com/Fraunhofer-IESE/badgers) f
 
 [Badgers](https://github.com/Fraunhofer-IESE/badgers) provides a set of predefined generators for different modalities (tabular data, time series, text, etc.) and different data quality problems (outliers, noise, drift, etc.). Of course many data quality problems are use case dependent and it is not possible to implement all generators. Therefore, the idea is that badgers can serve as a structure for developing novel generators (see how to develop novel generators in the [dev-tutorials](../tutorials/Create-New-Tabular-Generators/) section).
 
- Want to try [badgers](https://github.com/Fraunhofer-IESE/badgers)? Then go to the [getting started](getting-started.md) section or dive into the [tutorials](../tutorials/Imbalance-Tabular-Data/) section.
-
-
+ Want to try [badgers](https://github.com/Fraunhofer-IESE/badgers)? Then go to the [getting started](getting-started.md) section or dive into the [tutorials](../tutorials/tabular-data/Imbalance-Tabular-Data/) section.
 
