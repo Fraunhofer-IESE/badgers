@@ -13,9 +13,12 @@ class TyposGenerator(GeneratorMixin):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the TyposGenerator with a given random number generator.
 
-        :param random_generator: numpy.random.Generator, default default_rng(seed=0)
-            A random generator
+        Parameters
+        ----------
+        random_generator : numpy.random.Generator, default=default_rng(seed=0)
+            A random number generator used to introduce randomness in typo generation.
         """
         self.random_generator = random_generator
 

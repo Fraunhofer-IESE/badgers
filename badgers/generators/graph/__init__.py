@@ -1,3 +1,3 @@
 """
-Module containing all the transformers that accept graph data as input
+This module contains all the generator functions designed to process and yield data from graph inputs.
 """
