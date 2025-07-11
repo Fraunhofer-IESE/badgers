@@ -64,7 +64,7 @@ class PatternsGenerator(GeneratorMixin):
         pass
 
     def _inject_pattern(self, X: pd.DataFrame, p: Pattern, start_index: int, end_index: int,
-                        scaling_factor: Union[float,str,None] = 'auto'):
+                        scaling_factor: Union[float, str, None] = 'auto'):
         """
         Utility function to inject a predefined pattern `p` into a signal `X`
 
@@ -110,15 +110,16 @@ class RandomlySpacedPatterns(PatternsGenerator):
     @preprocess_inputs
     def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10,
-                 pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0])), scaling_factor='auto') -> Tuple:
+                 pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0])),
+                 scaling_factor: Union[float, str, None] = 'auto') -> Tuple:
         """
         Inject patterns with random width and indices in the time-series data.
 
         :param X: input time-series data
         :param y: target data (not used in this method)
         :param n_patterns: the number of patterns to inject
-        :param min_width_pattern: the minimal width of the pattern
-        :param max_width_patterns: the maximal width of the pattern
+        :param min_width_pattern: the minimal width of the pattern to inject
+        :param max_width_patterns: the maximal width of the pattern to inject
         :param pattern: the pattern to inject
         :param scaling_factor: float | None | "auto" (default "auto"), the scaling factor for the pattern
         :return: the transformed time-series data and the unchanged target data
@@ -132,7 +133,7 @@ class RandomlySpacedPatterns(PatternsGenerator):
             max_width_patterns=max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
-            X = self._inject_pattern(X, p=pattern, start_index=start, end_index=end, scaling_factor='auto')
+            X = self._inject_pattern(X, p=pattern, start_index=start, end_index=end, scaling_factor=scaling_factor)
 
         return X, y
 
