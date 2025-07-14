@@ -15,10 +15,8 @@ class TyposGenerator(GeneratorMixin):
         """
         Initialize the TyposGenerator with a given random number generator.
 
-        Parameters
-        ----------
-        random_generator : numpy.random.Generator, default=default_rng(seed=0)
-            A random number generator used to introduce randomness in typo generation.
+        :param random_generator: A random number generator used to introduce randomness in typo generation.
+        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
         """
         self.random_generator = random_generator
 
@@ -35,20 +33,23 @@ class SwapLettersGenerator(TyposGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: A random generator
+        Initialize the SwapLettersGenerator with a given random number generator.
+
+        :param random_generator: A random number generator used to introduce randomness in letter swapping.
+        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
         """
         super().__init__(random_generator)
 
     def generate(self, X, y, swap_proba:float=0.1) -> Tuple:
         """
-        For each word with a length greater than 3, apply a single swap with probability `self.swap_proba`
-        Where the swap happens is determined randomly
-
-
-        :param X: A list of words where we apply typos
-        :param y: not used
-        :param swap_proba: Each word with a length greater than 3 will have this probability to contain a switch (max one per word)
-        :return: the transformed list of words
+        For each word with a length greater than 3, apply a single swap with probability `swap_proba`.
+        The position of the swap is chosen randomly among possible adjacent pairs of letters,
+        excluding the first and last letters of the word.
+        :param X: A list of words where typos are introduced.
+        :param y: Not used in this method.
+        :param swap_proba: Probability that a word with more than 3 characters will have one adjacent pair of letters swapped.
+                           This probability applies to each eligible word independently.
+        :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
         """
         for i in range(len(X)):
             if len(X[i]) > 3 and self.random_generator.random() <= swap_proba:
@@ -67,8 +68,10 @@ class LeetSpeakGenerator(TyposGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the LeetSpeakGenerator with a given random number generator.
 
-        :param random_generator: a random number generator
+        :param random_generator: A random number generator used to introduce randomness in leetspeak transformation.
+        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
         """
         super().__init__(random_generator=random_generator)
         self.leet_speak_mapping = {
@@ -105,10 +108,14 @@ class LeetSpeakGenerator(TyposGenerator):
 
     def randomly_replace_letter(self, letter, replacement_proba):
         """
-        Randomly replace a letter with its leet counterpart
-        :param letter:
-        :param replacement_proba: the probability of replacing a letter with its leet counterpart
-        :return:
+        Randomly replace a letter with its leet counterpart based on the provided probability.
+
+        :param letter: The letter to potentially replace.
+        :type letter: str
+        :param replacement_proba: The probability of replacing the letter with its leet counterpart.
+        :type replacement_proba: float
+        :return: The replaced letter if a random draw is less than or equal to the replacement_proba, otherwise the original letter.
+        :rtype: str
         """
         if letter.upper() in self.leet_speak_mapping:
             if self.random_generator.random() < replacement_proba:
@@ -118,12 +125,22 @@ class LeetSpeakGenerator(TyposGenerator):
 
     def generate(self, X, y, replacement_proba: float = 0.1) -> Tuple:
         """
+        Apply leet speak transformation to a list of words.
 
-        :param X: A list of words where we apply leet replacement
-        :param y:
-        :param replacement_proba: the probability of replacing a letter with its leet counterpart
-        :return:
+        :param X: A list of words where leet speak transformation is applied.
+        :param y: The labels associated with the words, which remain unchanged.
+        :param replacement_proba: The probability of replacing a letter with its leet counterpart.
+                                  This probability applies to each letter in each word independently.
+        :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
         """
+        transformed_X = []
+        for word in X:
+            transformed_word = ''.join(
+                self.randomly_replace_letter(letter, replacement_proba) for letter in word
+            )
+            transformed_X.append(transformed_word)
+
+        return transformed_X, y
         assert 0 <= replacement_proba <= 1
         Xt = [
             ''.join([self.randomly_replace_letter(l, replacement_proba=replacement_proba) for l in word])
@@ -136,16 +153,23 @@ class SwapCaseGenerator(TyposGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: A random generator
+        Initialize the SwapCaseGenerator with a given random number generator.
+
+        :param random_generator: A random number generator used to introduce randomness in case swapping.
+        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
         """
         super().__init__(random_generator)
 
     def randomly_swapcase_letter(self, letter, swapcase_proba):
         """
-        Randomly swap case a letter
-        :param letter:
-        :param swapcase_proba: the probability of swapping case
-        :return:
+        Randomly swap the case of a letter based on the provided probability.
+
+        :param letter: The letter whose case may be swapped.
+        :type letter: str
+        :param swapcase_proba: The probability of swapping the case of the letter.
+        :type swapcase_proba: float
+        :return: The letter with swapped case if a random draw is less than or equal to the swapcase_proba, otherwise the original letter.
+        :rtype: str
         """
         if self.random_generator.random() < swapcase_proba:
             letter = letter.swapcase()
@@ -153,6 +177,15 @@ class SwapCaseGenerator(TyposGenerator):
         return letter
 
     def generate(self, X, y, swapcase_proba: float = 0.1) -> Tuple:
+        """
+        Apply random case swapping to each letter in a list of words.
+
+        :param X: A list of words where random case swapping is applied.
+        :param y: The labels associated with the words, which remain unchanged.
+        :param swapcase_proba: The probability of swapping the case of each letter.
+                               This probability applies to each letter in each word independently.
+        :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
+        """
         assert 0 <= swapcase_proba <= 1
         Xt = [
             ''.join([self.randomly_swapcase_letter(l, swapcase_proba=swapcase_proba) for l in word])

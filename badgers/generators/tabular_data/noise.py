@@ -11,23 +11,33 @@ from badgers.core.decorators.tabular_data import preprocess_inputs
 
 class NoiseGenerator(GeneratorMixin):
     """
-    Base class for generators that add noise to tabular data
+    Base class for generators that add noise to tabular data.
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: A random generator
+        Initialize the NoiseGenerator with a specified random number generator.
+
+        :param random_generator: A random number generator instance from numpy.random,
+                                 used to introduce randomness in the noise generation process.
         """
         self.random_generator = random_generator
 
     @abc.abstractmethod
     def generate(self, X, y, **params):
+        """
+        Abstract method to generate noisy data. Must be implemented by subclasses.
+
+        :param X: Input features (pandas DataFrame or numpy array).
+        :param y: Target variable (pandas Series or numpy array).
+        :param params: Additional parameters required for noise generation.
+        """
         pass
 
 
 class GaussianNoiseGenerator(NoiseGenerator):
     """
-    A generator that adds Gaussian white noise to the tabular data
+    A generator that adds Gaussian white noise to the tabular data.
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -41,15 +51,15 @@ class GaussianNoiseGenerator(NoiseGenerator):
     @preprocess_inputs
     def generate(self, X, y, noise_std):
         """
-        Adds Gaussian white noise to the data.
-        The data is first standardized (each column has a mean = 0 and variance = 1).
-        The noise is generated from a normal distribution with standard deviation = `noise_std`.
-        The noise is added to the data.
+        Adds Gaussian white noise to the input data.
+        The data is first standardized such that each feature (column) has a mean of 0 and a variance of 1.
+        Gaussian noise is then generated from a normal distribution with a standard deviation equal to `noise_std`.
+        This noise is added to the standardized data.
 
-        :param X: the input
-        :param y: the target
-        :param noise_std: The standard deviation of the noise to be added
-        :return: Xt, yt
+        :param X: Input features (pandas DataFrame or numpy array).
+        :param y: Target variable (pandas Series or numpy array), which remains unchanged.
+        :param noise_std: Standard deviation of the Gaussian noise to be added.
+        :return: Xt, yt where Xt is the noisy input features and yt is the unchanged target variable y.
         """
         # standardize X
         scaler = StandardScaler()
@@ -69,24 +79,26 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the GaussianNoiseClassesGenerator with a specified random number generator.
 
-        :param random_generator: A random generator
+        :param random_generator: A random number generator instance from numpy.random,
+                                 used to introduce randomness in the noise generation process.
         """
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
     def generate(self, X, y, noise_std_per_class=dict()):
         """
-        Add Gaussian white noise to the data.
-        the data is first standardized (each column has a mean = 0 and variance = 1).
-        The noise is generated from a normal distribution with standard deviation = `noise_std`.
-        The noise is added to the data.
+        Add Gaussian white noise to the data separately for each class.
+        The data is first standardized such that each feature (column) has a mean of 0 and a variance of 1.
+        Gaussian noise is then generated from a normal distribution with a standard deviation specified in `noise_std_per_class` for each class.
+        This noise is added to the standardized data for each class separately.
 
-        :param X: the input
-        :param y: the target
-                :param noise_std_per_class: A dictionary giving the standard deviation of the noise to be added for each class
-            key = class labels, values = noise std for this given class
-        :return: Xt, yt
+        :param X: Input features (pandas DataFrame or numpy array).
+        :param y: Target variable (pandas Series or numpy array).
+        :param noise_std_per_class: A dictionary specifying the standard deviation of the noise to be added for each class.
+            Keys are class labels, and values are the noise standard deviations for the corresponding classes.
+        :return: Xt, yt where Xt is the noisy input features and yt is the unchanged target variable y.
         """
         # standardize X
         scaler = StandardScaler()
