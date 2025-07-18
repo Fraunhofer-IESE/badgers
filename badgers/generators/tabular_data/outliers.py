@@ -21,12 +21,21 @@ class OutliersGenerator(GeneratorMixin):
 
     def __init__(self, random_generator: np.random.Generator=default_rng(seed=0)):
         """
-        :param random_generator: A random generator
+        Initialize the OutliersGenerator with a random number generator.
+
+        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
         self.random_generator = random_generator
 
     @abc.abstractmethod
     def generate(self, X, y=None, **params):
+        """
+        Abstract method to generate outliers data. Must be implemented by subclasses.
+
+        :param X: Input features (pandas DataFrame or numpy array).
+        :param y: Target variable (pandas Series or numpy array).
+        :param params: Additional parameters required for noise generation.
+        """
         pass
 
 
@@ -37,8 +46,9 @@ class ZScoreSamplingGenerator(OutliersGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the ZScoreSamplingGenerator with a random number generator.
 
-        :param random_generator: A random generator
+        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
         super().__init__(random_generator)
 
@@ -47,17 +57,19 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         """
         Randomly generates outliers as data points with a z-score > 3.
 
-        1. Standardize the input data (mean = 0, variance = 1)
-        3. Generate outliers as follows:
-            - the sign is randomly chosen
-            - for each dimension: the value is equal to 3 + a random number following an exponential distribution function
-            with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
-        4. Inverse the standardization transformation
+        The process involves the following steps:
+        1. Standardize the input data so that it has a mean of 0 and a variance of 1.
+        2. Generate outliers by:
+           - choosing a random sign for each outlier.
+           - for each dimension of the data, set the value to be 3 plus a random number drawn from an exponential distribution
+             with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
+        3. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
 
-        :param X: the input features
-        :param y: the class labels, target values or None (if none yt
-        :param n_outliers: The number of outliers to generate
-        :return:
+        :param X: the input features (pandas DataFrame or numpy array).
+        :param y: the class labels, target values, or None (if not provided).
+        :param n_outliers: The number of outliers to generate.
+        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
+                 If `y` is None, the returned target values will also be None.
         """
 
         # standardize X
@@ -91,27 +103,31 @@ class HypersphereSamplingGenerator(OutliersGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the HypersphereSamplingGenerator with a random number generator.
 
-        :param random_generator: A random generator
-
+        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
         super().__init__(random_generator)
 
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10):
         """
-        Randomly generates outliers as data points with a z-score > 3.
+        Randomly generates outliers by sampling points from a hypersphere.
 
-        1. Standardize the input data (mean = 0, variance = 1)
-        3. Generate outliers on a hypersphere (see https://en.wikipedia.org/wiki/N-sphere#Spherical_coordinates):
-            - angles are chosen uniformly at random
-            - radius is = 3 + a random number following an exponential distribution function with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
-        4. Inverse the standardization transformation
+        The process involves the following steps:
+        1. Standardize the input data so that it has a mean of 0 and a variance of 1.
+        2. Generate outliers by:
+           - choosing angles uniformly at random for each dimension of the data.
+           - setting the radius to be 3 plus a random number drawn from an exponential distribution with default parameters
+             (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
+        3. Convert the spherical coordinates to Cartesian coordinates.
+        4. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
 
-        :param X: the input features
-        :param y: not used
-        :param n_outliers: The number of outliers to generate
-        :return:
+        :param X: the input features (pandas DataFrame or numpy array).
+        :param y: the class labels, target values, or None (if not provided).
+        :param n_outliers: The number of outliers to generate.
+        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
+                 If `y` is None, the returned target values will also be None.
         """
 
         # standardize X
@@ -166,10 +182,12 @@ class IndependentHistogramsGenerator(OutliersGenerator):
 
         All values generated for each feature are simply concatenated (independence hypothesis!).
 
-        :param X: the input features
-        :param y: not used
-        :param params:
-        :return:
+        :param X: the input features (pandas DataFrame or numpy array).
+        :param y: the class labels, target values, or None (not used).
+        :param n_outliers: The number of outliers to generate.
+        :param bins: The number of bins to use when creating histograms for each feature.
+        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
+                 If `y` is None, the returned target values will also be None.
         """
         outliers = []
 
@@ -214,9 +232,9 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the HistogramSamplingGenerator with a random number generator.
 
-        :param random_generator: A random generator
-
+        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
 
         super().__init__(random_generator)
@@ -289,8 +307,9 @@ class LowDensitySamplingGenerator(OutliersGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the LowDensitySamplingGenerator with a random number generator.
 
-        :param random_generator: A random generator
+        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
         super().__init__(random_generator=random_generator)
         self.density_estimator = KernelDensity(bandwidth="scott")
@@ -363,9 +382,10 @@ class DecompositionAndOutlierGenerator(OutliersGenerator):
     def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
                  outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0))):
         """
+        Initialize the DecompositionAndOutlierGenerator with a decomposition transformer and an outlier generator.
 
-        :param decomposition_transformer: The dimensionality reduction transformer to be used before the outlier transformer
-        :param outlier_generator: The outlier transformer to be used after the dimensionality has been reduced
+        :param decomposition_transformer: The dimensionality reduction transformer to be applied to the data before generating outliers.
+        :param outlier_generator: The outlier generator to be used after the data has been transformed.
         """
         assert hasattr(
             decomposition_transformer,

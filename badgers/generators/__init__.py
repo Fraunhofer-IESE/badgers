@@ -1,3 +1,3 @@
 """
-Module containing all transformers
+Module containing all generators
 """

@@ -14,13 +14,25 @@ class ChangePointsGenerator(GeneratorMixin):
 
     def __init__(self, random_generator=default_rng(seed=0), ):
         """
-        :param random_generator: a random number generator
+        Initialize the ChangePointsGenerator with a given random number generator.
+
+        :param random_generator: A random number generator instance (default is numpy's default_rng with seed 0).
         """
         self.random_generator = random_generator
         self.changepoints = None
 
     @abc.abstractmethod
     def generate(self, X, y, **params) -> Tuple:
+        """
+        Abstract method that generates changepoints in the given time-series data.
+
+        This method must be overridden by subclasses.
+
+        :param X: Input features of the time-series data.
+        :param y: Target values of the time-series data.
+        :param params: Additional parameters required for changepoint generation.
+        :return: A tuple containing the modified time-series data and the generated changepoints.
+        """
         pass
 
 
@@ -30,19 +42,25 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
+        """
+        Initialize the RandomChangeInMeanGenerator with a given random number generator.
+
+        :param random_generator: A random number generator instance (default is numpy's default_rng with seed 0).
+        """
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
     def generate(self, X, y, n_changepoints: int = 10, min_change: float = -5,
                  max_change: float = 5) -> Tuple:
         """
+        Generate random changepoints in the time-series data where the mean changes at each changepoint.
 
-        :param X:
-        :param y:
-        :param max_change:
-        :param min_change:
-        :param n_changepoints:
-        :return:
+        :param X: Input features of the time-series data.
+        :param y: Target values of the time-series data.
+        :param n_changepoints: Number of changepoints to generate.
+        :param min_change: Minimum value of the change in mean.
+        :param max_change: Maximum value of the change in mean.
+        :return: A tuple containing the modified time-series data and the generated changepoints.
         """
         # Generate change points
         self.changepoints = list(

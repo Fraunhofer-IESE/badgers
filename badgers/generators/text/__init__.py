@@ -1,3 +1,3 @@
 """
-Module containing all the transformers that accept text data as input
+This module contains all the generator functions designed to process and yield data from text inputs.
 """

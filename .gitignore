@@ -162,3 +162,6 @@ cython_debug/
 .idea/
 
 /notebooks/
+/badgers/uncertainty-main-uncertainty-generate-augmentation/
+/experiments/
+/.continue/

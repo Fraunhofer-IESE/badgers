@@ -15,15 +15,14 @@ class MissingValuesGenerator(GeneratorMixin):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
-        :param random_generator: a random number generator
-        :param n_outliers: the number of outliers to generate
+        Initialize the MissingValuesGenerator with a given random number generator.
+
+        :param random_generator: An instance of a random number generator from NumPy,
+                                 used to introduce randomness in the generation process.
+                                 Defaults to a default_rng seeded with 0.
         """
         self.random_generator = random_generator
         self.missing_indices_ = []
-
-    @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
-        pass
 
 
 class MissingAtRandomGenerator(MissingValuesGenerator):
@@ -33,20 +32,23 @@ class MissingAtRandomGenerator(MissingValuesGenerator):
 
     def __init__(self, random_generator=default_rng(seed=0)):
         """
+        Initialize the MissingAtRandomGenerator with a given random number generator.
 
-        :param random_generator: a random number generator
-
+        :param random_generator: An instance of a random number generator from NumPy,
+                                 used to introduce randomness in the generation process.
+                                 Defaults to a default_rng seeded with 0.
         """
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
     def generate(self, X, y, n_missing: int = 10) -> Tuple:
         """
-        Randomly set values to np.nan (missing)
-        :param X:
-        :param y:
-        :param n_missing: the number of outliers to generate
-        :return:
+        Randomly sets a specified number of values in the input array X to np.nan, representing missing values.
+
+        :param X: A numpy array of shape (n_samples, n_features) containing the input time-series data.
+        :param y: A numpy array of shape (n_samples,) containing the target values. This parameter is not modified by this method.
+        :param n_missing: The number of missing values to randomly introduce into the data. Defaults to 10.
+        :return: A tuple (X_out, y_out) where X_out is the modified array with missing values and y_out is the original target array.
         """
         # generate missing values indices and values
         rows = self.random_generator.choice(X.shape[0], size=n_missing, replace=False, p=None)
