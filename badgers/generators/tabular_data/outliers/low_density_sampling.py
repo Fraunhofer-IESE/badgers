@@ -1,160 +1,12 @@
-import abc
 import warnings
 
 import numpy as np
-import sklearn.base
 from numpy.random import default_rng
-from sklearn.decomposition import PCA
 from sklearn.neighbors import KernelDensity
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.utils import random_sign, random_spherical_coordinate
-
-
-class OutliersGenerator(GeneratorMixin):
-    """
-    Base class for transformers that add outliers to tabular data
-    """
-
-    def __init__(self, random_generator: np.random.Generator=default_rng(seed=0)):
-        """
-        Initialize the OutliersGenerator with a random number generator.
-
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
-        """
-        self.random_generator = random_generator
-
-    @abc.abstractmethod
-    def generate(self, X, y=None, **params):
-        """
-        Abstract method to generate outliers data. Must be implemented by subclasses.
-
-        :param X: Input features (pandas DataFrame or numpy array).
-        :param y: Target variable (pandas Series or numpy array).
-        :param params: Additional parameters required for noise generation.
-        """
-        pass
-
-
-class ZScoreSamplingGenerator(OutliersGenerator):
-    """
-    Randomly generates outliers as data points with a z-score > 3.
-    """
-
-    def __init__(self, random_generator=default_rng(seed=0)):
-        """
-        Initialize the ZScoreSamplingGenerator with a random number generator.
-
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
-        """
-        super().__init__(random_generator)
-
-    @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10):
-        """
-        Randomly generates outliers as data points with a z-score > 3.
-
-        The process involves the following steps:
-        1. Standardize the input data so that it has a mean of 0 and a variance of 1.
-        2. Generate outliers by:
-           - choosing a random sign for each outlier.
-           - for each dimension of the data, set the value to be 3 plus a random number drawn from an exponential distribution
-             with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
-        3. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
-
-        :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (if not provided).
-        :param n_outliers: The number of outliers to generate.
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
-        """
-
-        # standardize X
-        scaler = StandardScaler()
-
-        # fit, transform
-        scaler.fit(X)
-        Xt = scaler.transform(X)
-
-        # generate outliers
-        outliers = np.array([
-            random_sign(self.random_generator, size=Xt.shape[1]) * (
-                3. + self.random_generator.exponential(size=Xt.shape[1]))
-            for _ in range(n_outliers)
-        ])
-
-        # in case we only have 1 outlier, reshape the array to match sklearn convention
-        if outliers.shape[0] == 1:
-            outliers = outliers.reshape(1, -1)
-
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
-
-        return scaler.inverse_transform(outliers), yt
-
-
-class HypersphereSamplingGenerator(OutliersGenerator):
-    """
-    Generates outliers by sampling points from a hypersphere with radius at least 3 sigma
-    """
-
-    def __init__(self, random_generator=default_rng(seed=0)):
-        """
-        Initialize the HypersphereSamplingGenerator with a random number generator.
-
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
-        """
-        super().__init__(random_generator)
-
-    @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10):
-        """
-        Randomly generates outliers by sampling points from a hypersphere.
-
-        The process involves the following steps:
-        1. Standardize the input data so that it has a mean of 0 and a variance of 1.
-        2. Generate outliers by:
-           - choosing angles uniformly at random for each dimension of the data.
-           - setting the radius to be 3 plus a random number drawn from an exponential distribution with default parameters
-             (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
-        3. Convert the spherical coordinates to Cartesian coordinates.
-        4. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
-
-        :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (if not provided).
-        :param n_outliers: The number of outliers to generate.
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
-        """
-
-        # standardize X
-        scaler = StandardScaler()
-
-        # fit, transform
-        scaler.fit(X)
-        Xt = scaler.transform(X)
-
-        # computing outliers
-        outliers = np.array([
-            random_spherical_coordinate(
-                random_generator=self.random_generator,
-                size=Xt.shape[1],
-                radius=3. + self.random_generator.exponential()
-            )
-            for _ in range(n_outliers)
-        ])
-
-        # in case we only have 1 outlier, reshape the array to match sklearn convention
-        if outliers.shape[0] == 1:
-            outliers = outliers.reshape(1, -1)
-
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
-
-        return scaler.inverse_transform(outliers), yt
+from badgers.generators.tabular_data.outliers import OutliersGenerator
 
 
 class IndependentHistogramsGenerator(OutliersGenerator):
@@ -239,7 +91,6 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
         super().__init__(random_generator)
 
-
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10,
                  threshold_low_density: float = 0.1, bins: int = 10):
@@ -312,8 +163,7 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
         super().__init__(random_generator=random_generator)
-        self.density_estimator = KernelDensity(bandwidth="scott")
-
+        self.density_estimator: KernelDensity = KernelDensity(bandwidth="scott")
 
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10, threshold_low_density: float = 0.1, max_samples: int = 100):
@@ -375,52 +225,3 @@ class LowDensitySamplingGenerator(OutliersGenerator):
             return outliers, yt
 
         return scaler.inverse_transform(outliers), yt
-
-
-class DecompositionAndOutlierGenerator(OutliersGenerator):
-
-    def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
-                 outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0))):
-        """
-        Initialize the DecompositionAndOutlierGenerator with a decomposition transformer and an outlier generator.
-
-        :param decomposition_transformer: The dimensionality reduction transformer to be applied to the data before generating outliers.
-        :param outlier_generator: The outlier generator to be used after the data has been transformed.
-        """
-        assert hasattr(
-            decomposition_transformer,
-            'inverse_transform'), \
-            f'the decomposition transformer class must implement the inverse_transform function.' \
-            f'\nUnfortunately the class {decomposition_transformer} does not'
-        super().__init__(random_generator=outlier_generator.random_generator)
-
-        self.decomposition_transformer = decomposition_transformer
-        self.outlier_generator = outlier_generator
-
-    @preprocess_inputs
-    def generate(self, X, y=None, **params):
-        """
-        Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)
-        and an outlier transformer.
-
-        1. Standardize the input data (mean = 0, variance = 1)
-        2. Apply the dimensionality reduction transformer
-        3. Generates outliers by applying the outlier transformer
-        4. Inverse the dimensionality reduction and the standardization transformations
-
-        :param X: the input features
-        :param y: the regression target, class labels, or None
-        :param params:
-        :return:
-        """
-
-        # standardize the data and apply the dimensionality reduction transformer
-        pipeline = make_pipeline(
-            StandardScaler(),
-            self.decomposition_transformer,
-        )
-        Xt = pipeline.fit_transform(X)
-        # add outliers using the zscore_transformer
-        Xt, yt = self.outlier_generator.generate(Xt, y, **params)
-        # inverse the manifold and standardization transformations
-        return pipeline.inverse_transform(Xt), yt
