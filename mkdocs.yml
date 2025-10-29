@@ -50,7 +50,6 @@ plugins:
                 python:
                     options:
                         show_source: true
-                    selection:
                         docstring_style: sphinx
     - mkdocs-jupyter
 watch:

@@ -25,7 +25,7 @@ trf = GaussianNoiseGenerator()
 Xt, yt = trf.generate(X, y, noise_std=0.5)
 ```
 
-More examples are available in the [tutorials](https://fraunhofer-iese.github.io/badgers/tutorials/Imbalance-Tabular-Data/) section.
+More examples are available in the [tutorials](https://fraunhofer-iese.github.io/badgers/tutorials/tabular-data/Imbalance-Tabular-Data/) section.
 
 The API documentation is also available in the [API](https://fraunhofer-iese.github.io/badgers/reference/badgers/) section.
 

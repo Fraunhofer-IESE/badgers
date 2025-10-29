@@ -25,6 +25,12 @@ Julien Siebert, Daniel Seifert, Patricia Kelbert, Michael Kläs, Adam Trendowicz
 }
 ```
 
+## Read more
+
+https://www.iese.fraunhofer.de/blog/badgers-open-source-python-bibliothek/ (German)
+
+https://www.iese.fraunhofer.de/blog/datenqualitaet-machine-learning/ (German)
+
 ## Contributing to Badgers
 
 Every contribution is welcome, please have a look at [dev-tutorials](../dev/Create-New-Tabular-Generators/) section and [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md) for more info.
