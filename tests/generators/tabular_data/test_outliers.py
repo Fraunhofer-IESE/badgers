@@ -7,9 +7,11 @@ from numpy.random import default_rng
 from sklearn.datasets import make_blobs
 from sklearn.decomposition import PCA
 
-from badgers.generators.tabular_data.outliers import ZScoreSamplingGenerator, HistogramSamplingGenerator, \
-    HypersphereSamplingGenerator, LowDensitySamplingGenerator, DecompositionAndOutlierGenerator, \
-    IndependentHistogramsGenerator
+from badgers.generators.tabular_data.outliers import DecompositionAndOutlierGenerator
+from badgers.generators.tabular_data.outliers.distribution_sampling import ZScoreSamplingGenerator, \
+    HypersphereSamplingGenerator
+from badgers.generators.tabular_data.outliers.low_density_sampling import HistogramSamplingGenerator, \
+    LowDensitySamplingGenerator, IndependentHistogramsGenerator
 from tests.generators.tabular_data import generate_test_data_only_features
 
 
