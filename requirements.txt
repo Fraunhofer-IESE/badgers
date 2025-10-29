@@ -13,3 +13,4 @@ mkdocs-literate-nav~=0.6.2
 mkdocs-jupyter~=0.25.1
 jupyterlab~=4.3.4
 matplotlib~=3.10.0
+seaborn~=0.13.2

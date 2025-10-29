@@ -3,13 +3,11 @@ import abc
 import numpy as np
 import sklearn.base
 from numpy.random import default_rng
-from sklearn.decomposition import PCA
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.generators.tabular_data.outliers.distribution_sampling import ZScoreSamplingGenerator
 
 
 class OutliersGenerator(GeneratorMixin):
@@ -17,7 +15,7 @@ class OutliersGenerator(GeneratorMixin):
     Base class for transformers that add outliers to tabular data
     """
 
-    def __init__(self, random_generator: np.random.Generator=default_rng(seed=0)):
+    def __init__(self, random_generator: np.random.Generator = default_rng(seed=0)):
         """
         Initialize the OutliersGenerator with a random number generator.
 
@@ -39,8 +37,7 @@ class OutliersGenerator(GeneratorMixin):
 
 class DecompositionAndOutlierGenerator(OutliersGenerator):
 
-    def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin = PCA(n_components=2),
-                 outlier_generator: OutliersGenerator = ZScoreSamplingGenerator(default_rng(0))):
+    def __init__(self, decomposition_transformer: sklearn.base.TransformerMixin, outlier_generator: OutliersGenerator):
         """
         Initialize the DecompositionAndOutlierGenerator with a decomposition transformer and an outlier generator.
 

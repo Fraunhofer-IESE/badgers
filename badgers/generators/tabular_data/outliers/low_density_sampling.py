@@ -91,7 +91,6 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
         super().__init__(random_generator)
 
-
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10,
                  threshold_low_density: float = 0.1, bins: int = 10):
@@ -164,8 +163,7 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
         """
         super().__init__(random_generator=random_generator)
-        self.density_estimator = KernelDensity(bandwidth="scott")
-
+        self.density_estimator: KernelDensity = KernelDensity(bandwidth="scott")
 
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10, threshold_low_density: float = 0.1, max_samples: int = 100):

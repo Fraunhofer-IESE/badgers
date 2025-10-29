@@ -71,6 +71,13 @@ class HyperCubeSampling(OutliersGenerator):
 class ZScoreSamplingGenerator(OutliersGenerator):
     """
     Randomly generates outliers as data points with a z-score > 3.
+
+    Very similar to "GaussTail" in section 6.1.5 in [1]
+
+    [1] Georg Steinbuss and Klemens Böhm. 2021.
+        Generating Artificial Outliers in the Absence of Genuine Ones — A Survey.
+        ACM Trans. Knowl. Discov. Data 15, 2, Article 30 (April 2021), 37 pages.
+        https://doi.org/10.1145/3447822
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -82,7 +89,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10):
+    def generate(self, X, y, n_outliers: int = 10, scale: float|np.ndarray = 1.0):
         """
         Randomly generates outliers as data points with a z-score > 3.
 
@@ -91,12 +98,15 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         2. Generate outliers by:
            - choosing a random sign for each outlier.
            - for each dimension of the data, set the value to be 3 plus a random number drawn from an exponential distribution
-             with default parameters (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
+            (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
         3. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
 
         :param X: the input features (pandas DataFrame or numpy array).
         :param y: the class labels, target values, or None (if not provided).
         :param n_outliers: The number of outliers to generate.
+        :param scale: float or array_like of floats (the scale parameter from https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
+                    The scale parameter, :math:`\beta = 1/\lambda`. Must be
+                    non-negative.
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
@@ -111,7 +121,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         # generate outliers
         outliers = np.array([
             random_sign(self.random_generator, size=Xt.shape[1]) * (
-                3. + self.random_generator.exponential(size=Xt.shape[1]))
+                3. + self.random_generator.exponential(size=Xt.shape[1], scale=scale))
             for _ in range(n_outliers)
         ])
 
@@ -128,6 +138,13 @@ class ZScoreSamplingGenerator(OutliersGenerator):
 class HypersphereSamplingGenerator(OutliersGenerator):
     """
     Generates outliers by sampling points from a hypersphere with radius at least 3 sigma
+
+    Very similar to "GaussTail" in section 6.1.5 in [1]
+
+    [1] Georg Steinbuss and Klemens Böhm. 2021.
+        Generating Artificial Outliers in the Absence of Genuine Ones — A Survey.
+        ACM Trans. Knowl. Discov. Data 15, 2, Article 30 (April 2021), 37 pages.
+        https://doi.org/10.1145/3447822
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -139,7 +156,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10):
+    def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
         """
         Randomly generates outliers by sampling points from a hypersphere.
 
@@ -147,7 +164,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         1. Standardize the input data so that it has a mean of 0 and a variance of 1.
         2. Generate outliers by:
            - choosing angles uniformly at random for each dimension of the data.
-           - setting the radius to be 3 plus a random number drawn from an exponential distribution with default parameters
+           - setting the radius to be 3 plus a random number drawn from an exponential distribution
              (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
         3. Convert the spherical coordinates to Cartesian coordinates.
         4. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
@@ -155,6 +172,9 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         :param X: the input features (pandas DataFrame or numpy array).
         :param y: the class labels, target values, or None (if not provided).
         :param n_outliers: The number of outliers to generate.
+        :param scale: float (the scale parameter from https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
+                    The scale parameter, :math:`\beta = 1/\lambda`. Must be
+                    non-negative.
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
@@ -171,7 +191,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
             random_spherical_coordinate(
                 random_generator=self.random_generator,
                 size=Xt.shape[1],
-                radius=3. + self.random_generator.exponential()
+                radius=3. + self.random_generator.exponential(scale=scale)
             )
             for _ in range(n_outliers)
         ])
