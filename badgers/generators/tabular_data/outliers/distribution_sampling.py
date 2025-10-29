@@ -89,7 +89,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10, scale: float|np.ndarray = 1.0):
+    def generate(self, X, y, n_outliers: int = 10, scale: float = 1.0):
         """
         Randomly generates outliers as data points with a z-score > 3.
 
