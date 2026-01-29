@@ -29,6 +29,7 @@ nav:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
             -   Implementing Novel Generators:
                     -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
+    - Architecture: architecture.md
     -   API: reference/
 
 theme:
