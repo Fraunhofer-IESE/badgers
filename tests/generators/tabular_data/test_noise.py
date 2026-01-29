@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.generators.tabular_data.noise import GaussianNoiseGenerator, GaussianNoiseClassesGenerator
-from tests.unit_tests.generators.tabular_data import generate_test_data_with_classification_labels, \
+from tests.generators.tabular_data import generate_test_data_with_classification_labels, \
     generate_test_data_only_features
 
 

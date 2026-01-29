@@ -14,7 +14,7 @@ from badgers.generators.tabular_data.outliers.distribution_sampling import ZScor
     HypersphereSamplingGenerator, HyperCubeSampling
 from badgers.generators.tabular_data.outliers.low_density_sampling import HistogramSamplingGenerator, \
     LowDensitySamplingGenerator, IndependentHistogramsGenerator
-from tests.unit_tests.generators.tabular_data import generate_test_data_only_features
+from tests.generators.tabular_data import generate_test_data_only_features
 
 
 class TestOutliersGenerator(TestCase):

@@ -3,11 +3,10 @@ from typing import Union
 
 import numpy as np
 import pandas as pd
-from numpy.random import default_rng
-from sklearn.preprocessing import StandardScaler
-
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from numpy.random import default_rng
+from sklearn.preprocessing import StandardScaler
 
 
 class DriftGenerator(GeneratorMixin):
@@ -47,7 +46,7 @@ class RandomShiftGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, shift_std: Union[float, np.array] = 0.1):
+    def generate(self, X, y=None, shift_std: Union[float, np.array, list] = 0.1):
         """
         Randomly shift (geometrical translation) values of each column independently of one another.
         Data are first standardized (mean = 0, var = 1), and a random number drawn from a normal distribution
@@ -60,6 +59,10 @@ class RandomShiftGenerator(DriftGenerator):
                           Can be a single float (applied to all columns) or an array of floats (one per column).
         :return: A tuple containing the modified feature matrix `X'` and the original target `y`.
         """
+        # check that if shift_std is an array, it is of length == X.shape[1]
+        if hasattr(shift_std, '__len__'):
+            assert len(shift_std) == X.shape[
+                1], f"shift_std length ({len(shift_std)}) must equal number of features in X ({X.shape[1]})"
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
@@ -103,12 +106,28 @@ class RandomShiftClassesGenerator(DriftGenerator):
         """
         # extract unique labels
         classes = np.unique(y)
+        # check that if shift_std is an array, it is either of length == len(classes) or it dimention is (len(classes), X.shape[1])
+        if hasattr(shift_std, '__len__'):
+            shift_std_len = len(shift_std)
+            expected_len = len(classes)
+            expected_shape = (len(classes), X.shape[1])
+
+            assert (
+                shift_std_len == expected_len or (hasattr(shift_std, 'shape') and shift_std.shape == expected_shape)
+            ), f"shift_std length ({shift_std_len}) must equal number of classes ({expected_len}) " \
+               f"or shape must be {expected_shape}, got {getattr(shift_std, 'shape', 'no shape attribute')}"
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
         # generate random values for the shift
-        shifts = self.random_generator.normal(loc=0, scale=shift_std, size=len(classes))
+        # generate random values for the shift
+        if hasattr(shift_std, 'shape') and shift_std.shape == (len(classes), X.shape[1]):
+            # shift_std is a 2D array: generate separate shifts for each class and feature
+            shifts = self.random_generator.normal(loc=0, scale=shift_std)
+        else:
+            # shift_std is 1D or scalar: generate one shift per class, applied to all features
+            shifts = self.random_generator.normal(loc=0, scale=shift_std, size=len(classes))
         # add shift
         for c, s in zip(classes, shifts):
             Xt[y == c] += s

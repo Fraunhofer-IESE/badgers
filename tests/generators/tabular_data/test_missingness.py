@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.generators.tabular_data.missingness import MissingValueGenerator
-from tests.unit_tests.generators.tabular_data import generate_test_data_only_features
+from tests.generators.tabular_data import generate_test_data_only_features
 
 
 class TestMissingValueGenerator(TestCase):

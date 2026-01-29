@@ -7,7 +7,7 @@ from numpy.random import default_rng
 from badgers.core.utils import normalize_proba
 from badgers.generators.tabular_data.imbalance import RandomSamplingFeaturesGenerator, \
     RandomSamplingClassesGenerator, RandomSamplingTargetsGenerator
-from tests.unit_tests.generators.tabular_data import generate_test_data_with_classification_labels, \
+from tests.generators.tabular_data import generate_test_data_with_classification_labels, \
     generate_test_data_with_regression_targets
 
 
