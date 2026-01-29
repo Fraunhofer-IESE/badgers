@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "badgers"
-version = "0.0.12"
+version = "0.0.13"
 keywords = ["data quality", "bad data", "data science"]
 authors = [
     { name = "Julien Siebert", email = "julien.siebert@iese.fraunhofer.de" },
@@ -23,11 +23,28 @@ classifiers = [
     "Development Status :: 1 - Planning",
 ]
 dependencies = [
-    "numpy",
-    "scipy",
-    "pandas",
-    "scikit-learn",
-    "networkx"
+    "numpy~=2.4.1",
+    "scikit-learn~=1.8.0",
+    "networkx~=3.6.1",
+    "pandas~=2.3.3",
+    "scipy~=1.17.0",
+]
+[project.optional-dependencies]
+dev = [
+    "tox~=4.34.1",
+    "mkdocs~=1.6.1",
+    "mkdocstrings~=1.0.1",
+    "mkdocstrings-python~=2.0.1",
+    "mkdocs-gen-files~=0.6.0",
+    "mkdocs-material~=9.7.1",
+    "mkdocs-literate-nav~=0.6.2",
+    "mkdocs-jupyter~=0.25.1",
+    "jupyterlab~=4.5.2",
+    "matplotlib~=3.10.8",
+    "seaborn~=0.13.2",
+    "pytest~=9.0.2",
+    "pytest-timeout~=2.4.0",
+    "pytest-benchmark~=5.2.3",
 ]
 [project.urls]
 "Homepage" = "https://github.com/Fraunhofer-IESE/badgers"

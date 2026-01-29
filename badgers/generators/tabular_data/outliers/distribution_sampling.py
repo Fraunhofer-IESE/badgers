@@ -53,6 +53,7 @@ class HyperCubeSampling(OutliersGenerator):
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
+        assert n_outliers > 0
         assert expansion >= 0
         low = 0 - expansion
         high = 1 + expansion
@@ -110,6 +111,8 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
+        assert n_outliers > 0
+        assert scale > 0
 
         # standardize X
         scaler = StandardScaler()
@@ -178,6 +181,8 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
+        assert n_outliers > 0
+        assert scale > 0
 
         # standardize X
         scaler = StandardScaler()

@@ -30,6 +30,7 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
+        assert n_outliers > 0
 
         outliers = pd.DataFrame(
             data=np.stack([self.random_generator.choice(X.iloc[:,i], size=n_outliers) for i in range(X.shape[1])]).T,

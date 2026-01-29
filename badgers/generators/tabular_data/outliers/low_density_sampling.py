@@ -41,6 +41,8 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
                  If `y` is None, the returned target values will also be None.
         """
+        assert n_outliers > 0
+        assert bins > 0
         outliers = []
 
         # loop over all features (columns)
@@ -109,6 +111,8 @@ class HistogramSamplingGenerator(OutliersGenerator):
         :param bins: number of bins for the histogram
         :return:
         """
+        assert n_outliers > 0
+        assert bins > 0
         assert 0 < threshold_low_density < 1
         if X.shape[1] > 5:
             raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns')
@@ -124,9 +128,11 @@ class HistogramSamplingGenerator(OutliersGenerator):
         norm_hist = hist / (np.max(hist) - np.min(hist))
         # get coordinates of the histogram where the density is low (below a certain threshold)
         hist_coords_low_density = np.where(norm_hist <= threshold_low_density)
+        low_density_coordinates = list(zip(*hist_coords_low_density))
+        if len(low_density_coordinates) == 0:
+            raise ValueError(f"Could not find regions of low density. Maybe threshold {threshold_low_density} is too high!")
         # randomly pick some coordinates in the histogram where the density is low
-        hist_coords_random = self.random_generator.choice(list(zip(*hist_coords_low_density)), n_outliers,
-                                                          replace=True)
+        hist_coords_random = self.random_generator.choice(low_density_coordinates, n_outliers, replace=True)
 
         # computing outliers values
         outliers = np.array([
@@ -184,7 +190,9 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         :param max_samples:
         :return:
         """
+        assert n_outliers > 0
         assert 0 < threshold_low_density < 1
+        assert max_samples > 0
         # standardize X
         scaler = StandardScaler()
         # fit, transform
