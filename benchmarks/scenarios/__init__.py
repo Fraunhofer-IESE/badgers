@@ -1,0 +1,1 @@
+"""Predefined benchmark scenarios for each data type."""

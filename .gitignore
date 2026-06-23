@@ -171,3 +171,7 @@ badgers.code-workspace
 /uncertainty-main-uncertainty-generate-augmentation/
 /mcp/
 /profiling_tests/
+
+# Benchmark results and baselines
+benchmarks/results/*.json
+benchmarks/baselines/*.json
