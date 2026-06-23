@@ -10,7 +10,7 @@ from typing import List
 
 from benchmarks.models import RunMeta, BenchmarkResult
 from benchmarks.registry import discover
-from benchmarks.runner import run_functional, run_performance, run_all
+from benchmarks.runner import run_performance, run_all
 
 RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 BASELINES_DIR = pathlib.Path(__file__).parent / "baselines"
@@ -82,14 +82,6 @@ def _serialize_results(results: List[BenchmarkResult], meta: RunMeta) -> dict:
                 "generator": r.generator,
                 "scenario": r.scenario,
                 "params": _make_json_safe(r.params),
-                "functional": {
-                    "passed": r.functional.passed,
-                    "failed": r.functional.failed,
-                    "checks": [
-                        {"name": c["name"], "passed": bool(c["passed"])}
-                        for c in r.functional.checks
-                    ],
-                } if r.functional else None,
                 "performance": {
                     key: {
                         "min": ps.min, "max": ps.max, "mean": ps.mean,
@@ -111,12 +103,7 @@ def cmd_run(args):
         print("No benchmarks discovered. Check that benchmark registration files exist.")
         sys.exit(1)
 
-    if args.type == "functional":
-        results = run_functional(benchmarks, args.generators)
-    elif args.type == "performance":
-        results = run_performance(benchmarks, args.generators, args.iterations, args.timeout)
-    else:
-        results = run_all(benchmarks, args.generators, args.iterations, args.timeout)
+    results = run_all(benchmarks, args.generators, args.iterations, args.timeout)
 
     meta = _make_meta()
     data = _serialize_results(results, meta)
@@ -211,10 +198,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     # run
     run_parser = subparsers.add_parser("run", help="Run benchmarks")
-    run_parser.add_argument(
-        "--type", choices=["functional", "performance", "all"],
-        default="all", help="Type of benchmarks to run (default: all)"
-    )
     run_parser.add_argument(
         "--generators", type=str, default=None,
         help="Filter by module path prefix (e.g. 'tabular_data.outliers')"
