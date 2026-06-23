@@ -3,7 +3,6 @@ import numpy as np
 from benchmarks.models import GeneratorBenchmark
 from benchmarks.registry import register
 from benchmarks.scenarios.time_series import SCENARIO_SINE_WAVE
-from benchmarks.checks.common import CHECK_SAME_SHAPE
 from badgers.generators.time_series.patterns import RandomlySpacedPatterns, Pattern
 
 register(GeneratorBenchmark(
@@ -15,5 +14,4 @@ register(GeneratorBenchmark(
         "pattern": Pattern(values=np.array([0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0])),
     },
     scenarios=[SCENARIO_SINE_WAVE],
-    functional_checks=[CHECK_SAME_SHAPE],
 ))

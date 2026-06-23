@@ -10,5 +10,4 @@ register(GeneratorBenchmark(
     module_path="graph.missingness",
     default_params={"percentage_missing": 0.1},
     scenarios=[SCENARIO_ERDOS_RENYI],
-    functional_checks=[],
 ))

@@ -10,5 +10,4 @@ register(GeneratorBenchmark(
     module_path="text.typos",
     default_params={"swap_proba": 0.5},
     scenarios=[SCENARIO_WORD_LIST],
-    functional_checks=[],
 ))

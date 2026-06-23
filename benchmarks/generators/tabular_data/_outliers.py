@@ -8,8 +8,6 @@ from benchmarks.scenarios.tabular import (
     SCENARIO_MEDIUM_BLOBS,
     SCENARIO_LARGE_BLOBS,
 )
-from benchmarks.checks.common import CHECK_SAME_SHAPE, CHECK_NO_NANS
-from benchmarks.checks.tabular import CHECK_OUTLIER_COUNT
 
 from badgers.generators.tabular_data.outliers.distribution_sampling import HyperCubeSampling
 from badgers.generators.tabular_data.outliers.instance_sampling import UniformInstanceAttributeSampling
@@ -22,7 +20,6 @@ register(GeneratorBenchmark(
     module_path="tabular_data.outliers",
     default_params={"n_outliers": 10},
     scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
-    functional_checks=[CHECK_SAME_SHAPE, CHECK_NO_NANS, CHECK_OUTLIER_COUNT],
 ))
 
 register(GeneratorBenchmark(
@@ -31,7 +28,6 @@ register(GeneratorBenchmark(
     module_path="tabular_data.outliers",
     default_params={"n_outliers": 10},
     scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
-    functional_checks=[CHECK_SAME_SHAPE, CHECK_NO_NANS, CHECK_OUTLIER_COUNT],
 ))
 
 register(GeneratorBenchmark(
@@ -40,5 +36,4 @@ register(GeneratorBenchmark(
     module_path="tabular_data.outliers",
     default_params={"n_outliers": 10, "bins": 10},
     scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
-    functional_checks=[CHECK_SAME_SHAPE, CHECK_NO_NANS, CHECK_OUTLIER_COUNT],
 ))

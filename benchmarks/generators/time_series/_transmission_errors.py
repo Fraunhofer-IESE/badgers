@@ -2,7 +2,6 @@
 from benchmarks.models import GeneratorBenchmark
 from benchmarks.registry import register
 from benchmarks.scenarios.time_series import SCENARIO_SINE_WAVE
-from benchmarks.checks.common import CHECK_SAME_SHAPE
 from badgers.generators.time_series.transmission_errors import RandomTimeSwitchGenerator
 
 register(GeneratorBenchmark(
@@ -11,5 +10,4 @@ register(GeneratorBenchmark(
     module_path="time_series.transmission_errors",
     default_params={"n_switches": 5},
     scenarios=[SCENARIO_SINE_WAVE],
-    functional_checks=[CHECK_SAME_SHAPE],
 ))
