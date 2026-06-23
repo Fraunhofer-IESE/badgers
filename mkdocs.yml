@@ -30,6 +30,7 @@ nav:
             -   Implementing Novel Generators:
                     -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
     - Architecture: architecture.md
+    -   Benchmarking: benchmarking.md
     -   API: reference/
 
 theme:
