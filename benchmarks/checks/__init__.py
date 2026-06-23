@@ -1,0 +1,1 @@
+"""Predefined functional checks for benchmark framework."""
