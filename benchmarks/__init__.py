@@ -1,0 +1,1 @@
+"""Benchmark framework for badgers generators."""
