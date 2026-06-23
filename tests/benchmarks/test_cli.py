@@ -37,7 +37,7 @@ class TestCLIParsing(unittest.TestCase):
 
     def test_baseline_list(self):
         args = self.parser.parse_args(["baseline", "list"])
-        self.assertEqual(args.command, "list")
+        self.assertEqual(args.baseline_command, "list")
 
     def test_compare_default(self):
         args = self.parser.parse_args(["compare"])

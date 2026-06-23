@@ -49,6 +49,24 @@ def _make_meta() -> RunMeta:
     )
 
 
+def _make_json_safe(obj):
+    """Recursively convert an object to a JSON-serializable form."""
+    import numpy as np
+    if isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
+    if isinstance(obj, (int, float, np.integer, np.floating)):
+        return float(obj) if isinstance(obj, np.floating) else int(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {str(k): _make_json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_make_json_safe(v) for v in obj]
+    if obj is None:
+        return None
+    return str(obj)
+
+
 def _serialize_results(results: List[BenchmarkResult], meta: RunMeta) -> dict:
     """Convert results to JSON-serializable dict."""
     return {
@@ -63,11 +81,14 @@ def _serialize_results(results: List[BenchmarkResult], meta: RunMeta) -> dict:
             {
                 "generator": r.generator,
                 "scenario": r.scenario,
-                "params": r.params,
+                "params": _make_json_safe(r.params),
                 "functional": {
                     "passed": r.functional.passed,
                     "failed": r.functional.failed,
-                    "checks": r.functional.checks,
+                    "checks": [
+                        {"name": c["name"], "passed": bool(c["passed"])}
+                        for c in r.functional.checks
+                    ],
                 } if r.functional else None,
                 "performance": {
                     key: {
@@ -117,7 +138,7 @@ def cmd_baseline(args):
     """Execute the 'baseline' subcommand."""
     BASELINES_DIR.mkdir(parents=True, exist_ok=True)
 
-    if args.command == "save":
+    if args.baseline_command == "save":
         result_files = sorted(RESULTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not result_files:
             print("No result files found. Run benchmarks first with: python -m benchmarks run")
@@ -128,7 +149,7 @@ def cmd_baseline(args):
         baseline_path.write_bytes(latest.read_bytes())
         print(f"Baseline '{args.name}' saved from {latest.name}")
 
-    elif args.command == "list":
+    elif args.baseline_command == "list":
         baselines = sorted(BASELINES_DIR.glob("*.json"))
         if not baselines:
             print("No baselines saved yet.")
@@ -209,7 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # baseline
     baseline_parser = subparsers.add_parser("baseline", help="Manage baselines")
-    baseline_sub = baseline_parser.add_subparsers(dest="command", required=True)
+    baseline_sub = baseline_parser.add_subparsers(dest="baseline_command", required=True)
     save_parser = baseline_sub.add_parser("save", help="Save current results as baseline")
     save_parser.add_argument("--name", type=str, default="latest", help="Baseline name")
     baseline_sub.add_parser("list", help="List saved baselines")
