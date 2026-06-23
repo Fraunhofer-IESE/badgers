@@ -1,37 +1,24 @@
-import unittest
-
 import numpy as np
 
 from badgers.generators.time_series.outliers import LocalZScoreGenerator, RandomZerosGenerator
 
-class TestRandomZerosGenerator(unittest.TestCase):
 
-    def setUp(self) -> None:
-        self.t = np.linspace(0, 4 * np.pi, 101)
-        self.X = np.sin(self.t).reshape(-1, 1)
-
-    def test_generator(self):
-        n_outliers = 10
-        generator = RandomZerosGenerator()
-        Xt, _ = generator.generate(X=self.X, y=None, n_outliers=n_outliers)
-        self.assertEqual(Xt.shape, self.X.shape)
-        self.assertEqual(len(generator.outliers_indices_), n_outliers)
-
-class TestLocalZScoreGenerator(unittest.TestCase):
-
-    def setUp(self) -> None:
-        self.t = np.linspace(0, 4 * np.pi, 101)
-        self.X = np.sin(self.t).reshape(-1, 1)
-
-    def test_generator(self):
-        n_outliers = 10
-        generator = LocalZScoreGenerator()
-        Xt, _ = generator.generate(X=self.X, y=None, n_outliers=n_outliers)
-        self.assertEqual(Xt.shape, self.X.shape)
-        self.assertEqual(len(generator.outliers_indices_), n_outliers)
-        self.assertFalse(Xt.isna().any()[0])
+def test_random_zeros__correct_shape_and_count(time_series_sine):
+    """RandomZerosGenerator produces correct shape and outlier count."""
+    n_outliers = 10
+    X, _ = time_series_sine
+    generator = RandomZerosGenerator()
+    Xt, _ = generator.generate(X=X, y=None, n_outliers=n_outliers)
+    assert Xt.shape == X.shape
+    assert len(generator.outliers_indices_) == n_outliers
 
 
-
-if __name__ == '__main__':
-    unittest.main()
+def test_local_zscore__correct_shape_and_count(time_series_sine):
+    """LocalZScoreGenerator produces correct shape, count, and no NaN."""
+    n_outliers = 10
+    X, _ = time_series_sine
+    generator = LocalZScoreGenerator()
+    Xt, _ = generator.generate(X=X, y=None, n_outliers=n_outliers)
+    assert Xt.shape == X.shape
+    assert len(generator.outliers_indices_) == n_outliers
+    assert not Xt.isna().any()[0]
