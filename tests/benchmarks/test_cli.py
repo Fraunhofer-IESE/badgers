@@ -12,16 +12,7 @@ class TestCLIParsing(unittest.TestCase):
 
     def test_run_defaults(self):
         args = self.parser.parse_args(["run"])
-        self.assertEqual(args.type, "all")
         self.assertIsNone(args.generators)
-
-    def test_run_functional_only(self):
-        args = self.parser.parse_args(["run", "--type", "functional"])
-        self.assertEqual(args.type, "functional")
-
-    def test_run_performance_only(self):
-        args = self.parser.parse_args(["run", "--type", "performance"])
-        self.assertEqual(args.type, "performance")
 
     def test_run_with_filter(self):
         args = self.parser.parse_args(["run", "--generators", "tabular_data"])
@@ -60,7 +51,6 @@ class TestCmdRun(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("benchmarks.cli.RESULTS_DIR", pathlib.Path(tmpdir)):
                 args = MagicMock()
-                args.type = "all"
                 args.generators = None
                 args.iterations = 5
                 args.timeout = 60

@@ -1,7 +1,7 @@
 import pathlib
 import unittest
 from unittest.mock import patch, MagicMock
-from benchmarks.models import Scenario, FunctionalCheck, GeneratorBenchmark
+from benchmarks.models import Scenario, GeneratorBenchmark
 from benchmarks.registry import register, get_registry, discover, _registry
 
 
@@ -14,14 +14,12 @@ class TestRegistry(unittest.TestCase):
 
     def _make_benchmark(self, name="TestGen", module_path="test.module"):
         s = Scenario("s1", "tabular", lambda rng: (None, None))
-        fc = FunctionalCheck("c1", "desc", lambda *a, **kw: True)
         return GeneratorBenchmark(
             generator_cls=type("FakeGen", (), {}),
             name=name,
             module_path=module_path,
             default_params={},
             scenarios=[s],
-            functional_checks=[fc],
         )
 
     def test_register_adds_to_registry(self):
