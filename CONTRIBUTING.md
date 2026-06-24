@@ -58,7 +58,7 @@ Ready to contribute? Here's how to set up `badgers` for local development.
 3. Install dependencies and start your virtualenv:
 
 ```
-    $ pip install 
+    $ pip install -e ".[dev]"
 ```
 
 5. Create a branch for local development:
@@ -74,6 +74,12 @@ Ready to contribute? Here's how to set up `badgers` for local development.
 
 ```
     $ tox
+```
+
+   You can also run tests directly with pytest:
+
+```
+    $ pytest -v tests
 ```
 
 7. Commit your changes and push your branch to GitHub:
@@ -94,7 +100,18 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.md.
-3. The pull request should work for Python PYTHON-VERSION and for PyPy. Check
-   https://github.com/Fraunhofer-IESE/badgers and make sure that the tests pass for all supported Python versions.
+3. The pull request should work for Python 3.10, 3.11, 3.12, and 3.13. Check
+   https://github.com/Fraunhofer-IESE/badgers/actions and make sure that the tests pass for all supported Python versions.
+
+## PR Submission Checklist
+
+Before opening a pull request, ensure you have:
+
+- [ ] Run `tox` locally and all environments pass
+- [ ] Run `pytest -v tests` locally and all tests pass
+- [ ] Run `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics` with zero errors
+- [ ] Added tests for any new functionality
+- [ ] Updated documentation (docstrings, README, or mkdocs) for any new features
+- [ ] Verified your branch is up to date with `main`
 
 
