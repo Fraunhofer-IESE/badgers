@@ -27,9 +27,9 @@ Julien Siebert, Daniel Seifert, Patricia Kelbert, Michael Kläs, Adam Trendowicz
 
 ## Read more
 
-https://www.iese.fraunhofer.de/blog/badgers-open-source-python-bibliothek/ (German)
+[https://www.iese.fraunhofer.de/blog/badgers-open-source-python-bibliothek/](https://www.iese.fraunhofer.de/blog/badgers-open-source-python-bibliothek/) (German)
 
-https://www.iese.fraunhofer.de/blog/datenqualitaet-machine-learning/ (German)
+[https://www.iese.fraunhofer.de/blog/datenqualitaet-machine-learning/](https://www.iese.fraunhofer.de/blog/datenqualitaet-machine-learning/) (German)
 
 ## Contributing to Badgers
 

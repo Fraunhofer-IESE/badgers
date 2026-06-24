@@ -1,0 +1,13 @@
+"""Benchmark registrations for time series trend generators."""
+from benchmarks.models import GeneratorBenchmark
+from benchmarks.registry import register
+from benchmarks.scenarios.time_series import SCENARIO_SINE_WAVE
+from badgers.generators.time_series.trends import GlobalAdditiveLinearTrendGenerator
+
+register(GeneratorBenchmark(
+    generator_cls=GlobalAdditiveLinearTrendGenerator,
+    name="GlobalLinearTrend",
+    module_path="time_series.trends",
+    default_params={"slope": 0.1},
+    scenarios=[SCENARIO_SINE_WAVE],
+))

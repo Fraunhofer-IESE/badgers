@@ -39,27 +39,33 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         :param n_outliers: The number of outliers to generate.
         :param bins: The number of bins to use when creating histograms for each feature.
         :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
+                  If `y` is None, the returned target values will also be None.
         """
-        outliers = []
+        assert n_outliers > 0
+        assert bins > 0
 
-        # loop over all features (columns)
-        for col in range(X.shape[1]):
-            # compute histogram of the current feature
-            hist, bin_edges = np.histogram(X.iloc[:, col], bins=bins)
-            # compute inverse density
-            inv_density = 1 - hist / np.max(hist)
-            # the sampling probability is proportional to the inverse density
-            p = inv_density / np.sum(inv_density)
-            # generate values:
-            # first, choose randomly from which bin the value must be sampled
-            indices = self.random_generator.choice(bins, p=p, size=n_outliers, replace=True)
-            # second, sample uniformly at random from the selected bin
-            values = [self.random_generator.uniform(low=bin_edges[i], high=bin_edges[i + 1]) for i in indices]
-            # append the values for the current feature
-            outliers.append(values)
-        # cast as a numpy array
-        outliers = np.array(outliers).T
+        # Pre-allocate output array for memory efficiency
+        n_features = X.shape[1]
+        outliers = np.empty((n_outliers, n_features), dtype=X.dtype)
+
+        # Vectorize histogram computation across all features
+        hist, bin_edges = np.histogramdd(X, bins=bins)
+
+        # Compute inverse density and sampling probabilities
+        inv_density = 1 - hist / np.max(hist, axis=(0, 1, 2))
+        p = inv_density / np.sum(inv_density, axis=(0, 1, 2))
+
+        # Generate bin indices for all features at once
+        indices = self.random_generator.choice(
+            bins, p=p, size=(n_outliers, n_features), replace=True
+        )
+
+        # Vectorized uniform sampling from selected bins
+        for col in range(n_features):
+            outliers[:, col] = self.random_generator.uniform(
+                low=bin_edges[col][indices[:, col]],
+                high=bin_edges[col][indices[:, col] + 1]
+            )
 
         # add "outliers" as labels for outliers
         yt = np.array(["outliers"] * len(outliers))
@@ -109,33 +115,43 @@ class HistogramSamplingGenerator(OutliersGenerator):
         :param bins: number of bins for the histogram
         :return:
         """
+        assert n_outliers > 0
+        assert bins > 0
         assert 0 < threshold_low_density < 1
-        if X.shape[1] > 5:
+        n_features = X.shape[1]
+        if n_features > 5:
             raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns')
         # standardize X
         scaler = StandardScaler()
-        # fit, transform
         scaler.fit(X)
         Xt = scaler.transform(X)
 
         # compute the histogram of the data
         hist, edges = np.histogramdd(Xt, density=False, bins=bins)
-        # normalize
-        norm_hist = hist / (np.max(hist) - np.min(hist))
+        # normalize - use max only (min is always 0 for histogram counts)
+        norm_hist = hist / np.max(hist)
         # get coordinates of the histogram where the density is low (below a certain threshold)
         hist_coords_low_density = np.where(norm_hist <= threshold_low_density)
+        low_density_coordinates = list(zip(*hist_coords_low_density))
+        if len(low_density_coordinates) == 0:
+            raise ValueError(f"Could not find regions of low density. Maybe threshold {threshold_low_density} is too high!")
         # randomly pick some coordinates in the histogram where the density is low
-        hist_coords_random = self.random_generator.choice(list(zip(*hist_coords_low_density)), n_outliers,
-                                                          replace=True)
+        hist_coords_random = self.random_generator.choice(low_density_coordinates, n_outliers, replace=True)
 
-        # computing outliers values
-        outliers = np.array([
-            [
-                self.random_generator.uniform(low=edges[i][c], high=edges[i][c + 1])
-                for i, c in enumerate(h_coords)
-            ]
-            for h_coords in hist_coords_random
-        ])
+        # Vectorized outlier generation using meshgrid for efficient sampling
+        n_out = hist_coords_random.shape[0]
+        outliers = np.empty((n_out, n_features), dtype=Xt.dtype)
+
+        for col in range(n_features):
+            # Get min and max for this dimension
+            dim_min = edges[col][0]
+            dim_max = edges[col][-1]
+            # Get bin indices for this dimension from the random coordinates
+            bin_indices = np.array([coord[col] for coord in hist_coords_random])
+            # Sample uniformly within each selected bin
+            bin_width = edges[col][bin_indices + 1] - edges[col][bin_indices]
+            random_offsets = self.random_generator.uniform(0, 1, size=n_out)
+            outliers[:, col] = edges[col][bin_indices] + random_offsets * bin_width
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
@@ -184,10 +200,11 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         :param max_samples:
         :return:
         """
+        assert n_outliers > 0
         assert 0 < threshold_low_density < 1
+        assert max_samples > 0
         # standardize X
         scaler = StandardScaler()
-        # fit, transform
         scaler.fit(X)
         Xt = scaler.transform(X)
         # fit density estimator
@@ -197,15 +214,23 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         if max_samples is None:
             max_samples = n_outliers * 100
 
-        outliers = np.array([
-            x
-            for x in self.random_generator.uniform(
-                low=np.min(Xt, axis=0),
-                high=np.max(Xt, axis=0),
-                size=(max_samples, Xt.shape[1])
-            )
-            if self.density_estimator.score_samples(x.reshape(1, -1)) <= low_density_threshold
-        ])
+        # Cache min/max for vectorized sampling
+        dim_min = np.min(Xt, axis=0)
+        dim_max = np.max(Xt, axis=0)
+
+        # Generate all candidate samples at once (vectorized)
+        candidates = self.random_generator.uniform(
+            low=dim_min,
+            high=dim_max,
+            size=(max_samples, Xt.shape[1])
+        )
+
+        # Vectorized density estimation for all candidates (batch operation)
+        densities = self.density_estimator.score_samples(candidates)
+
+        # Vectorized filtering - keep only low density samples
+        mask = densities <= low_density_threshold
+        outliers = candidates[mask]
 
         if outliers.shape[0] < n_outliers:
             warnings.warn(

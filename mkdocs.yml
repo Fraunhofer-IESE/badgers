@@ -29,6 +29,8 @@ nav:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
             -   Implementing Novel Generators:
                     -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
+    - Architecture: architecture.md
+    -   Benchmarking: benchmarking.md
     -   API: reference/
 
 theme:
@@ -52,5 +54,13 @@ plugins:
                         show_source: true
                         docstring_style: sphinx
     - mkdocs-jupyter
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
 watch:
     - ../badgers

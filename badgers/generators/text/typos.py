@@ -133,14 +133,6 @@ class LeetSpeakGenerator(TyposGenerator):
                                   This probability applies to each letter in each word independently.
         :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
         """
-        transformed_X = []
-        for word in X:
-            transformed_word = ''.join(
-                self.randomly_replace_letter(letter, replacement_proba) for letter in word
-            )
-            transformed_X.append(transformed_word)
-
-        return transformed_X, y
         assert 0 <= replacement_proba <= 1
         Xt = [
             ''.join([self.randomly_replace_letter(l, replacement_proba=replacement_proba) for l in word])

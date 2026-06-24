@@ -161,6 +161,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+.vscode/
+badgers.code-workspace
+
 /notebooks/
 /badgers/uncertainty-main-uncertainty-generate-augmentation/
 /experiments/
@@ -168,3 +171,7 @@ cython_debug/
 /uncertainty-main-uncertainty-generate-augmentation/
 /mcp/
 /profiling_tests/
+
+# Benchmark results and baselines
+benchmarks/results/*.json
+benchmarks/baselines/*.json

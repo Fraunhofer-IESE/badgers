@@ -1,30 +1,17 @@
-from unittest import TestCase
-
 import numpy as np
 
-from badgers.generators.time_series.noise import GlobalGaussianNoiseGenerator, LocalGaussianNoiseGenerator, NoiseGenerator
+from badgers.generators.time_series.noise import GlobalGaussianNoiseGenerator, LocalGaussianNoiseGenerator
 
 
+def test_local_gaussian_noise__generates(time_series_sine):
+    """LocalGaussianNoiseGenerator runs without error on sine wave."""
+    X, _ = time_series_sine
+    generator = LocalGaussianNoiseGenerator()
+    Xt, _ = generator.generate(X, None)
 
 
-
-class TestLocalGaussianNoiseGenerator(TestCase):
-
-    def setUp(self) -> None:
-        t = np.linspace(1, 10, 101)
-        self.X = (np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1)
-
-    def test_generate(self):
-        generator = LocalGaussianNoiseGenerator()
-        Xt, _ = generator.generate(self.X.reshape(-1, 1), None)
-
-
-class TestGlobalGaussianNoiseGenerator(TestCase):
-
-    def setUp(self) -> None:
-        t = np.linspace(1, 10, 101)
-        self.X = (np.sin(t * 2 * np.pi) + 0.5).reshape(-1, 1)
-
-    def test_generate(self):
-        generator = GlobalGaussianNoiseGenerator()
-        Xt, _ = generator.generate(self.X.reshape(-1, 1), None)
+def test_global_gaussian_noise__generates(time_series_sine):
+    """GlobalGaussianNoiseGenerator runs without error on sine wave."""
+    X, _ = time_series_sine
+    generator = GlobalGaussianNoiseGenerator()
+    Xt, _ = generator.generate(X, None)
