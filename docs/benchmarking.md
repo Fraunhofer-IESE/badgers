@@ -1,15 +1,12 @@
 # Benchmarking
 
-Badgers includes a benchmarking framework to measure functional correctness and performance (time/memory) of all generators. It helps detect regressions when refactoring or optimizing code.
+Badgers includes a benchmarking framework to measure performance (time/memory) of all generators. It helps detect regressions when refactoring or optimizing code.
 
 ## Quick Start
 
 ```bash
-# Run all benchmarks (functional + performance)
+# Run all benchmarks (performance)
 python -m benchmarks run
-
-# Run only functional correctness checks
-python -m benchmarks run --type functional
 
 # Run only performance measurements
 python -m benchmarks run --type performance
@@ -20,12 +17,12 @@ python -m benchmarks run --type performance
 ### `run` — Execute Benchmarks
 
 ```
-python -m benchmarks run [--type {functional,performance,all}] [--generators FILTER] [--iterations N] [--timeout S]
+python -m benchmarks run [--type {performance,all}] [--generators FILTER] [--iterations N] [--timeout S]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--type` | `all` | `functional` (correctness checks), `performance` (time/memory), or `all` |
+| `--type` | `all` | `performance` (time/memory), or `all` |
 | `--generators` | *(all)* | Filter by module path prefix, e.g. `tabular_data.outliers` |
 | `--iterations` | `5` | Number of iterations for performance measurement |
 | `--timeout` | `60` | Timeout in seconds per scenario |
@@ -54,18 +51,6 @@ Compares the latest (or specified) results against a baseline and reports regres
 
 ## What Gets Measured
 
-### Functional Checks
-
-Each generator is tested against predefined assertions:
-
-| Check | Description |
-|-------|-------------|
-| `CHECK_SAME_SHAPE` | Output has same shape as input |
-| `CHECK_NO_NANS` | Output contains no NaN values |
-| `CHECK_INCREASED_VARIANCE` | Output variance ≥ input variance (noise generators) |
-| `CHECK_OUTLIER_COUNT` | Correct number of outliers introduced |
-| `CHECK_PATTERN_COUNT` | Correct number of patterns injected (time series) |
-
 ### Performance Metrics
 
 - **Wall-clock time**: min, max, mean, median, stddev over N iterations
@@ -88,11 +73,14 @@ register(GeneratorBenchmark(
             params={},
         ),
     },
-    functional_checks=["CHECK_SAME_SHAPE", "CHECK_NO_NANS"],
 ))
 ```
 
 The registry auto-discovers all `_*.py` files — no other registration needed.
+
+## Testing Generators
+
+Generator correctness is tested separately from benchmarks using **pytest**. See the [Architecture](architecture.md#tests) page for the test structure and conventions.
 
 ## Architecture
 
