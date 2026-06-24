@@ -25,7 +25,7 @@ pytest -v tests
 ### 3. Run linting
 
 ```bash
-flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 badgers tests --count --select=E9,F63,F7,F82 --show-source --statistics
 ```
 
 This must produce **zero** errors before submitting.

@@ -109,7 +109,7 @@ Before opening a pull request, ensure you have:
 
 - [ ] Run `tox` locally and all environments pass
 - [ ] Run `pytest -v tests` locally and all tests pass
-- [ ] Run `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics` with zero errors
+- [ ] Run `flake8 badgers tests --count --select=E9,F63,F7,F82 --show-source --statistics` with zero errors
 - [ ] Added tests for any new functionality
 - [ ] Updated documentation (docstrings, README, or mkdocs) for any new features
 - [ ] Verified your branch is up to date with `main`

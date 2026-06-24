@@ -45,8 +45,32 @@ dev = [
     "pytest~=9.0.2",
     "pytest-timeout~=2.4.0",
     "pytest-benchmark~=5.2.3",
+    "flake8~=7.3.0",
 ]
 [project.urls]
 "Homepage" = "https://github.com/Fraunhofer-IESE/badgers"
 "Bug Tracker" = "https://github.com/Fraunhofer-IESE/badgers/issues"
+
+[tool.flake8]
+exclude = [
+    ".venv",
+    ".tox",
+    "site",
+    "experiments",
+    "uncertainty-main-*",
+    "__pycache__",
+    ".git",
+    ".idea",
+    ".vscode",
+    "notebooks",
+    ".continue",
+    "mcp",
+    "profiling_tests",
+    "benchmarks/results",
+    "benchmarks/baselines",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+]
 

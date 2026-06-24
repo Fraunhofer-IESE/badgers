@@ -88,6 +88,3 @@ def test_randomly_spaced_linear_patterns__interpolates(time_series_sine):
             assert Xt.iloc[start:end, col].tolist() == \
                 np.linspace(X.iloc[start, col], X.iloc[end, col], end - start).tolist()
 
-
-if __name__ == '__main__':
-    unittest.main()
