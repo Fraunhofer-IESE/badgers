@@ -14,7 +14,7 @@ Always run these checks locally before opening a pull request:
 tox
 ```
 
-This runs tests against all supported Python versions (3.10, 3.11, 3.12, 3.13).
+This runs tests against all supported Python versions (3.11, 3.12, 3.13).
 
 ### 2. Run tests directly with pytest
 
@@ -41,8 +41,8 @@ This must produce **zero** errors before submitting.
 
 ## Supported Python Versions
 
-- Python 3.10, 3.11, 3.12, 3.13
-- Python 3.8 and 3.9 are **no longer supported** (EOL, incompatible with NumPy 2.x)
+- Python 3.11, 3.12, 3.13
+- Python 3.8, 3.9, and 3.10 are **no longer supported** (EOL or incompatible with NumPy 2.x)
 
 ## Testing
 
@@ -55,6 +55,6 @@ This must produce **zero** errors before submitting.
 
 - GitHub Actions workflow: `.github/workflows/tests.yml`
 - Runs on push/PR to `main`
-- Matrix: Python 3.10–3.13 × Ubuntu, macOS, Windows
+- Matrix: Python 3.11–3.13 × Ubuntu, macOS, Windows
 - Linting: flake8 (syntax errors + complexity)
 - Tests: `tox -e py`
