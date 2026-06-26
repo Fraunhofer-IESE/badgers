@@ -71,10 +71,11 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
         assert n_switches > 0, 'n_switches should be strictly greater than 0'
 
         self.switch_indices_ = self.random_generator.choice(len(X) - 1, size=n_switches, replace=False)
-        for i in self.switch_indices_:
-            tmp = X.iloc[i].copy()
-            X.iloc[i] = X.iloc[i + 1].copy()
-            X.iloc[i + 1] = tmp
+        # Vectorized: swap all pairs at once via .values indexing
+        i = self.switch_indices_
+        tmp = X.values[i].copy()
+        X.values[i] = X.values[i + 1]
+        X.values[i + 1] = tmp
         return X, y
 
 

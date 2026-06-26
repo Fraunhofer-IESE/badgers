@@ -70,8 +70,8 @@ class RandomZerosGenerator(OutliersGenerator):
 
         self.outliers_indices_ = list(zip(rows, cols))
 
-        for r, c in self.outliers_indices_:
-            X.iloc[r, c] = 0
+        # vectorized assignment via .values
+        X.values[rows, cols] = 0
 
         return X, y
 
@@ -116,13 +116,15 @@ class LocalZScoreGenerator(OutliersGenerator):
 
         self.outliers_indices_ = list(zip(rows, cols))
 
-        for r, c in self.outliers_indices_:
+        # Pre-compute all outlier values, then assign in one shot
+        values = np.empty(n_outliers)
+        for idx, (r, c) in enumerate(self.outliers_indices_):
             local_window = X.iloc[r - delta:r + delta, c]
             local_mean = local_window.mean(axis=0)
             local_std = local_window.std(axis=0)
-            value = local_mean + random_sign(self.random_generator) * (
+            values[idx] = local_mean + random_sign(self.random_generator).item() * (
                 3. * local_std + self.random_generator.exponential())
-            # updating with new outliers
-            X.iloc[r, c] = value
+        # vectorized assignment via .values
+        X.values[rows, cols] = values
 
         return X, y

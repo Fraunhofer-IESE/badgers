@@ -56,7 +56,7 @@ class MissingAtRandomGenerator(MissingValuesGenerator):
 
         self.missing_indices_ = list(zip(rows, cols))
 
-        for r, c in self.missing_indices_:
-            X.iloc[r, c] = np.nan
+        # vectorized assignment via .values
+        X.values[rows, cols] = np.nan
 
         return X, y

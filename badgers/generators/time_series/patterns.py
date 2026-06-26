@@ -251,7 +251,12 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
             max_width_patterns=max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
-            for col in range(X.shape[1]):
-                X.iloc[start:end, col] = np.linspace(X.iloc[start, col], X.iloc[end, col], end - start)
+            # Vectorized: interpolate all columns at once using broadcasting
+            n_pts = end - start
+            start_vals = X.iloc[start, :].values
+            end_vals = X.iloc[end, :].values
+            # shape: (n_pts, n_cols) via outer product
+            t = np.linspace(0, 1, n_pts)[:, np.newaxis]
+            X.values[start:end, :] = start_vals + t * (end_vals - start_vals)
 
         return X, y
