@@ -8,8 +8,8 @@ Badgers includes a benchmarking framework to measure performance (time/memory) o
 # Run all benchmarks (performance)
 python -m benchmarks run
 
-# Run only performance measurements
-python -m benchmarks run --type performance
+# Filter by module path
+python -m benchmarks run --generators tabular_data.outliers
 ```
 
 ## CLI Reference
@@ -17,17 +17,16 @@ python -m benchmarks run --type performance
 ### `run` — Execute Benchmarks
 
 ```
-python -m benchmarks run [--type {performance,all}] [--generators FILTER] [--iterations N] [--timeout S]
+python -m benchmarks run [--generators FILTER] [--iterations N] [--timeout S]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--type` | `all` | `performance` (time/memory), or `all` |
 | `--generators` | *(all)* | Filter by module path prefix, e.g. `tabular_data.outliers` |
 | `--iterations` | `5` | Number of iterations for performance measurement |
 | `--timeout` | `60` | Timeout in seconds per scenario |
 
-Results are saved as JSON to `benchmarks/results/run_<branch>_<timestamp>.json`.
+Results are saved as JSON to `.benchmarks/results/run_<branch>_<timestamp>.json`. This directory is gitignored — results are local-only.
 
 ### `baseline` — Manage Baselines
 
@@ -37,6 +36,8 @@ python -m benchmarks baseline list
 ```
 
 Baselines are snapshots of results used for regression detection. Save a baseline after verifying all checks pass on a known-good commit.
+
+Baselines are stored in `.benchmarks/baselines/` (gitignored, local-only).
 
 ### `compare` — Detect Regressions
 
@@ -61,18 +62,17 @@ Compares the latest (or specified) results against a baseline and reports regres
 Create a registration file `_<name>.py` in `benchmarks/generators/<category>/`:
 
 ```python
-from benchmarks.models import Scenario, GeneratorBenchmark
+from benchmarks.models import GeneratorBenchmark
 from benchmarks.registry import register
+from benchmarks.scenarios.tabular import SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS
+from badgers.generators.tabular_data.noise import GaussianNoiseGenerator
 
 register(GeneratorBenchmark(
-    class_name="MyGenerator",
-    module="badgers.generators.tabular_data.noise",
-    scenarios={
-        "small": Scenario(
-            factory="benchmarks.scenarios.tabular:make_blobs_small",
-            params={},
-        ),
-    },
+    generator_cls=GaussianNoiseGenerator,
+    name="GaussianNoise",
+    module_path="tabular_data.noise",
+    default_params={"noise_std": 0.5},
+    scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
 ))
 ```
 
