@@ -12,8 +12,8 @@ from benchmarks.models import RunMeta, BenchmarkResult
 from benchmarks.registry import discover
 from benchmarks.runner import run_performance, run_all
 
-RESULTS_DIR = pathlib.Path(__file__).parent / "results"
-BASELINES_DIR = pathlib.Path(__file__).parent / "baselines"
+RESULTS_DIR = pathlib.Path(__file__).parent.parent / ".benchmarks" / "results"
+BASELINES_DIR = pathlib.Path(__file__).parent.parent / ".benchmarks" / "baselines"
 
 
 def _get_git_info() -> tuple:

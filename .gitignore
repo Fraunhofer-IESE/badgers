@@ -1,5 +1,8 @@
 /site/
 
+# Benchmark outputs (generated, not committed)
+.benchmarks/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
