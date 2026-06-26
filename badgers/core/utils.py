@@ -62,7 +62,68 @@ def random_spherical_coordinate(random_generator: numpy.random.Generator = defau
         cos_phis = np.cos(phis)
         sin_phis = np.sin(phis)
 
-        x = np.array(
-            [radius * cos_phis[i] * np.prod(sin_phis[:i]) for i in range(size - 1)] + [radius * np.prod(sin_phis)]
-        )
+        # Vectorized: use cumprod to avoid O(d²) Python loop
+        cumprod_sin = np.cumprod(sin_phis)
+        # x_i = radius * cos(phi_i) * prod(sin(phi_0)...sin(phi_{i-1})) for i=0..d-2
+        # x_{d-1} = radius * prod(sin(phi_0)...sin(phi_{d-1}))
+        x_head = radius * cos_phis[:-1] * cumprod_sin[:-1]
+        x_tail = np.array([radius * cumprod_sin[-1]])
+        x = np.concatenate([x_head, x_tail])
     return x
+
+
+def random_spherical_coordinates(
+    random_generator: np.random.Generator = default_rng(0),
+    size: int = None,
+    radii: np.ndarray = None,
+) -> np.ndarray:
+    """Generate multiple points on a hypersphere in batch (vectorized).
+
+    This is the batch equivalent of :func:`random_spherical_coordinate`,
+    producing ``n_samples`` points at once using vectorized NumPy operations.
+    It is significantly faster than calling the scalar version in a loop
+    when ``n_samples`` is large.
+
+    Args:
+        random_generator: A numpy random number generator.
+        size: The dimension of the hypersphere (number of coordinates per point).
+        radii: Array of shape ``(n_samples,)`` with the radius for each point.
+
+    Returns:
+        An array of shape ``(n_samples, size)`` where each row is a point
+        on the hypersphere with the corresponding radius from ``radii``.
+    """
+    assert size > 0
+    n_samples = len(radii)
+
+    if size == 1:
+        signs = random_sign(random_generator, size=(n_samples, 1))
+        return signs * radii.reshape(-1, 1)
+    elif size == 2:
+        phi = random_generator.uniform(0, 2. * np.pi, size=n_samples)
+        x = np.column_stack([
+            radii * np.cos(phi),
+            radii * np.sin(phi),
+        ])
+        return x
+    else:
+        # Generate all angles at once: (n_samples, size-1)
+        phis = np.empty((n_samples, size - 1))
+        phis[:, :-1] = random_generator.uniform(0, np.pi, size=(n_samples, size - 2))
+        phis[:, -1] = random_generator.uniform(0, 2. * np.pi, size=n_samples)
+
+        cos_phis = np.cos(phis)
+        sin_phis = np.sin(phis)
+
+        # Vectorized cumprod along axis=1
+        cumprod_sin = np.cumprod(sin_phis, axis=1)
+
+        # x[:, i] = radii * cos_phis[:, i] * cumprod_sin[:, i-1]  for i=0..d-2
+        # x[:, d-1] = radii * cumprod_sin[:, -1]
+        x_head = radii.reshape(-1, 1) * cos_phis[:, 1:] * cumprod_sin[:, :-1]
+        x_tail = radii.reshape(-1, 1) * cumprod_sin[:, -1:]
+
+        # First coordinate: radii * cos_phis[:, 0]
+        x_first = radii.reshape(-1, 1) * cos_phis[:, :1]
+
+        return np.concatenate([x_first, x_head, x_tail], axis=1)

@@ -32,9 +32,15 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
         """
         assert n_outliers > 0
 
+        # Vectorized: pick random row indices for each (outlier, column) pair,
+        # then index into the underlying numpy array directly (avoids expensive
+        # .iloc per-column slicing in a Python loop).
+        row_indices = self.random_generator.integers(0, len(X), size=(n_outliers, X.shape[1]))
+        outlier_values = X.values[row_indices, np.arange(X.shape[1])]
+
         outliers = pd.DataFrame(
-            data=np.stack([self.random_generator.choice(X.iloc[:,i], size=n_outliers) for i in range(X.shape[1])]).T,
-            columns = X.columns
+            data=outlier_values,
+            columns=X.columns,
         )
 
         # add "outliers" as labels for outliers

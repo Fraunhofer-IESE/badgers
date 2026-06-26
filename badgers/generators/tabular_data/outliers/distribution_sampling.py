@@ -3,7 +3,7 @@ from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.utils import random_sign, random_spherical_coordinate
+from badgers.core.utils import random_sign, random_spherical_coordinate, random_spherical_coordinates
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
 
@@ -121,12 +121,10 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # generate outliers
-        outliers = np.array([
-            random_sign(self.random_generator, size=Xt.shape[1]) * (
-                3. + self.random_generator.exponential(size=Xt.shape[1], scale=scale))
-            for _ in range(n_outliers)
-        ])
+        # generate outliers (vectorized: all samples at once)
+        signs = random_sign(self.random_generator, size=(n_outliers, Xt.shape[1]))
+        exponentials = self.random_generator.exponential(scale=scale, size=(n_outliers, Xt.shape[1]))
+        outliers = signs * (3.0 + exponentials)
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
@@ -191,15 +189,13 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # computing outliers
-        outliers = np.array([
-            random_spherical_coordinate(
-                random_generator=self.random_generator,
-                size=Xt.shape[1],
-                radius=3. + self.random_generator.exponential(scale=scale)
-            )
-            for _ in range(n_outliers)
-        ])
+        # computing outliers (vectorized: all radii + coordinates at once)
+        radii = 3.0 + self.random_generator.exponential(scale=scale, size=n_outliers)
+        outliers = random_spherical_coordinates(
+            random_generator=self.random_generator,
+            size=Xt.shape[1],
+            radii=radii,
+        )
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:

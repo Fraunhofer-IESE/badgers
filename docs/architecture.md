@@ -263,3 +263,83 @@ pytest tests/generators/
 # Run a specific category
 pytest tests/generators/tabular_data/ -v
 ```
+
+## Architectural Decisions
+
+This section records significant architectural decisions made during the project's evolution. Each decision includes the rationale and date of adoption.
+
+### ADR-1: Strict Separation of Tests and Benchmarks (2026-06-23)
+
+**Decision:** Unit tests (`tests/`) and performance benchmarks (`benchmarks/`) serve distinct purposes and must not overlap.
+
+| Concern | Unit Tests | Benchmarks |
+|---|---|---|
+| **Purpose** | Catch logic bugs | Measure perf, detect regressions |
+| **Data** | Small, varied (numpy/pandas × 1D/2D) | Medium-large, standardized |
+| **Data source** | Per-type `conftest.py` fixtures | `benchmarks/scenarios/` |
+| **Speed** | Fast (<1ms each) | Measured (timed iterations) |
+| **Checks** | Exact assertions | Performance stats only |
+
+**Rationale:** The benchmarks module originally duplicated functional assertions via `FunctionalCheck`/`FunctionalResult`. These were removed so that `tests/` is the single source of truth for correctness and benchmarks focus exclusively on timing, memory, and regression detection. Generator correctness is tested directly via pytest, not through the benchmark framework.
+
+### ADR-2: Per-Data-Type Pytest Fixture Architecture (2026-06-23)
+
+**Decision:** Tests use per-data-type `conftest.py` files with parametrized pytest fixtures instead of `unittest.TestCase` classes or a monolithic fixture file.
+
+```
+tests/
+  conftest.py                          # shared: rng fixture only
+  generators/
+    tabular_data/
+      conftest.py                      # tabular_data, tabular_data_labeled fixtures
+    time_series/
+      conftest.py                      # time_series_sine, time_series_walk fixtures
+    graph/
+      conftest.py                      # graph_erdos_renyi fixture
+    text/
+      conftest.py                      # text_word_list fixture
+```
+
+**Naming conventions:**
+- Fixtures: prefixed with data type (`tabular_data`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`)
+- Test functions: `test_<subject>__<behavior>` with double underscore separator (e.g., `test_gaussian_noise__increases_variance`)
+- No `unittest.TestCase` classes — flat pytest functions only
+- Only numpy and pandas input types (no `list_1D`/`list_2D`)
+
+**Rationale:** Fixtures are auto-discovered by pytest's `conftest.py` mechanism, scoped to the nearest directory. This keeps test data close to the tests that use it, avoids a single monolithic fixture file, and enables pytest's built-in parametrization for testing across input types.
+
+### ADR-3: Benchmark Registration via Auto-Discovered Modules (2026-06-24)
+
+**Decision:** Each generator category has a `_*.py` registration module in `benchmarks/generators/<data_type>/` that imports generator classes and calls `register(GeneratorBenchmark(...))`. The registry auto-discovers these modules.
+
+**Key constraint:** Density-based generators (e.g., `HistogramSamplingGenerator`) must only use `SCENARIO_SMALL_BLOBS` (2D) because they raise on >5D input.
+
+**Rationale:** Decouples benchmark definitions from the benchmark runner. Adding a new generator to benchmarks is a single `register()` call in the appropriate `_*.py` file — no other changes needed.
+
+### ADR-4: Vectorized NumPy Over Python Loops (2026-06-26)
+
+**Decision:** All generator implementations must prefer batched/vectorized NumPy operations over Python-level `for` loops, especially when `n_samples` can be large.
+
+**Three canonical patterns:**
+
+1. **Per-row RNG → batched RNG:** Replace `[rng.exponential(size=d) for _ in range(n)]` with `rng.exponential(size=(n, d))`
+2. **Per-column `.iloc`/`.choice` → integer array indexing:** Replace `np.stack([rng.choice(X.iloc[:, i], ...) for i in range(d)])` with `X.values[row_idx, np.arange(d)]`
+3. **Batch variants for utilities:** When a utility operates on a single sample (e.g., `random_spherical_coordinate`), also provide a batch version (`random_spherical_coordinates`) accepting arrays with `axis=` parameters
+
+**When NOT to vectorize:** small `n_samples` (≤10), algorithms requiring sequential state (e.g., rejection sampling with unknown iteration count).
+
+**Rationale:** Badgers generators often produce many samples at once. Python loops over RNG calls or pandas `.iloc` accesses are orders of magnitude slower than batched NumPy operations. The O(d²) `np.prod(sin_phis[:i])` pattern in `random_spherical_coordinate` was also fixed to O(d) via `np.cumprod`.
+
+### ADR-5: Baseline-Based Regression Detection (2026-06-24)
+
+**Decision:** Benchmarks support a baseline workflow for detecting performance regressions with defined thresholds:
+
+```bash
+python -m benchmarks run --iterations 10
+python -m benchmarks baseline save --name v0.0.13
+python -m benchmarks compare --baseline v0.0.13
+```
+
+**Regression thresholds:** >20% time increase or >30% memory increase triggers a flag in `comparator.py`.
+
+**Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.

@@ -58,3 +58,79 @@ This must produce **zero** errors before submitting.
 - Matrix: Python 3.11–3.14 × Ubuntu, macOS, Windows
 - Linting: flake8 (syntax errors + complexity)
 - Tests: `tox -e py`
+
+## Performance Patterns
+
+### Prefer Vectorized NumPy Over Python Loops
+
+Badgers generators often produce many samples at once. Always prefer vectorized
+NumPy operations over Python-level `for` loops, especially when `n_samples` can
+be large.
+
+**Rule of thumb:** If you see a list comprehension building a `np.array` row by
+row, it can almost certainly be vectorized.
+
+#### Pattern 1: Replace per-row RNG calls with batched calls
+
+```python
+# ❌ Slow — calls random_sign + exponential n_outliers times
+outliers = np.array([
+    random_sign(rng, size=d) * (3.0 + rng.exponential(scale=s, size=d))
+    for _ in range(n_outliers)
+])
+
+# ✅ Fast — one batched call each
+signs = random_sign(rng, size=(n_outliers, d))
+exponentials = rng.exponential(scale=s, size=(n_outliers, d))
+outliers = signs * (3.0 + exponentials)
+```
+
+#### Pattern 2: Replace per-row .iloc/.choice with integer array indexing
+
+```python
+# ❌ Slow — calls .iloc[:, i] and .choice per column in a Python loop
+np.stack([rng.choice(X.iloc[:, i], size=n) for i in range(X.shape[1])]).T
+
+# ✅ Fast — generate all indices at once, index into .values
+row_idx = rng.integers(0, len(X), size=(n, X.shape[1]))
+X.values[row_idx, np.arange(X.shape[1])]
+```
+
+#### Pattern 3: Provide batch variants for utility functions
+
+When a utility function operates on a single sample (e.g.,
+`random_spherical_coordinate`), also provide a batch version
+(`random_spherical_coordinates`) that accepts arrays and uses `axis=`
+parameters. This avoids forcing callers into Python loops.
+
+#### When NOT to vectorize
+
+- When `n_samples` is always small (≤10) — the allocation overhead of 2D arrays
+  can outweigh the benefit. Measure first.
+- When the algorithm inherently requires sequential state (e.g., rejection
+  sampling with unknown iteration count).
+
+### Benchmark Before and After
+
+Use the project's benchmark framework to measure performance changes:
+
+```bash
+# Run all benchmarks
+python -m benchmarks run --iterations 10
+
+# Run a subset
+python -m benchmarks run --generators tabular_data.outliers --iterations 10
+
+# Compare against a baseline
+python -m benchmarks compare --baseline v0.0.13
+```
+
+Results are saved to `.benchmarks/results/`. Baselines live in
+`.benchmarks/baselines/`.
+
+### Avoid Expensive pandas .iloc in Loops
+
+`DataFrame.iloc[:, i]` inside a loop is expensive because each call creates a
+new view object and triggers index lookups. When you need per-column random
+access, work with the underlying `.values` NumPy array instead, or use
+`.to_numpy()`.

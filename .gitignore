@@ -178,3 +178,6 @@ badgers.code-workspace
 # Benchmark results and baselines
 benchmarks/results/*.json
 benchmarks/baselines/*.json
+
+# Superpowers design specs and plans (local only)
+docs/superpowers/
