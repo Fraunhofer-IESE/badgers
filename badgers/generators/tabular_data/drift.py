@@ -2,7 +2,6 @@ import abc
 from typing import Union
 
 import numpy as np
-import pandas as pd
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from numpy.random import default_rng
@@ -72,7 +71,7 @@ class RandomShiftGenerator(DriftGenerator):
         # add shift
         Xt += shift
         # inverse transform
-        return pd.DataFrame(data=scaler.inverse_transform(Xt), columns=X.columns, index=X.index), y
+        return scaler.inverse_transform(Xt), y
 
 
 class RandomShiftClassesGenerator(DriftGenerator):

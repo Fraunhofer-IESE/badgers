@@ -81,7 +81,7 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         col_idx = np.arange(X.shape[1])[:, np.newaxis].repeat(nb_missing, axis=1)
         self.missing_values_indices_ = list(zip(row_idx.ravel(), col_idx.ravel()))
         # vectorized assignment via .values
-        X.values[row_idx.ravel(), col_idx.ravel()] = np.nan
+        X[row_idx.ravel(), col_idx.ravel()] = np.nan
 
         return X, y
 
@@ -125,7 +125,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
         # initialize probability with zeros
         p = np.zeros_like(X)
         # normalize values between 0 and 1
-        X_norm = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))).values
+        X_norm = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0)))
         # make columns i depends on all the other
         if X.shape[1] > 1:
             for i in range(X.shape[1]):
@@ -145,7 +145,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
         col_idx = np.arange(X.shape[1])[:, np.newaxis].repeat(nb_missing, axis=1)
         self.missing_values_indices_ = list(zip(row_idx.ravel(), col_idx.ravel()))
         # vectorized assignment via .values
-        X.values[row_idx.ravel(), col_idx.ravel()] = np.nan
+        X[row_idx.ravel(), col_idx.ravel()] = np.nan
 
         return X, y
 
@@ -187,7 +187,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         assert 0 <= percentage_missing <= 1
 
         # normalize values between 0 and 1
-        p = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))).values
+        p = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0)))
         # make the sum of each column = 1
         p = normalize_proba(p)
 
@@ -200,7 +200,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         ])
         col_idx = np.arange(X.shape[1])[:, np.newaxis].repeat(nb_missing, axis=1)
         self.missing_values_indices_ = list(zip(row_idx.ravel(), col_idx.ravel()))
-        # vectorized assignment via .values
-        X.values[row_idx.ravel(), col_idx.ravel()] = np.nan
+        # vectorized assignment
+        X[row_idx.ravel(), col_idx.ravel()] = np.nan
 
         return X, y
