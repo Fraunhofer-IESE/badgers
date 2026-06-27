@@ -27,7 +27,7 @@ def test_random_sampling_features__preserves_shape_and_columns(tabular_data_labe
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
 
     def proba_func(X):
-        feature = X.iloc[:, 0]
+        feature = X[:, 0]
         return normalize_proba(
             (np.max(feature) - feature) / (np.max(feature) - np.min(feature))
         )

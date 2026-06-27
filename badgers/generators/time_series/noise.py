@@ -1,6 +1,7 @@
 import abc
 from typing import Tuple
 
+import numpy as np
 from badgers.generators.time_series.utils import generate_random_patterns_indices
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
@@ -23,7 +24,7 @@ class NoiseGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple[pd.DataFrame, pd.Series]:
+    def generate(self, X, y, **params) -> Tuple[np.ndarray, np.ndarray]:
         """
         Abstract method to be implemented by subclasses. Adds noise to the input data.
 
@@ -48,7 +49,7 @@ class LocalGaussianNoiseGenerator(NoiseGenerator):
 
     @preprocess_inputs
     def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5, max_width_patterns: int = 10,
-                 noise_std: float = 0.1) -> Tuple[pd.DataFrame, pd.Series]:
+                 noise_std: float = 0.1) -> Tuple[np.ndarray, np.ndarray]:
         """
         Adds Gaussian noise to randomly selected local patterns within the input data.
 
@@ -110,4 +111,4 @@ class GlobalGaussianNoiseGenerator(NoiseGenerator):
         # add noise
         Xt = Xt + self.random_generator.normal(loc=0, scale=noise_std, size=Xt.shape)
         # inverse standardization
-        return pd.DataFrame(data=scaler.inverse_transform(Xt), columns=X.columns, index=X.index), y
+        return scaler.inverse_transform(Xt), y

@@ -131,4 +131,4 @@ class RandomShiftClassesGenerator(DriftGenerator):
         for c, s in zip(classes, shifts):
             Xt[y == c] += s
         # inverse transform
-        return pd.DataFrame(data=scaler.inverse_transform(Xt), columns=X.columns, index=X.index), y
+        return scaler.inverse_transform(Xt), y

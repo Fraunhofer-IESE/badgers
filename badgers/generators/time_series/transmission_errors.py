@@ -25,7 +25,7 @@ class TransmissionErrorGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple[pd.DataFrame, pd.Series]:
+    def generate(self, X, y, **params) -> Tuple[np.ndarray, np.ndarray]:
         """
         Abstract method to generate transmission errors on the input data.
 
@@ -129,7 +129,7 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
         offset = 0
 
         for i, l in self.repeats_:
-            repeat = np.repeat(X[i], l)
+            repeat = np.repeat(X[i:i+1], l, axis=0)
             Xt = np.insert(Xt, i + offset, repeat, axis=0)
             offset += l
 
@@ -297,7 +297,7 @@ class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
         offset = 0
 
         for i, l in self.repeats_:
-            repeat = np.repeat(X[i], l)
+            repeat = np.repeat(X[i:i+1], l, axis=0)
             Xt = np.insert(Xt, i + offset, repeat, axis=0)
             offset += l
 

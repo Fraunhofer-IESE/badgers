@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 from badgers.generators.time_series.patterns import Pattern, add_offset, \
     add_linear_trend, scale, RandomlySpacedConstantPatterns, RandomlySpacedLinearPatterns, RandomlySpacedPatterns
@@ -68,23 +67,23 @@ def test_randomly_spaced_constant_patterns__injects_zeros(time_series_sine):
     """RandomlySpacedConstantPatterns injects constant-zero regions."""
     n_patterns = 3
     X_sine, _ = time_series_sine
-    X = pd.DataFrame(data=X_sine)
+    X = X_sine
     generator = RandomlySpacedConstantPatterns()
     Xt, _ = generator.generate(X=X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10,
                                constant_value=0)
     assert n_patterns == len(generator.patterns_indices_)
     for start, end in generator.patterns_indices_:
-        assert Xt.iloc[start:end, :].values.tolist() == np.zeros((end - start, X.shape[1])).tolist()
+        assert Xt[start:end, :].tolist() == np.zeros((end - start, X.shape[1])).tolist()
 
 
 def test_randomly_spaced_linear_patterns__interpolates(time_series_sine):
     """RandomlySpacedLinearPatterns linearly interpolates between endpoints."""
     X_sine, _ = time_series_sine
-    X = pd.DataFrame(data=X_sine)
+    X = X_sine
     generator = RandomlySpacedLinearPatterns()
     Xt, _ = generator.generate(X=X, y=None, n_patterns=3, min_width_pattern=5, max_width_patterns=10)
     for (start, end) in generator.patterns_indices_:
         for col in range(X.shape[1]):
-            assert Xt.iloc[start:end, col].tolist() == \
-                np.linspace(X.iloc[start, col], X.iloc[end, col], end - start).tolist()
+            assert Xt[start:end, col].tolist() == \
+                np.linspace(X[start, col], X[end, col], end - start).tolist()
 
