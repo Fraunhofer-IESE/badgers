@@ -71,7 +71,7 @@ class RandomZerosGenerator(OutliersGenerator):
         self.outliers_indices_ = list(zip(rows, cols))
 
         # vectorized assignment via .values
-        X.values[rows, cols] = 0
+        X[rows, cols] = 0
 
         return X, y
 

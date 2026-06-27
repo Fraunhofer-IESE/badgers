@@ -1,7 +1,6 @@
 import abc
 from typing import Tuple
 
-import pandas as pd
 from badgers.generators.time_series.utils import generate_random_patterns_indices
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
@@ -79,7 +78,7 @@ class LocalGaussianNoiseGenerator(NoiseGenerator):
             Xt[start:end, :] += self.random_generator.normal(loc=0, scale=noise_std, size=(end-start, Xt.shape[1]))
 
         # Inverse standardize the data
-        return pd.DataFrame(data=scaler.inverse_transform(Xt), columns=X.columns, index=X.index), y
+        return scaler.inverse_transform(Xt), y
 
 
 class GlobalGaussianNoiseGenerator(NoiseGenerator):
