@@ -48,23 +48,23 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         n_features = X.shape[1]
         outliers = np.empty((n_outliers, n_features), dtype=X.dtype)
 
-        # Vectorize histogram computation across all features
-        hist, bin_edges = np.histogramdd(X, bins=bins)
-
-        # Compute inverse density and sampling probabilities
-        inv_density = 1 - hist / np.max(hist, axis=(0, 1, 2))
-        p = inv_density / np.sum(inv_density, axis=(0, 1, 2))
-
-        # Generate bin indices for all features at once
-        indices = self.random_generator.choice(
-            bins, p=p, size=(n_outliers, n_features), replace=True
-        )
-
-        # Vectorized uniform sampling from selected bins
+        # Compute independent histograms for each feature
         for col in range(n_features):
+            hist, bin_edges = np.histogram(X[:, col], bins=bins)
+
+            # Compute inverse density and sampling probabilities
+            inv_density = 1 - hist / np.max(hist)
+            p = inv_density / np.sum(inv_density)
+
+            # Generate bin indices for this feature
+            indices = self.random_generator.choice(
+                bins, p=p, size=n_outliers, replace=True
+            )
+
+            # Uniform sampling from selected bins
             outliers[:, col] = self.random_generator.uniform(
-                low=bin_edges[col][indices[:, col]],
-                high=bin_edges[col][indices[:, col] + 1]
+                low=bin_edges[indices],
+                high=bin_edges[indices + 1]
             )
 
         # add "outliers" as labels for outliers
