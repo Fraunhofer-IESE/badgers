@@ -2,7 +2,6 @@ import abc
 from typing import Tuple, Union
 
 import numpy as np
-import pandas as pd
 from numpy.random import default_rng
 from scipy.interpolate import CubicSpline
 
@@ -94,22 +93,22 @@ class PatternsGenerator(GeneratorMixin):
         """
         pass
 
-    def _inject_pattern(self, X: pd.DataFrame, p: Pattern, start_index: int, end_index: int,
+    def _inject_pattern(self, X: np.ndarray, p: Pattern, start_index: int, end_index: int,
                         scaling_factor: Union[float, str, None] = 'auto'):
         """
         Utility function to inject a predefined pattern `p` into a signal `X`.
 
-        :param X: The signal (time-series data) to inject the pattern into, as a pandas DataFrame.
+        :param X: The signal (time-series data) to inject the pattern into, as a numpy array.
         :param p: The pattern to be injected, represented as a `Pattern` object.
         :param start_index: The starting index in `X` where the pattern injection begins.
         :param end_index: The ending index in `X` where the pattern injection ends.
         :param scaling_factor: The factor by which to scale the pattern before injection. Can be a float, 'auto' to scale based on the signal's range, or None to apply no scaling.
-        :return: The transformed signal (time-series data) as a pandas DataFrame, where the pattern has been injected.
+        :return: The transformed signal (time-series data) as a numpy array, where the pattern has been injected.
         """
 
         # start and end values
-        v_start = X.iloc[start_index, :].values
-        v_end = X.iloc[start_index, :].values
+        v_start = X[start_index, :]
+        v_end = X[end_index, :]
 
         # number of points needed for resampling
         nb_points = end_index - start_index + 1
@@ -126,7 +125,7 @@ class PatternsGenerator(GeneratorMixin):
         transformed_pattern = scale(transformed_pattern, scaling_factor=scaling_factor)
         transformed_pattern = add_linear_trend(start_value=v_start, end_value=v_end, values=transformed_pattern)
 
-        X.iloc[start_index:end_index + 1, :] = transformed_pattern
+        X[start_index:end_index + 1, :] = transformed_pattern
         return X
 
 
@@ -211,7 +210,7 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
             max_width_patterns=max_width_patterns)
 
         for (start, end) in self.patterns_indices_:
-            X.iloc[start:end, :] = constant_value
+            X[start:end, :] = constant_value
 
         return X, y
 
@@ -253,10 +252,10 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
         for (start, end) in self.patterns_indices_:
             # Vectorized: interpolate all columns at once using broadcasting
             n_pts = end - start
-            start_vals = X.iloc[start, :].values
-            end_vals = X.iloc[end, :].values
+            start_vals = X[start, :]
+            end_vals = X[end, :]
             # shape: (n_pts, n_cols) via outer product
             t = np.linspace(0, 1, n_pts)[:, np.newaxis]
-            X.values[start:end, :] = start_vals + t * (end_vals - start_vals)
+            X[start:end, :] = start_vals + t * (end_vals - start_vals)
 
         return X, y

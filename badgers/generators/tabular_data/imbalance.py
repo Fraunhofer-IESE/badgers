@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-import pandas as pd
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
@@ -53,7 +52,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, sampling_proba_func=lambda X: normalize_proba(X.iloc[:, 0])):
+    def generate(self, X, y=None, sampling_proba_func=lambda X: normalize_proba(X[:, 0])):
         """
         Randomly samples instances based on the feature values in X using a specified sampling probability function.
 
@@ -76,7 +75,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         # sampling
         sampling_proba = sampling_proba_func(X)
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_proba, size=X.shape[0], replace=True)
-        Xt = X.iloc[sampling_mask,:]
+        Xt = X[sampling_mask, :]
         yt = y[sampling_mask] if y is not None else y
         return Xt, yt
 
@@ -120,15 +119,12 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
 
         for label, prop in proportion_classes.items():
             size = int(prop * X.shape[0])
-            Xt.append(self.random_generator.choice(X[y == label], size=size, replace=True))
+            Xt.append(self.random_generator.choice(X[y == label, :], size=size, replace=True))
             transformed_labels += [label] * size
 
-        Xt = pd.DataFrame(
-            data=np.vstack(Xt),
-            columns=X.columns
-        )
+        Xt = np.vstack(Xt)
 
-        yt = pd.Series(data=transformed_labels)
+        yt = np.array(transformed_labels)
 
         return Xt, yt
 
@@ -171,7 +167,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_probabilities_, size=X.shape[0],
                                                      replace=True)
 
-        Xt = X.iloc[sampling_mask, :]
+        Xt = X[sampling_mask, :]
         yt = y[sampling_mask]
 
         return Xt, yt

@@ -119,12 +119,11 @@ class LocalZScoreGenerator(OutliersGenerator):
         # Pre-compute all outlier values, then assign in one shot
         values = np.empty(n_outliers)
         for idx, (r, c) in enumerate(self.outliers_indices_):
-            local_window = X.iloc[r - delta:r + delta, c]
+            local_window = X[r - delta:r + delta, c]
             local_mean = local_window.mean(axis=0)
             local_std = local_window.std(axis=0)
             values[idx] = local_mean + random_sign(self.random_generator).item() * (
                 3. * local_std + self.random_generator.exponential())
-        # vectorized assignment via .values
-        X.values[rows, cols] = values
+        X[rows, cols] = values
 
         return X, y

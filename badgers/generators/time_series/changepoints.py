@@ -71,6 +71,6 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
         )
 
         for idx, change in self.changepoints:
-            X.iloc[idx:] += change
+            X[idx:] += change
 
         return X, y
