@@ -1,3 +1,4 @@
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
@@ -49,3 +50,35 @@ def tabular_data_labeled(request, rng):
             ),
             pd.Series([0, 1, 2, 3, 4] * 20),
         )
+
+
+@pytest.fixture
+def chain_graph():
+    """X -> Y -> Z"""
+    g = nx.DiGraph()
+    g.add_edges_from([("X", "Y"), ("Y", "Z")])
+    return g
+
+
+@pytest.fixture
+def fork_graph():
+    """C -> X, C -> Y"""
+    g = nx.DiGraph()
+    g.add_edges_from([("C", "X"), ("C", "Y")])
+    return g
+
+
+@pytest.fixture
+def collider_graph():
+    """X -> Z <- Y"""
+    g = nx.DiGraph()
+    g.add_edges_from([("X", "Z"), ("Y", "Z")])
+    return g
+
+
+@pytest.fixture
+def diamond_graph():
+    """A -> B, A -> C, B -> D, C -> D"""
+    g = nx.DiGraph()
+    g.add_edges_from([("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")])
+    return g
