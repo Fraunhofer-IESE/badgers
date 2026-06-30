@@ -133,36 +133,4 @@ def get_leaf_nodes(graph: nx.DiGraph) -> list:
     return [n for n in graph.nodes if graph.out_degree(n) == 0]
 
 
-def node_to_index(graph: nx.DiGraph, node) -> int:
-    """
-    Map a graph node to a column index.
 
-    Integer nodes map directly to themselves.
-    String nodes are sorted alphabetically and mapped to 0..d-1.
-
-    Parameters
-    ----------
-    graph : nx.DiGraph
-        A directed graph.
-    node : int or str
-        The node to map.
-
-    Returns
-    -------
-    int
-        Column index for this node.
-
-    Raises
-    ------
-    ValueError
-        If the node is not in the graph.
-    """
-    if node not in graph.nodes:
-        raise ValueError(f"node '{node}' not found in graph")
-
-    if isinstance(node, int):
-        return node
-
-    # String nodes: sort alphabetically and map to indices
-    sorted_nodes = sorted([n for n in graph.nodes if isinstance(n, str)])
-    return sorted_nodes.index(node)
