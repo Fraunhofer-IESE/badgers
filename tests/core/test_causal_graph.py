@@ -9,7 +9,6 @@ from badgers.core.causal_graph import (
     get_ancestors,
     get_root_nodes,
     get_leaf_nodes,
-    node_to_index,
 )
 
 
@@ -52,14 +51,6 @@ def cyclic_graph():
     """X -> Y -> Z -> X"""
     g = nx.DiGraph()
     g.add_edges_from([("X", "Y"), ("Y", "Z"), ("Z", "X")])
-    return g
-
-
-@pytest.fixture
-def int_node_graph():
-    """0 -> 1 -> 2"""
-    g = nx.DiGraph()
-    g.add_edges_from([(0, 1), (1, 2)])
     return g
 
 
@@ -172,17 +163,4 @@ def test_get_leaf_nodes__fork(fork_graph):
     assert set(get_leaf_nodes(fork_graph)) == {"X", "Y"}
 
 
-# --- node_to_index ---
 
-def test_node_to_index__int_nodes(int_node_graph):
-    """Integer nodes should map directly to themselves."""
-    assert node_to_index(int_node_graph, 0) == 0
-    assert node_to_index(int_node_graph, 1) == 1
-    assert node_to_index(int_node_graph, 2) == 2
-
-
-def test_node_to_index__str_nodes(chain_graph):
-    """String nodes should map to sorted order indices."""
-    assert node_to_index(chain_graph, "X") == 0
-    assert node_to_index(chain_graph, "Y") == 1
-    assert node_to_index(chain_graph, "Z") == 2

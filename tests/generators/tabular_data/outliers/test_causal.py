@@ -679,3 +679,125 @@ def test_generate__out_of_distribution_sampler_rejects_within_distribution(rng):
             outlier_magnitude=3.0, n_outliers=3,
             out_of_distribution_sampler=UniformSampler(),
         )
+
+
+# --- column_mapping validation tests ---
+
+
+def test_generate__column_mapping_none_raises(rng):
+    """Should raise ValueError if column_mapping is None."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X = rng.normal(size=(10, 2))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="column_mapping parameter is required"):
+        generator.generate(
+            X, y=None, graph=graph,
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_not_dict_raises(rng):
+    """Should raise ValueError if column_mapping is not a dict."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X = rng.normal(size=(10, 2))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="column_mapping must be a dict"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping=[("X", 0), ("Y", 1)],
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_missing_node_raises(rng):
+    """Should raise ValueError if a graph node is missing from column_mapping."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y"), ("Y", "Z")])
+    X = rng.normal(size=(10, 3))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="column_mapping missing node"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_extra_node_raises(rng):
+    """Should raise ValueError if column_mapping has nodes not in the graph."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X = rng.normal(size=(10, 2))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="column_mapping has unknown node"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1, "Z": 2},
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_non_int_value_raises(rng):
+    """Should raise ValueError if a column_mapping value is not an int."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X = rng.normal(size=(10, 2))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="column_mapping values must be int"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": "col1"},
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_out_of_range_raises(rng):
+    """Should raise ValueError if a column index is out of range."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X = rng.normal(size=(10, 2))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="out of range"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 5},
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_duplicate_index_raises(rng):
+    """Should raise ValueError if column_mapping has duplicate indices."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y"), ("Y", "Z")])
+    X = rng.normal(size=(10, 3))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="duplicate column index"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1, "Z": 1},
+            perturbation_nodes=["X"],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
+
+
+def test_generate__column_mapping_int_nodes_raises(rng):
+    """Should raise ValueError if graph has integer nodes."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([(0, 1)])
+    X = rng.normal(size=(10, 2))
+    generator = CausalOutlierPropagationGenerator(random_generator=rng)
+    with pytest.raises(ValueError, match="graph nodes must be strings"):
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={0: 0, 1: 1},
+            perturbation_nodes=[0],
+            outlier_magnitude=3.0, n_outliers=3,
+        )
