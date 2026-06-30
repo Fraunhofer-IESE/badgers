@@ -54,11 +54,12 @@ def test_generate__chain_x_to_y(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("Y", "Z")])
     coefs = {("X", "Y"): 2.0, ("Y", "Z"): 0.5}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -83,11 +84,12 @@ def test_generate__chain_y_do_intervention(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("Y", "Z")])
     coefs = {("X", "Y"): 2.0, ("Y", "Z"): 0.5}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["Y"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["Y"],
         outlier_magnitude=3.0, n_outliers=3,
     )
 
@@ -112,11 +114,12 @@ def test_generate__fork(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("C", "X"), ("C", "Y")])
     coefs = {("C", "X"): 1.5, ("C", "Y"): 0.8}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["C"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["C"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -138,11 +141,12 @@ def test_generate__collider(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Z"), ("Y", "Z")])
     coefs = {("X", "Z"): 1.0, ("Y", "Z"): 1.0}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -167,11 +171,12 @@ def test_generate__diamond(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")])
     coefs = {("A", "B"): 1.0, ("A", "C"): 1.0, ("B", "D"): 0.5, ("C", "D"): 0.5}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["A"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["A"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -190,7 +195,10 @@ def test_generate__no_graph_raises(rng):
     X = rng.normal(size=(100, 3))
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="graph"):
-        generator.generate(X, y=None, perturbation_nodes=["X"])
+        generator.generate(
+            X, y=None, column_mapping={"X": 0, "Y": 1, "Z": 2},
+            perturbation_nodes=["X"],
+        )
 
 
 def test_generate__invalid_perturbation_raises(rng):
@@ -200,7 +208,11 @@ def test_generate__invalid_perturbation_raises(rng):
     X = rng.normal(size=(100, 2))
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="not found"):
-        generator.generate(X, y=None, graph=graph, perturbation_nodes=["Z"])
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["Z"],
+        )
 
 
 def test_generate__cycle_raises(rng):
@@ -210,19 +222,24 @@ def test_generate__cycle_raises(rng):
     X = rng.normal(size=(100, 2))
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="not a directed acyclic graph"):
-        generator.generate(X, y=None, graph=graph, perturbation_nodes=["X"])
+        generator.generate(
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
+        )
 
 
 def test_generate__y_with_labels(rng):
     """When y is provided, outlier labels should be appended."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
     y = np.array([0, 1] * 50)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=y, graph=graph, perturbation_nodes=["X"],
+        X, y=y, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
     )
 
@@ -236,11 +253,12 @@ def test_generate__y_none_creates_labels(rng):
     """When y is None, labels should be created."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
     )
 
@@ -253,11 +271,12 @@ def test_generate__original_data_unchanged(rng):
     """Original rows should be identical to input."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("Y", "Z")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -269,11 +288,12 @@ def test_generate__magnitude_zero(rng):
     with the causal model (no extra perturbation beyond sampling noise)."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("Y", "Z")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=0.0, n_outliers=3,
     )
 
@@ -302,21 +322,28 @@ def test_generate__n_outliers_zero_raises(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="n_outliers must be positive"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes=["X"],
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
             outlier_magnitude=3.0, n_outliers=0,
         )
 
 
-def test_generate__int_nodes(rng):
-    """Should work with integer node labels."""
+def test_generate__string_nodes_explicit_mapping(rng):
+    """Should work with string node labels and explicit column_mapping."""
     graph = nx.DiGraph()
-    graph.add_edges_from([(0, 1), (1, 2)])
-    coefs = {(0, 1): 2.0, (1, 2): 0.5}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    graph.add_edges_from([("A", "B"), ("B", "C")])
+    coefs = {("A", "B"): 2.0, ("B", "C"): 0.5}
+    column_mapping = {"A": 0, "B": 1, "C": 2}
+    X, _ = _generate_linear_data(
+        graph, n_samples=100, rng=rng, coefficients=coefs,
+        column_mapping=column_mapping,
+    )
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=[0],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["A"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -337,11 +364,12 @@ def test_generate__multiple_perturbation_nodes(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("Y", "Z")])
     coefs = {("X", "Y"): 2.0, ("Y", "Z"): 0.5}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X", "Y"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X", "Y"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -362,11 +390,12 @@ def test_generate__non_root_perturbation_do_style(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("C", "Y"), ("Y", "T")])
     coefs = {("C", "Y"): 1.5, ("Y", "T"): 0.8}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["Y"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["Y"],
         outlier_magnitude=3.0, n_outliers=5,
     )
 
@@ -390,11 +419,12 @@ def test_generate__out_of_distribution_sampler_string(rng):
     """out_of_distribution_sampler as a string should be resolved via create_out_of_distribution_sampler."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
         out_of_distribution_sampler="hypersphere",
     )
@@ -409,12 +439,13 @@ def test_generate__out_of_distribution_sampler_instance(rng):
 
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     sampler = ZScoreSampler(scale=2.0)
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
         out_of_distribution_sampler=sampler,
     )
@@ -431,7 +462,9 @@ def test_generate__perturbation_nodes_not_list_raises(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="must be a list"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes="X",
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes="X",
             outlier_magnitude=3.0, n_outliers=3,
         )
 
@@ -444,7 +477,9 @@ def test_generate__perturbation_nodes_empty_raises(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="must not be empty"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes=[],
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=[],
             outlier_magnitude=3.0, n_outliers=3,
         )
 
@@ -458,6 +493,7 @@ def test_generate__perturbation_nodes_none_raises(rng):
     with pytest.raises(ValueError, match="perturbation_nodes"):
         generator.generate(
             X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
             outlier_magnitude=3.0, n_outliers=3,
         )
 
@@ -470,7 +506,9 @@ def test_generate__invalid_out_of_distribution_sampler_type_raises(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="out_of_distribution_sampler must be"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes=["X"],
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
             outlier_magnitude=3.0, n_outliers=3,
             out_of_distribution_sampler=42,
         )
@@ -480,11 +518,12 @@ def test_generate__within_distribution_sampler_string(rng):
     """within_distribution_sampler as a string should be resolved via create_within_distribution_sampler."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
         within_distribution_sampler="uniform",
     )
@@ -499,12 +538,13 @@ def test_generate__within_distribution_sampler_instance(rng):
 
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     sampler = UniformSampler()
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
         within_distribution_sampler=sampler,
     )
@@ -521,7 +561,9 @@ def test_generate__invalid_within_distribution_sampler_type_raises(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="within_distribution_sampler must be"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes=["X"],
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
             outlier_magnitude=3.0, n_outliers=3,
             within_distribution_sampler=42,
         )
@@ -534,11 +576,12 @@ def test_generate__both_samplers_specified(rng):
     graph = nx.DiGraph()
     graph.add_edges_from([("C", "Y"), ("Y", "T")])
     coefs = {("C", "Y"): 1.5, ("Y", "T"): 0.8}
-    X = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["Y"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["Y"],
         outlier_magnitude=3.0, n_outliers=5,
         within_distribution_sampler=UniformSampler(),
         out_of_distribution_sampler=ZScoreSampler(scale=2.0),
@@ -552,11 +595,12 @@ def test_generate__default_samplers(rng):
     """Default samplers should be NormalSampler (within) and ZScoreSampler (out-of)."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
     )
 
@@ -570,12 +614,13 @@ def test_generate__uniform_out_of_distribution_sampler(rng):
 
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
-    X = _generate_linear_data(graph, n_samples=100, rng=rng)
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     sampler = UniformOutOfDistributionSampler(expansion=0.5)
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     Xt, yt = generator.generate(
-        X, y=None, graph=graph, perturbation_nodes=["X"],
+        X, y=None, graph=graph, column_mapping=column_mapping,
+        perturbation_nodes=["X"],
         outlier_magnitude=3.0, n_outliers=3,
         out_of_distribution_sampler=sampler,
     )
@@ -610,7 +655,9 @@ def test_generate__within_distribution_sampler_rejects_out_of_distribution(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="within_distribution_sampler must be"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes=["X"],
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
             outlier_magnitude=3.0, n_outliers=3,
             within_distribution_sampler=ZScoreSampler(),
         )
@@ -626,7 +673,9 @@ def test_generate__out_of_distribution_sampler_rejects_within_distribution(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng)
     with pytest.raises(ValueError, match="out_of_distribution_sampler must be"):
         generator.generate(
-            X, y=None, graph=graph, perturbation_nodes=["X"],
+            X, y=None, graph=graph,
+            column_mapping={"X": 0, "Y": 1},
+            perturbation_nodes=["X"],
             outlier_magnitude=3.0, n_outliers=3,
             out_of_distribution_sampler=UniformSampler(),
         )
