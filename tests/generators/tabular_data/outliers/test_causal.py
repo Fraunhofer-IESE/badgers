@@ -7,34 +7,44 @@ from badgers.generators.tabular_data.outliers.causal import CausalOutlierPropaga
 
 # --- Helper: generate linear data from a graph ---
 
-def _generate_linear_data(graph, n_samples, rng, coefficients=None):
+def _generate_linear_data(graph, n_samples, rng, coefficients=None,
+                          column_mapping=None):
     """
     Generate data following linear structural equations.
 
     Each node v = sum_{p in parents(v)} coef[p->v] * p + noise
     where noise ~ N(0, 0.1).
+
+    Parameters
+    ----------
+    column_mapping : dict of str -> int, optional
+        Mapping from node names to column indices. If None, defaults to
+        alphabetical sort order (for backward compatibility in tests that
+        don't yet use explicit mapping).
     """
     if coefficients is None:
         coefficients = {}
         for u, v in graph.edges:
             coefficients[(u, v)] = 1.0
 
+    if column_mapping is None:
+        column_mapping = {n: i for i, n in enumerate(sorted(graph.nodes))}
+
     order = list(nx.topological_sort(graph))
-    node_to_idx = {n: i for i, n in enumerate(sorted(graph.nodes))}
     d = len(graph.nodes)
     X = np.zeros((n_samples, d))
 
     for node in order:
-        col = node_to_idx[node]
+        col = column_mapping[node]
         parents = list(graph.predecessors(node))
         if parents:
-            parent_cols = [node_to_idx[p] for p in parents]
+            parent_cols = [column_mapping[p] for p in parents]
             coefs = np.array([coefficients.get((p, node), 1.0) for p in parents])
             X[:, col] = X[:, parent_cols] @ coefs + rng.normal(0, 0.1, size=n_samples)
         else:
             X[:, col] = rng.normal(0, 1.0, size=n_samples)
 
-    return X
+    return X, column_mapping
 
 
 # --- Tests ---
