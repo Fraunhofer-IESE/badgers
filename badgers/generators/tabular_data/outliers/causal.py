@@ -8,7 +8,6 @@ from badgers.core.causal_graph import (
     get_ancestors,
     get_descendants,
     get_parents,
-    node_to_index,
     topological_order,
     validate_dag,
 )
@@ -41,9 +40,10 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
     generate() parameters (passed via **params)
     ----------
     graph : nx.DiGraph
-        Causal DAG. Nodes must be int (column indices) or str (mapped to
-        sorted column order).
-    perturbation_nodes : list of int or str
+        Causal DAG. All nodes must be strings.
+    column_mapping : dict of str -> int
+        Mapping from graph node names to column indices in X. Required.
+    perturbation_nodes : list of str
         Nodes where the intervention is applied. Each outlier row gets
         perturbations at ALL of these nodes simultaneously.
     n_outliers : int, default=10
@@ -63,7 +63,8 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
 
     @preprocess_inputs
     def generate(self, X, y, graph=None, perturbation_nodes=None,
-                 n_outliers=10, outlier_magnitude=3.0,
+                 column_mapping=None, n_outliers=10,
+                 outlier_magnitude=3.0,
                  within_distribution_sampler=None,
                  out_of_distribution_sampler=None):
         """
@@ -82,6 +83,10 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
             Causal DAG.
         perturbation_nodes : list of int or str
             Nodes where the intervention is applied.
+        column_mapping : dict of str -> int
+            Mapping from graph node names to column indices in X.
+            Required. Every graph node must have an entry, and all
+            values must be unique integers in 0..n_features-1.
         n_outliers : int, default=10
             Number of outlier rows to generate.
         outlier_magnitude : float, default=3.0
@@ -137,6 +142,61 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
                 f"n_outliers must be positive, got {n_outliers}"
             )
 
+        # Validate column_mapping
+        if column_mapping is None:
+            raise ValueError("column_mapping parameter is required")
+
+        if not isinstance(column_mapping, dict):
+            raise ValueError(
+                "column_mapping must be a dict, "
+                f"got {type(column_mapping).__name__}"
+            )
+
+        # Check all graph nodes are strings
+        for node in graph.nodes:
+            if not isinstance(node, str):
+                raise ValueError(
+                    f"graph nodes must be strings, "
+                    f"got {type(node).__name__} for node '{node}'"
+                )
+
+        # Check every graph node has a mapping entry
+        missing = set(graph.nodes) - set(column_mapping.keys())
+        if missing:
+            raise ValueError(
+                f"column_mapping missing node(s): {sorted(missing)}"
+            )
+
+        # Check no extra entries
+        extra = set(column_mapping.keys()) - set(graph.nodes)
+        if extra:
+            raise ValueError(
+                f"column_mapping has unknown node(s): {sorted(extra)}"
+            )
+
+        # Check all values are int and in range
+        for node, idx in column_mapping.items():
+            if not isinstance(idx, int):
+                raise ValueError(
+                    f"column_mapping values must be int, "
+                    f"got {type(idx).__name__} for node '{node}'"
+                )
+            if idx < 0 or idx >= n_features:
+                raise ValueError(
+                    f"column index {idx} for node '{node}' "
+                    f"is out of range [0, {n_features - 1}]"
+                )
+
+        # Check no duplicate column indices
+        seen = {}
+        for node, idx in column_mapping.items():
+            if idx in seen:
+                raise ValueError(
+                    f"duplicate column index {idx} "
+                    f"for nodes {sorted([seen[idx], node])}"
+                )
+            seen[idx] = node
+
         # Resolve within-distribution sampler (for exogenous nodes)
         if within_distribution_sampler is None:
             within_distribution_sampler = create_within_distribution_sampler("normal")
@@ -168,9 +228,8 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
         # Compute topological order
         order = topological_order(graph)
 
-        # Build node -> column index mapping
-        # TODO this has to be more explicit (maybe using an explicit mapping or using dataframes for the input data)
-        node_to_col = {n: node_to_index(graph, n) for n in graph.nodes}
+        # Use the explicit column mapping directly
+        node_to_col = column_mapping
 
         # Fit linear coefficients: for each node v, regress X[:,v] on X[:,parents(v)]
         coefficients = {}
