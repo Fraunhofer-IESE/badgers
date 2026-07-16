@@ -24,25 +24,25 @@ classifiers = [
 ]
 dependencies = [
     "numpy~=2.4.1",
-    "scikit-learn~=1.8.0",
+    "scikit-learn>=1.8,<1.10",
     "networkx~=3.6.1",
-    "pandas~=2.3.3",
+    "pandas>=2.3.3,<3.1.0",
     "scipy~=1.17.0",
 ]
 [project.optional-dependencies]
 dev = [
-    "tox~=4.34.1",
+    "tox>=4.34.1,<4.57.0",
     "mkdocs~=1.6.1",
     "mkdocstrings~=1.0.1",
     "mkdocstrings-python~=2.0.1",
     "mkdocs-gen-files~=0.6.0",
     "mkdocs-material~=9.7.1",
     "mkdocs-literate-nav~=0.6.2",
-    "mkdocs-jupyter~=0.25.1",
-    "jupyterlab~=4.5.2",
-    "matplotlib~=3.10.8",
+    "mkdocs-jupyter>=0.25.1,<0.27.0",
+    "jupyterlab>=4.5.2,<4.7.0",
+    "matplotlib>=3.10.8,<3.12.0",
     "seaborn~=0.13.2",
-    "pytest~=9.0.2",
+    "pytest>=9.0.2,<9.2.0",
     "pytest-timeout~=2.4.0",
     "pytest-benchmark~=5.2.3",
     "flake8~=7.3.0",
