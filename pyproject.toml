@@ -31,7 +31,7 @@ dependencies = [
 ]
 [project.optional-dependencies]
 dev = [
-    "tox>=4.34.1,<4.57.0",
+    "tox>=4.34.1,<4.59.0",
     "mkdocs~=1.6.1",
     "mkdocstrings~=1.0.1",
     "mkdocstrings-python~=2.0.1",
