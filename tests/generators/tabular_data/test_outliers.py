@@ -1,55 +1,6 @@
 import numpy as np
 import pandas as pd
 from numpy.random import default_rng
-
-from badgers.generators.tabular_data.outliers.distribution_sampling import (
-    ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
-)
-from badgers.generators.tabular_data.outliers.low_density_sampling import (
-    HistogramSamplingGenerator, LowDensitySamplingGenerator,
-    IndependentHistogramsGenerator,
-)
-
-COMMON_GENERATORS = [
-    ("hyper_cube", HyperCubeSampling, {"expansion": 0.0}),
-    ("z_score", ZScoreSamplingGenerator, {"scale": 1.0}),
-    ("hypersphere", HypersphereSamplingGenerator, {"scale": 1.0}),
-    ("histogram", HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
-    ("low_density", LowDensitySamplingGenerator, {}),
-    ("independent_histograms", IndependentHistogramsGenerator, {"bins": 3}),
-]
-
-
-def test_outliers__correct_shape_and_labels(tabular_data):
-    """For each generator and input type: outliers shape is correct, yt has right length."""
-    n_outliers = 10
-    X, y = tabular_data
-
-    for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
-        generator = gen_class(random_generator=default_rng(0))
-        X_original = X.copy() if hasattr(X, "copy") else np.array(X, copy=True)
-
-        try:
-            outliers, yt = generator.generate(
-                X.copy(), y, n_outliers=n_outliers, **default_kwargs
-            )
-        except NotImplementedError:
-            continue
-
-        # yt has correct length
-        assert len(yt) == len(outliers)
-
-        # outliers have correct shape
-        if isinstance(X, pd.DataFrame):
-            assert outliers.shape[1] == X.shape[1]
-        else:
-            assert outliers.shape[1] == (X.shape[1] if X.ndim > 1 else 1)
-
-        assert outliers.shape[0] == n_outliers
-
-import numpy as np
-import pandas as pd
-from numpy.random import default_rng
 from sklearn.datasets import make_blobs
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
@@ -75,27 +26,33 @@ COMMON_GENERATORS = [
 
 
 def test_outliers__correct_shape_and_labels(tabular_data):
-    """For each generator and input type: outliers shape is correct, yt has right length."""
+    """For each generator and input type: Xt has original + outliers, yt has right labels."""
     n_outliers = 10
     X, y = tabular_data
     X_np = np.asarray(X)
+    n_samples = len(X_np)
 
     for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
         generator = gen_class(random_generator=default_rng(0))
 
         try:
-            outliers, yt = generator.generate(
+            Xt, yt = generator.generate(
                 X_np.copy(), y, n_outliers=n_outliers, **default_kwargs
             )
         except (NotImplementedError, AttributeError, ValueError):
             continue
 
-        if len(outliers) == 0:
-            continue
+        if len(Xt) == n_samples:
+            continue  # LowDensitySamplingGenerator may generate 0 outliers
 
-        assert len(yt) == len(outliers)
-        assert outliers.shape[1] == (X_np.shape[1] if X_np.ndim > 1 else 1)
-        assert outliers.shape[0] == n_outliers
+        # Xt has original + outlier rows
+        assert Xt.shape[0] == n_samples + n_outliers
+        assert Xt.shape[1] == (X_np.shape[1] if X_np.ndim > 1 else 1)
+
+        # yt has correct length and labels
+        assert len(yt) == len(Xt)
+        assert list(yt[:n_samples]) == ["original"] * n_samples
+        assert list(yt[n_samples:]) == ["outliers"] * n_outliers
 
 
 def test_outliers__reproducibility_given_same_seed(tabular_data):
@@ -110,15 +67,15 @@ def test_outliers__reproducibility_given_same_seed(tabular_data):
         gen2 = gen_class(random_generator=rng2)
 
         try:
-            out1, yt1 = gen1.generate(X_np.copy(), y, n_outliers=20, **default_kwargs)
-            out2, yt2 = gen2.generate(X_np.copy(), y, n_outliers=20, **default_kwargs)
+            Xt1, yt1 = gen1.generate(X_np.copy(), y, n_outliers=20, **default_kwargs)
+            Xt2, yt2 = gen2.generate(X_np.copy(), y, n_outliers=20, **default_kwargs)
         except (NotImplementedError, AttributeError, ValueError):
             continue
 
-        if len(out1) == 0:
+        if len(Xt1) == len(X_np):
             continue
 
-        np.testing.assert_allclose(out1, out2)
+        np.testing.assert_allclose(Xt1, Xt2)
         np.testing.assert_array_equal(yt1, yt2)
 
 
@@ -136,13 +93,16 @@ def test_outliers__scores_worse_than_original():
     for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
         generator = gen_class(random_generator=default_rng(0))
         try:
-            outliers, yt = generator.generate(X.copy(), y, n_outliers=50, **default_kwargs)
+            Xt, yt = generator.generate(X.copy(), y, n_outliers=50, **default_kwargs)
         except (NotImplementedError, AttributeError, ValueError):
             continue
 
-        outliers = np.asarray(outliers)
-        if len(outliers) == 0:
+        Xt = np.asarray(Xt)
+        n_original = len(X)
+        if len(Xt) == n_original:
             continue
+        # Extract only the outlier rows (appended after original data)
+        outliers = Xt[n_original:]
         outlier_scores = detector.decision_function(outliers)
         mean_outlier_score = outlier_scores.mean()
 
@@ -162,8 +122,13 @@ def test_zscore__scale_effect_on_zscore_magnitude():
 
     generator = ZScoreSamplingGenerator(random_generator=default_rng(0))
     n_outliers = 200
-    outliers_small, _ = generator.generate(X_scaled.copy(), y, n_outliers=n_outliers, scale=0.1)
-    outliers_large, _ = generator.generate(X_scaled.copy(), y, n_outliers=n_outliers, scale=5.0)
+    Xt_small, _ = generator.generate(X_scaled.copy(), y, n_outliers=n_outliers, scale=0.1)
+    Xt_large, _ = generator.generate(X_scaled.copy(), y, n_outliers=n_outliers, scale=5.0)
+
+    # Extract only the outlier rows
+    n_original = len(X_scaled)
+    outliers_small = Xt_small[n_original:]
+    outliers_large = Xt_large[n_original:]
 
     z_small = np.abs(outliers_small)
     z_large = np.abs(outliers_large)
@@ -192,10 +157,11 @@ def test_histogram__3cols_works():
     y = None
 
     generator = HistogramSamplingGenerator(random_generator=default_rng(0))
-    outliers, yt = generator.generate(X.copy(), y, n_outliers=10, bins=3)
-    assert len(outliers) == 10
-    assert len(yt) == 10
-    assert outliers.shape[1] == 3
+    Xt, yt = generator.generate(X.copy(), y, n_outliers=10, bins=3)
+    n_original = len(X)
+    assert len(Xt) == n_original + 10
+    assert len(yt) == n_original + 10
+    assert Xt.shape[1] == 3
 
 
 def test_hypersphere__radius_ge_three_in_standardized_space():
@@ -208,9 +174,13 @@ def test_hypersphere__radius_ge_three_in_standardized_space():
     scaler = StandardScaler().fit(X_arr)
 
     generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
-    outliers, yt = generator.generate(X.copy(), y, n_outliers=100, scale=1.0)
+    Xt, yt = generator.generate(X.copy(), y, n_outliers=100, scale=1.0)
+    assert len(Xt) == 200  # 100 original + 100 outliers
+    assert len(yt) == 200
+
+    # Extract only the outlier rows
+    outliers = Xt[yt == "outliers"]
     assert len(outliers) == 100
-    assert len(yt) == 100
 
     outliers_std = scaler.transform(outliers)
     radii = np.linalg.norm(outliers_std, axis=1)
@@ -224,8 +194,12 @@ def test_hypersphere__scale_effect_on_radius():
     y = None
 
     generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
-    outliers_small, _ = generator.generate(X.copy(), y, n_outliers=200, scale=0.1)
-    outliers_large, _ = generator.generate(X.copy(), y, n_outliers=200, scale=5.0)
+    Xt_small, _ = generator.generate(X.copy(), y, n_outliers=200, scale=0.1)
+    Xt_large, _ = generator.generate(X.copy(), y, n_outliers=200, scale=5.0)
+
+    # Extract only the outlier rows
+    outliers_small = Xt_small[200:]  # last 200 rows are outliers
+    outliers_large = Xt_large[200:]
 
     r_small = np.linalg.norm(outliers_small, axis=1).mean()
     r_large = np.linalg.norm(outliers_large, axis=1).mean()
@@ -241,9 +215,13 @@ def test_hypercube__expansion_zero_within_min_max():
 
     X_arr = np.asarray(X)
     generator = HyperCubeSampling(random_generator=default_rng(0))
-    outliers, yt = generator.generate(X.copy(), y, n_outliers=100, expansion=0.0)
+    Xt, yt = generator.generate(X.copy(), y, n_outliers=100, expansion=0.0)
+    assert len(Xt) == 200  # 100 original + 100 outliers
+    assert len(yt) == 200
+
+    # Extract only the outlier rows
+    outliers = Xt[yt == "outliers"]
     assert len(outliers) == 100
-    assert len(yt) == 100
 
     mins = X_arr.min(axis=0)
     maxs = X_arr.max(axis=0)
@@ -262,9 +240,13 @@ def test_hypercube__expansion_positive_respects_range():
     expansion = 0.1
 
     generator = HyperCubeSampling(random_generator=default_rng(0))
-    outliers, yt = generator.generate(X.copy(), y, n_outliers=100, expansion=expansion)
+    Xt, yt = generator.generate(X.copy(), y, n_outliers=100, expansion=expansion)
+    assert len(Xt) == 200  # 100 original + 100 outliers
+    assert len(yt) == 200
+
+    # Extract only the outlier rows
+    outliers = Xt[yt == "outliers"]
     assert len(outliers) == 100
-    assert len(yt) == 100
 
     outliers_scaled = scaler.transform(outliers)
     assert np.all(outliers_scaled >= 0 - expansion - 1e-8)
@@ -300,7 +282,11 @@ def test_decomposition_and_outlier__generates_correct_shape():
             decomposition_transformer=PCA(n_components=3),
             outlier_generator=outlier_generator,
         )
-        outliers, yt = generator.generate(X.copy(), y, n_outliers=n_outliers)
-        assert len(yt) == len(outliers)
+        Xt, yt = generator.generate(X.copy(), y, n_outliers=n_outliers)
+        assert len(yt) == len(Xt)
+        assert Xt.shape[0] == X.shape[0] + n_outliers
+        assert Xt.shape[1] == X.shape[1]
+
+        # Extract only the outlier rows
+        outliers = Xt[yt == "outliers"]
         assert outliers.shape[0] == n_outliers
-        assert outliers.shape[1] == X.shape[1]

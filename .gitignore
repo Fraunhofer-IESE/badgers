@@ -181,3 +181,6 @@ benchmarks/baselines/*.json
 
 # Superpowers design specs and plans (local only)
 docs/superpowers/
+.superpowers
+
+.agents

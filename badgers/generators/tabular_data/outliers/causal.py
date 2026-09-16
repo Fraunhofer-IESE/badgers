@@ -64,7 +64,6 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
     @preprocess_inputs
     def generate(self, X, y, graph=None, perturbation_nodes=None,
                  column_mapping=None, n_outliers=10,
-                 outlier_magnitude=3.0,
                  within_distribution_sampler=None,
                  out_of_distribution_sampler=None):
         """
@@ -282,15 +281,13 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
             )
 
         # Step 2: Set perturbation nodes directly (sever incoming edges).
-        # Sample base values, then add ±outlier_magnitude * std perturbation.
+        # The out_of_distribution_sampler already handles sign (±) and
+        # magnitude (e.g., 3σ + exponential for zscore), so no additional
+        # perturbation is needed here.
         if perturb_cols:
             outliers[:, perturb_cols] = out_of_distribution_sampler.sample(
                 self.random_generator, X, perturb_cols, n_outliers,
             )
-            for pn in perturbation_nodes:
-                col = node_to_col[pn]
-                signs = random_sign(self.random_generator, size=(n_outliers,))
-                outliers[:, col] += signs * outlier_magnitude * col_stds[col]
 
         # Step 3: Forward-pass only to descendants of perturbation nodes.
         for node in order:

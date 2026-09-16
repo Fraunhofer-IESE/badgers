@@ -62,11 +62,19 @@ class HyperCubeSampling(OutliersGenerator):
         scaler.fit(X)
 
         outliers = self.random_generator.uniform(low=low, high=high, size=(n_outliers, X.shape[1]))
+        outliers = scaler.inverse_transform(outliers)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
 
-        return scaler.inverse_transform(outliers), yt
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class ZScoreSamplingGenerator(OutliersGenerator):
@@ -130,10 +138,19 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class HypersphereSamplingGenerator(OutliersGenerator):
@@ -201,7 +218,16 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt

@@ -6,8 +6,8 @@ from badgers.generators.tabular_data.imbalance import RandomSamplingFeaturesGene
     RandomSamplingClassesGenerator, RandomSamplingTargetsGenerator
 
 
-def test_random_sampling_classes__preserves_shape_and_columns(tabular_data_labeled):
-    """RandomSamplingClassesGenerator preserves shape and DataFrame columns."""
+def test_random_sampling_classes__preserves_shape_and_respects_proportions(tabular_data_labeled):
+    """RandomSamplingClassesGenerator preserves shape and respects proportion_classes."""
     X, y = tabular_data_labeled
     X_np = np.asarray(X)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
@@ -19,9 +19,18 @@ def test_random_sampling_classes__preserves_shape_and_columns(tabular_data_label
     assert Xt.shape[1] == n_features
     assert Xt.shape[0] == len(yt)
 
+    # Verify class proportions are approximately respected
+    yt_np = np.asarray(yt)
+    total = len(yt_np)
+    for label, expected_prop in proportion_classes.items():
+        actual_prop = np.sum(yt_np == label) / total
+        # Allow 20% relative tolerance since sampling is random
+        assert abs(actual_prop - expected_prop) < 0.15, \
+            f"Class {label}: expected ~{expected_prop}, got {actual_prop:.3f}"
 
-def test_random_sampling_features__preserves_shape_and_columns(tabular_data_labeled):
-    """RandomSamplingFeaturesGenerator preserves shape and DataFrame columns."""
+
+def test_random_sampling_features__preserves_shape_and_modifies_distribution(tabular_data_labeled):
+    """RandomSamplingFeaturesGenerator preserves shape and changes row count."""
     X, y = tabular_data_labeled
     X_np = np.asarray(X)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
@@ -37,9 +46,16 @@ def test_random_sampling_features__preserves_shape_and_columns(tabular_data_labe
     assert Xt.shape[1] == n_features
     assert Xt.shape[0] == len(yt)
 
+    # With replacement sampling, output should have same length as input
+    assert Xt.shape[0] == X_np.shape[0]
 
-def test_random_sampling_targets__preserves_shape_and_columns(tabular_data_labeled):
-    """RandomSamplingTargetsGenerator preserves shape and DataFrame columns."""
+    # Distribution of first feature should shift toward lower values
+    # (since proba_func gives higher weight to lower values)
+    assert np.mean(Xt[:, 0]) < np.mean(X_np[:, 0])
+
+
+def test_random_sampling_targets__preserves_shape_and_modifies_distribution(tabular_data_labeled):
+    """RandomSamplingTargetsGenerator preserves shape and changes target distribution."""
     X, y = tabular_data_labeled
     X_np = np.asarray(X)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
@@ -53,3 +69,12 @@ def test_random_sampling_targets__preserves_shape_and_columns(tabular_data_label
     Xt, yt = generator.generate(X.copy(), y, sampling_proba_func=proba_func)
     assert Xt.shape[1] == n_features
     assert Xt.shape[0] == len(yt)
+
+    # Output should have same length as input (sampling with replacement)
+    assert Xt.shape[0] == X_np.shape[0]
+
+    # Target mean should shift toward lower values
+    # (since proba_func gives higher weight to lower target values)
+    y_np = np.asarray(y)
+    yt_np = np.asarray(yt)
+    assert np.mean(yt_np) < np.mean(y_np)

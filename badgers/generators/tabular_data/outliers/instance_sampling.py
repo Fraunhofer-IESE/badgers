@@ -39,7 +39,14 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
 
         outliers = outlier_values
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
 
-        return outliers, yt
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt

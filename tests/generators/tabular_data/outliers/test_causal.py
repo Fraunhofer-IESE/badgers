@@ -60,7 +60,7 @@ def test_generate__chain_x_to_y(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     # Original data should be unchanged
@@ -90,7 +90,7 @@ def test_generate__chain_y_do_intervention(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["Y"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
     )
 
     # Original data unchanged
@@ -120,7 +120,7 @@ def test_generate__fork(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["C"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert Xt.shape == (105, 3)
@@ -147,7 +147,7 @@ def test_generate__collider(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert Xt.shape == (105, 3)
@@ -177,7 +177,7 @@ def test_generate__diamond(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["A"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert Xt.shape == (105, 4)
@@ -240,7 +240,7 @@ def test_generate__y_with_labels(rng):
     Xt, yt = generator.generate(
         X, y=y, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
     )
 
     assert Xt.shape == (103, 2)
@@ -259,7 +259,7 @@ def test_generate__y_none_creates_labels(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
     )
 
     assert Xt.shape == (103, 2)
@@ -277,15 +277,14 @@ def test_generate__original_data_unchanged(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert np.allclose(Xt[:100], X)
 
 
 def test_generate__magnitude_zero(rng):
-    """outlier_magnitude=0: outliers should be structurally consistent
-    with the causal model (no extra perturbation beyond sampling noise)."""
+    """Default ZScoreSampler: outliers should be structurally consistent with the causal model."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("Y", "Z")])
     X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
@@ -294,14 +293,13 @@ def test_generate__magnitude_zero(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=0.0, n_outliers=3,
+        n_outliers=3,
     )
 
     assert Xt.shape == (103, 3)
     assert np.allclose(Xt[:100], X)
 
-    # With zero magnitude and do(X), X is sampled + 0 perturbation.
-    # Y and Z are descendants, computed via forward pass.
+    # With do(X), X is perturbed. Y and Z are descendants, computed via forward pass.
     # Fit the coefficients from the data to verify structure.
     from numpy.linalg import lstsq
     beta_xy = lstsq(X[:, :1], X[:, 1])[0][0]
@@ -325,7 +323,7 @@ def test_generate__n_outliers_zero_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=0,
+            n_outliers=0,
         )
 
 
@@ -344,7 +342,7 @@ def test_generate__string_nodes_explicit_mapping(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["A"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert Xt.shape == (105, 3)
@@ -370,7 +368,7 @@ def test_generate__multiple_perturbation_nodes(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X", "Y"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert Xt.shape == (105, 3)
@@ -396,7 +394,7 @@ def test_generate__non_root_perturbation_do_style(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["Y"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
     )
 
     assert Xt.shape == (105, 3)
@@ -425,7 +423,7 @@ def test_generate__out_of_distribution_sampler_string(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
         out_of_distribution_sampler="hypersphere",
     )
 
@@ -446,7 +444,7 @@ def test_generate__out_of_distribution_sampler_instance(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
         out_of_distribution_sampler=sampler,
     )
 
@@ -465,7 +463,7 @@ def test_generate__perturbation_nodes_not_list_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes="X",
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -480,7 +478,7 @@ def test_generate__perturbation_nodes_empty_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=[],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -494,7 +492,7 @@ def test_generate__perturbation_nodes_none_raises(rng):
         generator.generate(
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -509,7 +507,7 @@ def test_generate__invalid_out_of_distribution_sampler_type_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
             out_of_distribution_sampler=42,
         )
 
@@ -524,7 +522,7 @@ def test_generate__within_distribution_sampler_string(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
         within_distribution_sampler="uniform",
     )
 
@@ -545,7 +543,7 @@ def test_generate__within_distribution_sampler_instance(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
         within_distribution_sampler=sampler,
     )
 
@@ -564,7 +562,7 @@ def test_generate__invalid_within_distribution_sampler_type_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
             within_distribution_sampler=42,
         )
 
@@ -582,7 +580,7 @@ def test_generate__both_samplers_specified(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["Y"],
-        outlier_magnitude=3.0, n_outliers=5,
+        n_outliers=5,
         within_distribution_sampler=UniformSampler(),
         out_of_distribution_sampler=ZScoreSampler(scale=2.0),
     )
@@ -601,7 +599,7 @@ def test_generate__default_samplers(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
     )
 
     assert Xt.shape == (103, 2)
@@ -621,7 +619,7 @@ def test_generate__uniform_out_of_distribution_sampler(rng):
     Xt, yt = generator.generate(
         X, y=None, graph=graph, column_mapping=column_mapping,
         perturbation_nodes=["X"],
-        outlier_magnitude=3.0, n_outliers=3,
+        n_outliers=3,
         out_of_distribution_sampler=sampler,
     )
 
@@ -658,7 +656,7 @@ def test_generate__within_distribution_sampler_rejects_out_of_distribution(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
             within_distribution_sampler=ZScoreSampler(),
         )
 
@@ -676,7 +674,7 @@ def test_generate__out_of_distribution_sampler_rejects_within_distribution(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
             out_of_distribution_sampler=UniformSampler(),
         )
 
@@ -694,7 +692,7 @@ def test_generate__column_mapping_none_raises(rng):
         generator.generate(
             X, y=None, graph=graph,
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -709,7 +707,7 @@ def test_generate__column_mapping_not_dict_raises(rng):
             X, y=None, graph=graph,
             column_mapping=[("X", 0), ("Y", 1)],
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -724,7 +722,7 @@ def test_generate__column_mapping_missing_node_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -739,7 +737,7 @@ def test_generate__column_mapping_extra_node_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1, "Z": 2},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -754,7 +752,7 @@ def test_generate__column_mapping_non_int_value_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": "col1"},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -769,7 +767,7 @@ def test_generate__column_mapping_out_of_range_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 5},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -784,7 +782,7 @@ def test_generate__column_mapping_duplicate_index_raises(rng):
             X, y=None, graph=graph,
             column_mapping={"X": 0, "Y": 1, "Z": 1},
             perturbation_nodes=["X"],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )
 
 
@@ -799,5 +797,5 @@ def test_generate__column_mapping_int_nodes_raises(rng):
             X, y=None, graph=graph,
             column_mapping={0: 0, 1: 1},
             perturbation_nodes=[0],
-            outlier_magnitude=3.0, n_outliers=3,
+            n_outliers=3,
         )

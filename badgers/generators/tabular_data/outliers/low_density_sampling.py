@@ -67,10 +67,17 @@ class IndependentHistogramsGenerator(OutliersGenerator):
                 high=bin_edges[indices + 1]
             )
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
 
-        return outliers, yt
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class HistogramSamplingGenerator(OutliersGenerator):
@@ -157,10 +164,19 @@ class HistogramSamplingGenerator(OutliersGenerator):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class LowDensitySamplingGenerator(OutliersGenerator):
@@ -242,11 +258,26 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
         # in the case no outliers could be generated
         if outliers.shape[0] == 0:
-            return outliers, yt
+            # Build yt labels even when no outliers
+            n_samples = len(X)
+            if y is None:
+                yt = np.array(["original"] * n_samples)
+            else:
+                yt = np.asarray(y, dtype=str)
+            return X, yt
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * len(outliers))
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * len(outliers))
+
+        return Xt, yt
