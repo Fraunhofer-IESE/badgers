@@ -48,9 +48,9 @@ https://imbalanced-learn.org/stable/
 
 ## Blog posts
 
-https://neptune.ai/blog/data-augmentation-nlp
+https://web.archive.org/web/20251012091722/https://neptune.ai/blog/data-augmentation-nlp
 
-https://neptune.ai/blog/data-augmentation-in-python
+https://web.archive.org/web/20251006184913/https://neptune.ai/blog/data-augmentation-in-python
 
 ## Scientific literature
 
