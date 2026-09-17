@@ -1,0 +1,3855 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://github.com/Fraunhofer-IESE/badgers/tests/evaluation-report/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Test Suite Evaluation Report — Badgers - Badgers Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#test-suite-evaluation-report-badgers" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Badgers Documentation" class="md-header__button md-logo" aria-label="Badgers Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Badgers Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Test Suite Evaluation Report — Badgers
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Fraunhofer-IESE/badgers" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Fraunhofer-IESE/badgers
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Badgers Documentation" class="md-nav__button md-logo" aria-label="Badgers Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Badgers Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Fraunhofer-IESE/badgers" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Fraunhofer-IESE/badgers
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tabular Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tabular Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/tabular-data/Imbalance-Tabular-Data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generating imbalancedness in tabular data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/tabular-data/Missingness-Tabular-Data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generating missing values in tabular data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/tabular-data/Noise-Tabular-Data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generating noise in tabular data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/tabular-data/Outliers-Tabular-Data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generating outliers in tabular data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/tabular-data/Causal-Outlier-Propagation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Causal Outlier Propagation — An Approach to Structurally-Informed Data Degradation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Text Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/text/Typos-Text/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding typos to text
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time Series Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Time Series Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Outliers-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate point outliers in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Missingness-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate missing data in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Noise-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate noise in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Patterns-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate patterns in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Trends-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate trends / drift in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Seasons-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate seasons in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Changepoints-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate changepoints in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/time-series/Transmission-Errors-Time-Series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate "transmission errors" in time series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipelines
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pipelines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/Pipeline-Tabular-Data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chaining generators through pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementing Novel Generators
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Implementing Novel Generators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/Create-New-Tabular-Generators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a (tabular_data) generator: Scenario
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    badgers
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    badgers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/core/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    core
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_2" id="__nav_8_1_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_1_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    core
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/base/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/causal_graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    causal_graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_2_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/core/decorators/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    decorators
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_2_4" id="__nav_8_1_2_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_8_1_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    decorators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/decorators/tabular_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tabular_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/decorators/time_series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    time_series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/core/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/generators/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    generators
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_3" id="__nav_8_1_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_8_1_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    generators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/geolocated_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    geolocated_data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_3_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/generators/graph/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    graph
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_3_3" id="__nav_8_1_3_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_8_1_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    graph
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/graph/missingness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    missingness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_3_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/generators/tabular_data/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tabular_data
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_3_5" id="__nav_8_1_3_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_8_1_3_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_3_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    tabular_data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/imbalance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imbalance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/missingness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    missingness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/noise/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    noise
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_3_5_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/generators/tabular_data/outliers/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_3_5_6" id="__nav_8_1_3_5_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="5" aria-labelledby="__nav_8_1_3_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_3_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    outliers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/outliers/causal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    causal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/outliers/distribution_sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    distribution_sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/outliers/instance_sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    instance_sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/tabular_data/outliers/low_density_sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    low_density_sampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_3_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/generators/text/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    text
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_3_6" id="__nav_8_1_3_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_8_1_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    text
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/text/typos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    typos
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1_3_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../reference/badgers/generators/time_series/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    time_series
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1_3_7" id="__nav_8_1_3_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_8_1_3_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_1_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    time_series
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/changepoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    changepoints
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/missingness/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    missingness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/noise/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    noise
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/outliers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/seasons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    seasons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/transmission_errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transmission_errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/trends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    trends
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/badgers/generators/time_series/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-scope-and-assumptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Scope and Assumptions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Scope and Assumptions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#artifacts-reviewed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Artifacts Reviewed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#assumptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assumptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-requirement-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Requirement Coverage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Requirement Coverage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#core-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Module
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tabular-data-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tabular Data Generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#time-series-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time Series Generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#text-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text Generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#graph-generators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Graph Generators
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-oracle-assessment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Oracle Assessment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Oracle Assessment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strong-independent-oracles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strong, Independent Oracles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weak-or-circular-oracles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weak or Circular Oracles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-observations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Observations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-fault-discrimination-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Fault-Discrimination Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Fault-Discrimination Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#surviving-semantic-mutants-hypothetical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Surviving Semantic Mutants (Hypothetical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-domain-and-boundary-gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Domain and Boundary Gaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Domain and Boundary Gaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-partitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Partitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-state-transition-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing State Transition Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#missing-property-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Missing Property Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-reliability-and-maintainability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Reliability and Maintainability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Reliability and Maintainability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issues-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issues Found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flaky-test-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flaky Test Risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-prioritized-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Prioritized Recommendations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Prioritized Recommendations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#critical-must-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Critical (Must Fix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high-should-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        High (Should Fix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-consider-fixing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Medium (Consider Fixing)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#low-nice-to-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Low (Nice to Have)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-residual-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Residual Risk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-tests-that-need-immediate-updates-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Tests That Need Immediate Updates (Summary)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="test-suite-evaluation-report-badgers">Test Suite Evaluation Report — Badgers</h1>
+<p><strong>Date:</strong> 2026-09-15<br />
+<strong>Evaluator:</strong> AI Coding Agent (test-evaluator skill)<br />
+<strong>Verdict:</strong> <strong>Accept with conditions</strong></p>
+<p>The test suite provides reasonable coverage for most generators, but has several critical issues: 30 tests in <code>test_causal.py</code> are <strong>failing</strong> due to an API mismatch (the <code>outlier_magnitude</code> parameter was removed from <code>CausalOutlierPropagationGenerator.generate()</code>), and several test files contain weak oracles that only check shape preservation without verifying behavioral correctness.</p>
+<hr />
+<h2 id="1-scope-and-assumptions">1. Scope and Assumptions</h2>
+<h3 id="artifacts-reviewed">Artifacts Reviewed</h3>
+<ul>
+<li><strong>Source code:</strong> <code>badgers/core/</code>, <code>badgers/generators/</code> (tabular_data, time_series, text, graph)</li>
+<li><strong>Test suite:</strong> <code>tests/core/</code>, <code>tests/generators/</code>, <code>tests/benchmarks/</code></li>
+<li><strong>Documentation:</strong> <code>docs/index.md</code>, <code>docs/architecture.md</code>, <code>AGENTS.md</code></li>
+<li><strong>Specification:</strong> The project README and architecture docs serve as the primary specification. The core contract is: each generator provides a <code>generate(X, y, **params)</code> method returning <code>(Xt, yt)</code>.</li>
+</ul>
+<h3 id="environment">Environment</h3>
+<ul>
+<li>Python 3.12.6, pytest 9.0.2, Windows</li>
+<li>Test run: 148 tests collected, 118 passed, 30 failed</li>
+</ul>
+<h3 id="assumptions">Assumptions</h3>
+<ul>
+<li>The <code>GeneratorMixin</code> interface (<code>generate(X, y, **params) -&gt; Tuple</code>) is the authoritative contract.</li>
+<li>The architecture docs describe the intended behavior of each generator.</li>
+<li>The <code>AGENTS.md</code> performance patterns are normative for implementation quality but not for behavioral correctness.</li>
+</ul>
+<hr />
+<h2 id="2-requirement-coverage">2. Requirement Coverage</h2>
+<h3 id="core-module">Core Module</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Tests</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GeneratorMixin</code> abstract interface</td>
+<td>None directly</td>
+<td>Not tested</td>
+</tr>
+<tr>
+<td><code>Pipeline</code> chains generators</td>
+<td><code>test_pipelines.py::test_generate</code></td>
+<td><strong>Weak</strong> — no assertions</td>
+</tr>
+<tr>
+<td><code>normalize_proba</code> normalizes to sum=1</td>
+<td><code>test_utils.py::test_normalize_proba</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>random_sign</code> produces ±1</td>
+<td><code>test_utils.py::test_random_signs</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>random_spherical_coordinate</code> lies on sphere</td>
+<td><code>test_utils.py::test_random_spherical_coordinate</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>Sampler</code> base class abstract</td>
+<td><code>test_sampling.py::test_sampler_is_abstract</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>NormalSampler</code> mean/std approx</td>
+<td><code>test_sampling.py::test_normal_sampler_*</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>UniformSampler</code> within bounds</td>
+<td><code>test_sampling.py::test_uniform_sampler_*</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>ZScoreSampler</code> ≥3σ from mean</td>
+<td><code>test_sampling.py::test_zscore_sampler_*</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>HypersphereSampler</code> ≥3σ distance</td>
+<td><code>test_sampling.py::test_hypersphere_sampler_*</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>UniformOutOfDistributionSampler</code> beyond bounds</td>
+<td><code>test_sampling.py::test_uniform_ood_sampler_*</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td>Sampler factory functions</td>
+<td><code>test_sampling.py::test_create_*</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td>Causal graph utilities (DAG validation, topology, parents, etc.)</td>
+<td><code>test_causal_graph.py</code> (14 tests)</td>
+<td><strong>Well covered</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="tabular-data-generators">Tabular Data Generators</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Tests</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GaussianNoiseGenerator</code> preserves shape</td>
+<td><code>test_noise.py::test_gaussian_noise__preserves_shape</code></td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td><code>GaussianNoiseGenerator</code> increases variance</td>
+<td><code>test_noise.py::test_gaussian_noise__increases_variance</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>GaussianNoiseClassesGenerator</code> preserves shape</td>
+<td><code>test_noise.py::test_gaussian_noise_classes__preserves_shape</code></td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td><code>RandomShiftGenerator</code> preserves shape (scalar/array)</td>
+<td><code>test_drift.py</code> (2 tests)</td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td><code>RandomShiftClassesGenerator</code> preserves shape (scalar/array/2D)</td>
+<td><code>test_drift.py</code> (3 tests)</td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td><code>MissingValueGenerator</code> subclasses insert NaNs</td>
+<td><code>test_missingness.py</code> (1 test)</td>
+<td>Partially covered</td>
+</tr>
+<tr>
+<td><code>RandomSamplingClassesGenerator</code> preserves shape</td>
+<td><code>test_imbalance.py</code> (1 test)</td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td><code>RandomSamplingFeaturesGenerator</code> preserves shape</td>
+<td><code>test_imbalance.py</code> (1 test)</td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td><code>RandomSamplingTargetsGenerator</code> preserves shape</td>
+<td><code>test_imbalance.py</code> (1 test)</td>
+<td><strong>Weak</strong> — shape-only</td>
+</tr>
+<tr>
+<td>Outlier generators shape/labels</td>
+<td><code>test_outliers.py</code> (multiple)</td>
+<td>Covered</td>
+</tr>
+<tr>
+<td>Outlier reproducibility</td>
+<td><code>test_outliers.py::test_outliers__reproducibility_given_same_seed</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td>Outlier scores worse than original</td>
+<td><code>test_outliers.py::test_outliers__scores_worse_than_original</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>CausalOutlierPropagationGenerator</code></td>
+<td><code>test_causal.py</code> (30 tests)</td>
+<td><strong>ALL FAILING</strong> — API mismatch</td>
+</tr>
+</tbody>
+</table>
+<h3 id="time-series-generators">Time Series Generators</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Tests</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LocalGaussianNoiseGenerator</code> runs</td>
+<td><code>test_noise.py::test_local_gaussian_noise__generates</code></td>
+<td><strong>Weak</strong> — no assertions</td>
+</tr>
+<tr>
+<td><code>GlobalGaussianNoiseGenerator</code> runs</td>
+<td><code>test_noise.py::test_global_gaussian_noise__generates</code></td>
+<td><strong>Weak</strong> — no assertions</td>
+</tr>
+<tr>
+<td><code>RandomZerosGenerator</code> shape/count</td>
+<td><code>test_outliers.py</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>LocalZScoreGenerator</code> shape/count/no NaN</td>
+<td><code>test_outliers.py</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>MissingAtRandomGenerator</code> shape/count</td>
+<td><code>test_missingness.py</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>RandomChangeInMeanGenerator</code> modifies data</td>
+<td><code>test_changepoints.py</code></td>
+<td><strong>Weak</strong> — only checks <code>any(X != Xt)</code></td>
+</tr>
+<tr>
+<td>Trend generators match expected</td>
+<td><code>test_trends.py</code> (3 tests)</td>
+<td><strong>Well covered</strong></td>
+</tr>
+<tr>
+<td>Season generator matches expected</td>
+<td><code>test_seasons.py</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td>Pattern utilities</td>
+<td><code>test_patterns.py</code> (8 tests)</td>
+<td><strong>Well covered</strong></td>
+</tr>
+<tr>
+<td>Transmission error generators</td>
+<td><code>test_transmission_errors.py</code> (13 tests)</td>
+<td><strong>Well covered</strong></td>
+</tr>
+<tr>
+<td>Pattern index generation</td>
+<td><code>test_utils.py</code> (3 tests)</td>
+<td>Covered</td>
+</tr>
+</tbody>
+</table>
+<h3 id="text-generators">Text Generators</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Tests</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SwapLettersGenerator</code> transforms long words</td>
+<td><code>test_typos.py</code></td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>LeetSpeakGenerator</code> same length</td>
+<td><code>test_typos.py</code></td>
+<td><strong>Weak</strong> — length-only</td>
+</tr>
+<tr>
+<td><code>SwapCaseGenerator</code> uppercases</td>
+<td><code>test_typos.py</code></td>
+<td>Covered</td>
+</tr>
+</tbody>
+</table>
+<h3 id="graph-generators">Graph Generators</h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Tests</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NodesMissingCompletelyAtRandom</code> removes nodes</td>
+<td><code>test_missingness.py</code> (2 tests)</td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><code>EdgesMissingCompletelyAtRandom</code> removes edges</td>
+<td><code>test_missingness.py</code> (1 test)</td>
+<td>Covered</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-oracle-assessment">3. Oracle Assessment</h2>
+<h3 id="strong-independent-oracles">Strong, Independent Oracles</h3>
+<ul>
+<li><strong><code>test_sampling.py</code></strong>: <code>ZScoreSampler</code> and <code>HypersphereSampler</code> tests verify mathematical properties (≥3σ, Euclidean distance) derived from the specification, not from the implementation.</li>
+<li><strong><code>test_causal_graph.py</code></strong>: Topological order, parent/descendant/ancestor relationships are verified against graph-theoretic properties independent of implementation.</li>
+<li><strong><code>test_trends.py</code></strong>: Expected outputs are computed from the mathematical definition of linear trends, not from running the code.</li>
+<li><strong><code>test_seasons.py</code></strong>: Expected sinusoidal output computed from <code>sin(t * 2π / period)</code>.</li>
+<li><strong><code>test_patterns.py</code></strong>: Pattern transformations verified against arithmetic expectations.</li>
+<li><strong><code>test_transmission_errors.py</code></strong>: Length changes, value preservation verified against specification.</li>
+</ul>
+<h3 id="weak-or-circular-oracles">Weak or Circular Oracles</h3>
+<ul>
+<li><strong><code>test_pipelines.py::test_generate</code></strong>: <strong>No assertions at all.</strong> The test only calls <code>pipeline.generate()</code> without checking any result. This is the weakest possible oracle — it only verifies the code doesn't crash.</li>
+<li><strong><code>test_noise.py</code> (time series)</strong>: Both <code>test_local_gaussian_noise__generates</code> and <code>test_global_gaussian_noise__generates</code> have <strong>zero assertions</strong>. They only verify the code runs without exception.</li>
+<li><strong><code>test_drift.py</code> (all 5 tests)</strong>: Only check <code>len(X) == len(Xt)</code>. No verification that drift actually occurred or that the shift magnitude is correct.</li>
+<li><strong><code>test_imbalance.py</code> (all 3 tests)</strong>: Only check shape preservation. No verification that sampling probabilities are respected or that the output distribution matches expectations.</li>
+<li><strong><code>test_noise.py</code> (tabular, <code>GaussianNoiseClassesGenerator</code>)</strong>: Only checks shape. No verification that per-class noise was applied correctly.</li>
+<li><strong><code>test_changepoints.py</code></strong>: Only checks <code>any(X != Xt)</code>. A generator that adds 1e-15 to one cell would pass.</li>
+<li><strong><code>test_typos.py::test_leet_speak__generates_same_length</code></strong>: Only checks length. No verification that leet speak transformation actually occurred.</li>
+</ul>
+<h3 id="missing-observations">Missing Observations</h3>
+<ul>
+<li>No test verifies that <code>GaussianNoiseGenerator</code> with <code>noise_std=0</code> produces identical output.</li>
+<li>No test verifies that <code>RandomShiftGenerator</code> with <code>shift_std=0</code> produces identical output.</li>
+<li>No test verifies the <code>MissingCompletelyAtRandom</code> vs <code>DummyMissingAtRandom</code> behavioral difference.</li>
+<li>No test verifies that <code>RandomSamplingClassesGenerator</code> actually respects the <code>proportion_classes</code> distribution.</li>
+<li>No test verifies that <code>RandomSamplingFeaturesGenerator</code> actually respects the <code>sampling_proba_func</code>.</li>
+</ul>
+<hr />
+<h2 id="4-fault-discrimination-results">4. Fault-Discrimination Results</h2>
+<h3 id="surviving-semantic-mutants-hypothetical">Surviving Semantic Mutants (Hypothetical)</h3>
+<p>The following plausible incorrect implementations would pass the current test suite:</p>
+<ol>
+<li>
+<p><strong>Constant-return noise generator</strong>: A <code>GaussianNoiseGenerator</code> that always returns <code>X + 0.001</code> would pass the "increases variance" test (since variance increases slightly) and the shape test. No test checks the noise magnitude.</p>
+</li>
+<li>
+<p><strong>No-op drift generator</strong>: A <code>RandomShiftGenerator</code> that ignores <code>shift_std</code> and always adds 0 would fail no test — the shape tests only check <code>len(X) == len(Xt)</code>.</p>
+</li>
+<li>
+<p><strong>No-op imbalance generator</strong>: A <code>RandomSamplingClassesGenerator</code> that returns the input unchanged would pass the shape tests. No test checks the output distribution.</p>
+</li>
+<li>
+<p><strong>No-op leet speak generator</strong>: A <code>LeetSpeakGenerator</code> that returns input unchanged would pass the length-only test.</p>
+</li>
+<li>
+<p><strong>No-op time series noise</strong>: Both time series noise tests have zero assertions — any implementation that doesn't crash passes.</p>
+</li>
+</ol>
+<h3 id="known-failures">Known Failures</h3>
+<ul>
+<li><strong>30 tests in <code>test_causal.py</code></strong> fail because they pass <code>outlier_magnitude=3.0</code> to <code>CausalOutlierPropagationGenerator.generate()</code>, but the parameter was removed from the method signature (replaced by sampler-based perturbation control).</li>
+</ul>
+<hr />
+<h2 id="5-domain-and-boundary-gaps">5. Domain and Boundary Gaps</h2>
+<h3 id="missing-partitions">Missing Partitions</h3>
+<ul>
+<li><strong>Zero noise/drift</strong>: No test verifies behavior with <code>noise_std=0</code> or <code>shift_std=0</code>.</li>
+<li><strong>Edge case percentages</strong>: <code>percentage_missing=0</code> and <code>percentage_missing=1</code> are not tested for <code>MissingValueGenerator</code>.</li>
+<li><strong>Single-sample input</strong>: No test verifies behavior with <code>n_samples=1</code>.</li>
+<li><strong>High-dimensional data</strong>: No test with &gt;100 features.</li>
+<li><strong>Empty input</strong>: No test with <code>X</code> having 0 rows.</li>
+<li><strong>NaN in input</strong>: No test verifies behavior when input already contains NaN.</li>
+<li><strong>Integer-typed input</strong>: All fixtures use float data; integer input behavior is untested.</li>
+</ul>
+<h3 id="missing-state-transition-tests">Missing State Transition Tests</h3>
+<ul>
+<li>No test verifies that <code>generate()</code> is idempotent or that calling it twice produces different results with different seeds.</li>
+<li>No test verifies that generator internal state (e.g., <code>missing_values_indices_</code>, <code>outliers_indices_</code>) is reset between calls.</li>
+</ul>
+<h3 id="missing-property-tests">Missing Property Tests</h3>
+<ul>
+<li><strong>Roundtrip property</strong>: For invertible transformations, <code>inverse(transform(X)) ≈ X</code>.</li>
+<li><strong>Monotonicity</strong>: Larger <code>noise_std</code> → larger variance increase.</li>
+<li><strong>Distribution preservation</strong>: For MCAR missingness, the distribution of non-missing values should match the original.</li>
+</ul>
+<hr />
+<h2 id="6-reliability-and-maintainability">6. Reliability and Maintainability</h2>
+<h3 id="issues-found">Issues Found</h3>
+<ol>
+<li>
+<p><strong><code>test_pipelines.py</code> uses <code>unittest.TestCase</code></strong> while all other tests use pytest-style functions. Inconsistent style.</p>
+</li>
+<li>
+<p><strong><code>test_utils.py</code> uses <code>unittest.TestCase</code></strong> — same inconsistency.</p>
+</li>
+<li>
+<p><strong><code>test_pipelines.py::test_generate</code> has no assertions</strong> — the test is effectively dead code.</p>
+</li>
+<li>
+<p><strong>Duplicate <code>COMMON_GENERATORS</code> definition</strong> in <code>test_outliers.py</code> — defined twice with slightly different imports.</p>
+</li>
+<li>
+<p><strong><code>test_outliers.py</code> has duplicate imports</strong> — <code>numpy</code>, <code>pandas</code>, <code>default_rng</code>, <code>make_blobs</code>, etc. are imported twice.</p>
+</li>
+<li>
+<p><strong>Hardcoded magic values</strong>: <code>n_outliers=10</code>, <code>noise_std=1</code>, <code>shift_std=0.1</code> appear throughout without explanation.</p>
+</li>
+<li>
+<p><strong>No <code>@pytest.mark.parametrize</code> for noise_std values</strong> — only one value tested per generator.</p>
+</li>
+</ol>
+<h3 id="flaky-test-risk">Flaky Test Risk</h3>
+<ul>
+<li>Tests using <code>IsolationForest</code> (in <code>test_outliers.py</code>) depend on sklearn's random state and could be fragile across sklearn versions.</li>
+<li>Tests using <code>np.linalg.lstsq</code> (in <code>test_causal.py</code>) could be fragile with near-singular matrices.</li>
+</ul>
+<hr />
+<h2 id="7-prioritized-recommendations">7. Prioritized Recommendations</h2>
+<h3 id="critical-must-fix">Critical (Must Fix)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>File</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td>30 failing tests due to <code>outlier_magnitude</code> API removal</td>
+<td><code>tests/generators/tabular_data/outliers/test_causal.py</code></td>
+<td>Remove <code>outlier_magnitude=...</code> from all <code>generator.generate()</code> calls. The parameter no longer exists; perturbation magnitude is now controlled via the <code>out_of_distribution_sampler</code> parameter.</td>
+</tr>
+<tr>
+<td>C2</td>
+<td><code>test_pipelines.py</code> has zero assertions</td>
+<td><code>tests/core/test_pipelines.py</code></td>
+<td>Add assertions: verify <code>Xt</code> shape, verify pipeline applies both generators (e.g., check that noise was added AND sampling occurred).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="high-should-fix">High (Should Fix)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>File</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1</td>
+<td>Time series noise tests have zero assertions</td>
+<td><code>tests/generators/time_series/test_noise.py</code></td>
+<td>Add assertions: verify shape preserved, verify variance increased, verify noise magnitude matches <code>noise_std</code>.</td>
+</tr>
+<tr>
+<td>H2</td>
+<td>Drift tests only check shape</td>
+<td><code>tests/generators/tabular_data/test_drift.py</code></td>
+<td>Add assertions: verify that shifted data differs from original, verify shift magnitude is proportional to <code>shift_std</code>.</td>
+</tr>
+<tr>
+<td>H3</td>
+<td>Imbalance tests only check shape</td>
+<td><code>tests/generators/tabular_data/test_imbalance.py</code></td>
+<td>Add assertions: verify output class distribution matches <code>proportion_classes</code>, verify sampling with replacement changes row count correctly.</td>
+</tr>
+<tr>
+<td>H4</td>
+<td>Leet speak test only checks length</td>
+<td><code>tests/generators/text/test_typos.py</code></td>
+<td>Add assertion: verify at least some characters were transformed to leet equivalents.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="medium-consider-fixing">Medium (Consider Fixing)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>File</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M1</td>
+<td>No zero-parameter edge case tests</td>
+<td>Multiple</td>
+<td>Add tests for <code>noise_std=0</code>, <code>shift_std=0</code>, <code>percentage_missing=0</code>, <code>percentage_missing=1</code>.</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>Duplicate imports and COMMON_GENERATORS</td>
+<td><code>tests/generators/tabular_data/test_outliers.py</code></td>
+<td>Consolidate imports and remove duplicate <code>COMMON_GENERATORS</code> definition.</td>
+</tr>
+<tr>
+<td>M3</td>
+<td>Inconsistent test style (unittest vs pytest)</td>
+<td><code>tests/core/test_pipelines.py</code>, <code>tests/core/test_utils.py</code></td>
+<td>Convert to pytest-style functions for consistency.</td>
+</tr>
+<tr>
+<td>M4</td>
+<td>Missing <code>DummyMissingAtRandom</code> test</td>
+<td><code>tests/generators/tabular_data/test_missingness.py</code></td>
+<td>The test only covers <code>MissingCompletelyAtRandom</code> via <code>__subclasses__()</code>. Add a test that verifies MAR behavior differs from MCAR.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="low-nice-to-have">Low (Nice to Have)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>File</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1</td>
+<td>No property-based tests</td>
+<td>All</td>
+<td>Consider adding <code>hypothesis</code>-based tests for invariants (e.g., <code>noise_std=0 → Xt == X</code>).</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>No parametrized edge values</td>
+<td>Multiple</td>
+<td>Use <code>@pytest.mark.parametrize</code> for <code>noise_std=[0, 0.1, 1, 10]</code>, <code>percentage_missing=[0, 0.5, 1]</code>.</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>Magic numbers lack documentation</td>
+<td>Multiple</td>
+<td>Extract magic numbers to named constants or document in test docstrings.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-residual-risk">8. Residual Risk</h2>
+<ol>
+<li>
+<p><strong>Causal outlier generator is untested</strong>: All 30 causal tests fail. The <code>CausalOutlierPropagationGenerator</code> has zero effective test coverage despite being one of the most complex generators.</p>
+</li>
+<li>
+<p><strong>Weak oracles mask behavioral bugs</strong>: Generators for noise (time series), drift, and imbalance could have significant behavioral bugs that the current shape-only tests would not detect.</p>
+</li>
+<li>
+<p><strong>No integration tests</strong>: There are no tests that chain multiple generators through a <code>Pipeline</code> and verify the combined effect.</p>
+</li>
+<li>
+<p><strong>No regression tests for historical bugs</strong>: The test suite doesn't reference any historical defects, so there's no evidence of regression protection.</p>
+</li>
+<li>
+<p><strong>No concurrency/thread-safety tests</strong>: If generators are used in parallel pipelines, thread safety is unverified.</p>
+</li>
+<li>
+<p><strong>No performance regression tests in CI</strong>: While benchmarks exist, they are not run as part of the CI pipeline.</p>
+</li>
+</ol>
+<hr />
+<h2 id="9-tests-that-need-immediate-updates-summary">9. Tests That Need Immediate Updates (Summary)</h2>
+<p>The following test files <strong>must</strong> be updated:</p>
+<ol>
+<li>
+<p><strong><code>tests/generators/tabular_data/outliers/test_causal.py</code></strong> — Remove <code>outlier_magnitude=</code> from all 30 <code>generator.generate()</code> calls. This is the only change needed; the parameter was removed from the API.</p>
+</li>
+<li>
+<p><strong><code>tests/core/test_pipelines.py</code></strong> — Add actual assertions to <code>test_generate</code>. Currently it calls the pipeline but verifies nothing.</p>
+</li>
+</ol>
+<p>The following test files <strong>should</strong> be updated to strengthen weak oracles:</p>
+<ol>
+<li><strong><code>tests/generators/time_series/test_noise.py</code></strong> — Add assertions beyond "doesn't crash."</li>
+<li><strong><code>tests/generators/tabular_data/test_drift.py</code></strong> — Add behavioral assertions beyond shape checks.</li>
+<li><strong><code>tests/generators/tabular_data/test_imbalance.py</code></strong> — Add distribution verification assertions.</li>
+<li><strong><code>tests/generators/tabular_data/test_noise.py</code></strong> — Add zero-noise and magnitude verification tests.</li>
+<li><strong><code>tests/generators/text/test_typos.py</code></strong> — Add transformation verification for leet speak test.</li>
+<li><strong><code>tests/generators/tabular_data/test_outliers.py</code></strong> — Clean up duplicate imports and COMMON_GENERATORS.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
