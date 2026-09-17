@@ -30,6 +30,11 @@ def preprocess_inputs(generate_func):
                 f"X is: {type(X)}"
             )
 
+        # Ensure X is writable: pandas 3.0 (Copy-on-Write) and some inputs
+        # yield read-only arrays, but generators mutate X in place.
+        if not X.flags.writeable:
+            X = X.copy()
+
         # Validate dimensionality of X
         if X.ndim == 1:
             X = X.reshape(-1, 1)

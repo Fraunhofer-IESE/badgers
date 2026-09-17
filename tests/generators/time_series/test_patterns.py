@@ -84,6 +84,6 @@ def test_randomly_spaced_linear_patterns__interpolates(time_series_sine):
     Xt, _ = generator.generate(X=X, y=None, n_patterns=3, min_width_pattern=5, max_width_patterns=10)
     for (start, end) in generator.patterns_indices_:
         for col in range(X.shape[1]):
-            assert Xt[start:end, col].tolist() == \
-                np.linspace(X[start, col], X[end, col], end - start).tolist()
+            assert np.allclose(Xt[start:end, col],
+                               np.linspace(X[start, col], X[end, col], end - start))
 
