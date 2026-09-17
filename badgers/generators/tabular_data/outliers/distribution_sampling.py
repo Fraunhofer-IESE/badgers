@@ -3,7 +3,7 @@ from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.utils import random_sign, random_spherical_coordinate
+from badgers.core.utils import random_sign, random_spherical_coordinate, random_spherical_coordinates
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
 
@@ -62,11 +62,19 @@ class HyperCubeSampling(OutliersGenerator):
         scaler.fit(X)
 
         outliers = self.random_generator.uniform(low=low, high=high, size=(n_outliers, X.shape[1]))
+        outliers = scaler.inverse_transform(outliers)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
 
-        return scaler.inverse_transform(outliers), yt
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class ZScoreSamplingGenerator(OutliersGenerator):
@@ -121,21 +129,28 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # generate outliers
-        outliers = np.array([
-            random_sign(self.random_generator, size=Xt.shape[1]) * (
-                3. + self.random_generator.exponential(size=Xt.shape[1], scale=scale))
-            for _ in range(n_outliers)
-        ])
+        # generate outliers (vectorized: all samples at once)
+        signs = random_sign(self.random_generator, size=(n_outliers, Xt.shape[1]))
+        exponentials = self.random_generator.exponential(scale=scale, size=(n_outliers, Xt.shape[1]))
+        outliers = signs * (3.0 + exponentials)
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class HypersphereSamplingGenerator(OutliersGenerator):
@@ -191,21 +206,28 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # computing outliers
-        outliers = np.array([
-            random_spherical_coordinate(
-                random_generator=self.random_generator,
-                size=Xt.shape[1],
-                radius=3. + self.random_generator.exponential(scale=scale)
-            )
-            for _ in range(n_outliers)
-        ])
+        # computing outliers (vectorized: all radii + coordinates at once)
+        radii = 3.0 + self.random_generator.exponential(scale=scale, size=n_outliers)
+        outliers = random_spherical_coordinates(
+            random_generator=self.random_generator,
+            size=Xt.shape[1],
+            radii=radii,
+        )
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt

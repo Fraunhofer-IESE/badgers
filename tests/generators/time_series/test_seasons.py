@@ -16,5 +16,5 @@ def test_global_additive_sinusoidal_season__matches_expected():
     season = np.sin(t * 2 * np.pi / period)
     Xt_expected = X + season
 
-    assert Xt_expected.reshape(-1, 1).tolist() == Xt.values.tolist()
+    assert Xt_expected.reshape(-1, 1).tolist() == Xt.tolist()
     assert yt is None

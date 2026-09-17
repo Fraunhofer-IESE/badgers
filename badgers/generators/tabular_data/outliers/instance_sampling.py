@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from numpy.random import default_rng
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
@@ -32,12 +31,22 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
         """
         assert n_outliers > 0
 
-        outliers = pd.DataFrame(
-            data=np.stack([self.random_generator.choice(X.iloc[:,i], size=n_outliers) for i in range(X.shape[1])]).T,
-            columns = X.columns
-        )
+        # Vectorized: pick random row indices for each (outlier, column) pair,
+        # then index into the underlying numpy array directly (avoids expensive
+        # .iloc per-column slicing in a Python loop).
+        row_indices = self.random_generator.integers(0, len(X), size=(n_outliers, X.shape[1]))
+        outlier_values = X[row_indices, np.arange(X.shape[1])]
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = outlier_values
 
-        return outliers, yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt

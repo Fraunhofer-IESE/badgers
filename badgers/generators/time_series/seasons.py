@@ -51,5 +51,5 @@ class GlobalAdditiveSinusoidalSeasonGenerator(SeasonsGenerator):
         """
         t = np.arange(len(X))
         season = np.sin(t[:,np.newaxis]*2*np.pi/period)
-        Xt = X.add(season, axis=0)
+        Xt = X + season
         return Xt, y

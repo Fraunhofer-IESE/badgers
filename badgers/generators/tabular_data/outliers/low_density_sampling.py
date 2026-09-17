@@ -48,29 +48,36 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         n_features = X.shape[1]
         outliers = np.empty((n_outliers, n_features), dtype=X.dtype)
 
-        # Vectorize histogram computation across all features
-        hist, bin_edges = np.histogramdd(X, bins=bins)
-
-        # Compute inverse density and sampling probabilities
-        inv_density = 1 - hist / np.max(hist, axis=(0, 1, 2))
-        p = inv_density / np.sum(inv_density, axis=(0, 1, 2))
-
-        # Generate bin indices for all features at once
-        indices = self.random_generator.choice(
-            bins, p=p, size=(n_outliers, n_features), replace=True
-        )
-
-        # Vectorized uniform sampling from selected bins
+        # Compute independent histograms for each feature
         for col in range(n_features):
-            outliers[:, col] = self.random_generator.uniform(
-                low=bin_edges[col][indices[:, col]],
-                high=bin_edges[col][indices[:, col] + 1]
+            hist, bin_edges = np.histogram(X[:, col], bins=bins)
+
+            # Compute inverse density and sampling probabilities
+            inv_density = 1 - hist / np.max(hist)
+            p = inv_density / np.sum(inv_density)
+
+            # Generate bin indices for this feature
+            indices = self.random_generator.choice(
+                bins, p=p, size=n_outliers, replace=True
             )
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+            # Uniform sampling from selected bins
+            outliers[:, col] = self.random_generator.uniform(
+                low=bin_edges[indices],
+                high=bin_edges[indices + 1]
+            )
 
-        return outliers, yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class HistogramSamplingGenerator(OutliersGenerator):
@@ -157,10 +164,19 @@ class HistogramSamplingGenerator(OutliersGenerator):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
+
+        return Xt, yt
 
 
 class LowDensitySamplingGenerator(OutliersGenerator):
@@ -242,11 +258,26 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         if outliers.shape[0] == 1:
             outliers = outliers.reshape(1, -1)
 
-        # add "outliers" as labels for outliers
-        yt = np.array(["outliers"] * len(outliers))
+        outliers = scaler.inverse_transform(outliers)
 
         # in the case no outliers could be generated
         if outliers.shape[0] == 0:
-            return outliers, yt
+            # Build yt labels even when no outliers
+            n_samples = len(X)
+            if y is None:
+                yt = np.array(["original"] * n_samples)
+            else:
+                yt = np.asarray(y, dtype=str)
+            return X, yt
 
-        return scaler.inverse_transform(outliers), yt
+        # Append outliers to original data
+        Xt = np.vstack([X, outliers])
+
+        # Build yt labels
+        n_samples = len(X)
+        if y is None:
+            yt = np.array(["original"] * n_samples + ["outliers"] * len(outliers))
+        else:
+            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * len(outliers))
+
+        return Xt, yt

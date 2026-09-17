@@ -21,4 +21,4 @@ def test_local_zscore__correct_shape_and_count(time_series_sine):
     Xt, _ = generator.generate(X=X, y=None, n_outliers=n_outliers)
     assert Xt.shape == X.shape
     assert len(generator.outliers_indices_) == n_outliers
-    assert not Xt.isna().any()[0]
+    assert not np.isnan(Xt).any()

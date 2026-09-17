@@ -30,6 +30,17 @@ def test_leet_speak__generates_same_length():
     assert len(X) == len(Xt)
 
 
+def test_leet_speak__modifies_some_words():
+    """LeetSpeakGenerator should modify at least some words when proba=1."""
+    X = ['leet', 'speak', 'hacker', 'elite', 'password']
+    trf = LeetSpeakGenerator(random_generator=default_rng(42))
+    Xt, _ = trf.generate(deepcopy(X), None, replacement_proba=1.0)
+    # At least one word should be modified
+    assert any(xt != x for xt, x in zip(Xt, X))
+    # All words should be non-empty
+    assert all(len(xt) > 0 for xt in Xt)
+
+
 def test_swap_case__uppercases_all():
     """SwapCaseGenerator uppercases all words when proba=1."""
     X = ['the', 'quick', 'brown', 'fox', 'jumps', 'over', 'the', 'lazy', 'fox', ' <> ']

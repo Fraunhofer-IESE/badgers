@@ -2,7 +2,6 @@ import abc
 from typing import Tuple
 
 import numpy as np
-import pandas as pd
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
@@ -26,7 +25,7 @@ class TransmissionErrorGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple[pd.DataFrame, pd.Series]:
+    def generate(self, X, y, **params) -> Tuple[np.ndarray, np.ndarray]:
         """
         Abstract method to generate transmission errors on the input data.
 
@@ -71,10 +70,11 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
         assert n_switches > 0, 'n_switches should be strictly greater than 0'
 
         self.switch_indices_ = self.random_generator.choice(len(X) - 1, size=n_switches, replace=False)
-        for i in self.switch_indices_:
-            tmp = X.iloc[i].copy()
-            X.iloc[i] = X.iloc[i + 1].copy()
-            X.iloc[i + 1] = tmp
+        # Vectorized: swap all pairs at once via .values indexing
+        i = self.switch_indices_
+        tmp = X[i].copy()
+        X[i] = X[i + 1]
+        X[i + 1] = tmp
         return X, y
 
 
@@ -123,18 +123,15 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
             self.random_generator.integers(low=min_nb_repeats, high=max_nb_repeats, size=n_repeats)
         )]
 
-        Xt = X.values
+        Xt = X.copy()
 
         # generate the repeats and insert them
         offset = 0
 
         for i, l in self.repeats_:
-            repeat = np.repeat(X.iloc[i], l)
-            Xt = np.insert(Xt, i + offset, repeat)
+            repeat = np.repeat(X[i:i+1], l, axis=0)
+            Xt = np.insert(Xt, i + offset, repeat, axis=0)
             offset += l
-
-        # create a pandas dataframe with same columns as X
-        Xt = pd.DataFrame(data=Xt, columns=X.columns)
 
         return Xt, y
 
@@ -177,7 +174,7 @@ class RandomDropGenerator(TransmissionErrorGenerator):
         # generate indices for drops
         self.drops_indices_ = self.random_generator.choice(len(X), size=n_drops, replace=False, shuffle=False)
 
-        Xt = X.drop(X.index[self.drops_indices_], axis=0).reset_index(drop=True)
+        Xt = np.delete(X, self.drops_indices_, axis=0)
 
         return Xt, y
 
@@ -232,7 +229,7 @@ class LocalRegionsRandomDropGenerator(TransmissionErrorGenerator):
         # generate indices for drops
         self.drops_indices_ = self.random_generator.choice(len(X), size=n_drops, p=self.drops_probabilities_, replace=False, shuffle=False)
 
-        Xt = X.drop(X.index[self.drops_indices_], axis=0).reset_index(drop=True)
+        Xt = np.delete(X, self.drops_indices_, axis=0)
 
         return Xt, y
 
@@ -294,17 +291,14 @@ class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
             self.random_generator.integers(low=min_nb_repeats, high=max_nb_repeats, size=n_repeats)
         )]
 
-        Xt = X.values
+        Xt = X.copy()
 
         # generate the repeats and insert them
         offset = 0
 
         for i, l in self.repeats_:
-            repeat = np.repeat(X.iloc[i], l)
-            Xt = np.insert(Xt, i + offset, repeat)
+            repeat = np.repeat(X[i:i+1], l, axis=0)
+            Xt = np.insert(Xt, i + offset, repeat, axis=0)
             offset += l
-
-        # create a pandas dataframe with same columns as X
-        Xt = pd.DataFrame(data=Xt, columns=X.columns)
 
         return Xt, y

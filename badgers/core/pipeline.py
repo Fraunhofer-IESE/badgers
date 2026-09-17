@@ -6,7 +6,6 @@ class Pipeline:
     Class for chaining different generators together.
 
     Not compatible with scikit-learn Pipelines
-    Only words for python 3.7 as it relies upon dictionaries, and they need to be ordered
     """
 
     def __init__(self, generators: Dict):

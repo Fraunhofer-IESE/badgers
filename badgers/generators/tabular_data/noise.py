@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-import pandas as pd
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
@@ -69,7 +68,7 @@ class GaussianNoiseGenerator(NoiseGenerator):
         Xt += self.random_generator.normal(loc=0, scale=noise_std, size=Xt.shape)
         # inverse standardization
         Xt = scaler.inverse_transform(Xt)
-        return pd.DataFrame(data=Xt, columns=X.columns, index=X.index), y
+        return Xt, y
 
 
 class GaussianNoiseClassesGenerator(NoiseGenerator):
@@ -110,7 +109,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         tmp_Xt = []
         tmp_yt = []
         for label, noise_std in noise_std_per_class.items():
-            data_class = np.array(Xt[y == label])
+            data_class = Xt[y == label, :]
             noisy_data_class = data_class + self.random_generator.normal(loc=0, scale=noise_std, size=data_class.shape)
             labels = np.array([label] * data_class.shape[0])
             tmp_Xt.append(noisy_data_class.copy())
@@ -120,4 +119,4 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         yt = np.concatenate(tmp_yt, axis=0)
         # inverse standardization
         Xt = scaler.inverse_transform(Xt)
-        return pd.DataFrame(data=Xt, columns=X.columns, index=X.index), pd.Series(yt)
+        return Xt, yt

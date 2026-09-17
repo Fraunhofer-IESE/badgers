@@ -11,4 +11,4 @@ def test_missing_at_random__correct_shape_and_count(time_series_sine):
     Xt, _ = generator.generate(X=X, y=None, n_missing=n_missing)
     assert Xt.shape == X.shape
     assert len(generator.missing_indices_) == n_missing
-    assert Xt.isna().sum()[0] == n_missing
+    assert np.isnan(Xt).sum() == n_missing
