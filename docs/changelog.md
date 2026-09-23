@@ -2,6 +2,20 @@
 
 See https://github.com/Fraunhofer-IESE/badgers/releases
 
+## dev_0_0_15 (unreleased)
+
+### Added
+
+- **Causal defect family**: A new family of tabular generators that produce bad data by perturbing the *structure* of the data (causal graph + data generation process) and propagating the effect through descendants. All generators share an explicit `fit(X, graph, column_mapping)` phase followed by `generate(...)` with a mechanism-gating API (`mechanism`, `mechanism_cause`, `mechanism_rate`) that selects which rows receive the defect.
+  - **`PyMCDGP`** (`badgers.core.dgp`): PyMC-based data generation process. Fits a Bayesian linear structural model (latent nodes + observation layer) and exposes `fit`, `forward_pass`, and `sample` for structural perturbation.
+  - **`CausalGenerator`** (`badgers.generators.tabular_data.causal`): shared base class with DAG/column-mapping/perturbation validation, DGP fitting, mechanism gating, and label building.
+  - **`CausalMissingnessGenerator`** (`badgers.generators.tabular_data.missingness`): m-graph mechanism-based missingness with `any`/`all` descendant propagation.
+  - **`CausalNoiseGenerator`** (`badgers.generators.tabular_data.noise`): per-edge noise injection with configurable `noise_std`.
+  - **`CausalDriftGenerator`** (`badgers.generators.tabular_data.drift`): systematic drift on perturbation nodes and their descendants.
+  - **`CausalImbalanceGenerator`** (`badgers.generators.tabular_data.imbalance`): truncates the dataset to a quantile range of the perturbation node, then recomputes descendants.
+  - **`CausalEdgePerturbationGenerator`** (`badgers.generators.tabular_data.relationship`): marginal-preserving edge-weight perturbation (relationship-level defect).
+- **`causal` optional extra**: PyMC + PyTensor are now an optional dependency (`pip install "badgers[causal]"`). The classic defect packages do not import PyMC; only the `causal` subpackage requires the extra.
+
 ## dev_0_0_14 (unreleased)
 
 ### Added
