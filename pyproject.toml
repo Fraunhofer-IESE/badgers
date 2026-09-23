@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "badgers"
-version = "0.0.14"
+version = "0.0.15"
 keywords = ["data quality", "bad data", "data science"]
 authors = [
     { name = "Julien Siebert", email = "julien.siebert@iese.fraunhofer.de" },
@@ -30,6 +30,10 @@ dependencies = [
     "scipy~=1.17.0",
 ]
 [project.optional-dependencies]
+causal = [
+    "pymc>=5.0",
+    "pytensor>=2.0",
+]
 dev = [
     "tox>=4.34.1,<4.62.0",
     "mkdocs~=1.6.1",

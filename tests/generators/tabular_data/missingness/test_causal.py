@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from badgers.generators.tabular_data.causal.missingness import (
+from badgers.generators.tabular_data.missingness.causal import (
     CausalMissingnessGenerator,
 )
 
@@ -47,7 +47,7 @@ def test_generate__all_rule_diamond_recoverable(chain_data):
     # A -> B, A -> C, B -> D, C -> D ; perturb A, rule=all.
     # D has parents B and C (both missing) -> D missing.
     import networkx as nx
-    from tests.generators.tabular_data.causal.conftest import (
+    from tests.generators.tabular_data.conftest import (
         _generate_linear_data,
     )
     rng = np.random.default_rng(0)
@@ -69,7 +69,7 @@ def test_generate__all_rule_recoverable_child_computed_from_observed_parent():
     # Y has parents X (missing) and Z (observed) -> Y is RECOVERABLE:
     # computed from the observed parent Z via the structural equation.
     import networkx as nx
-    from tests.generators.tabular_data.causal.conftest import (
+    from tests.generators.tabular_data.conftest import (
         _generate_linear_data,
     )
     rng = np.random.default_rng(0)

@@ -1,5 +1,5 @@
 import numpy as np
-from badgers.generators.tabular_data.noise import (
+from badgers.generators.tabular_data.noise.noise import (
     GaussianNoiseGenerator, GaussianNoiseClassesGenerator,
 )
 

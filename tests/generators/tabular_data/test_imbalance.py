@@ -2,7 +2,7 @@ import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.utils import normalize_proba
-from badgers.generators.tabular_data.imbalance import RandomSamplingFeaturesGenerator, \
+from badgers.generators.tabular_data.imbalance.imbalance import RandomSamplingFeaturesGenerator, \
     RandomSamplingClassesGenerator, RandomSamplingTargetsGenerator
 
 

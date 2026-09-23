@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.random import default_rng
 
-from badgers.generators.tabular_data.drift import RandomShiftGenerator, RandomShiftClassesGenerator
+from badgers.generators.tabular_data.drift.drift import RandomShiftGenerator, RandomShiftClassesGenerator
 
 
 def test_random_shift__preserves_shape_and_modifies_data(tabular_data):

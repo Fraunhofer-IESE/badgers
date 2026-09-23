@@ -5,8 +5,8 @@ from numpy.random import default_rng
 from sklearn.datasets import make_blobs
 
 from badgers.core.pipeline import Pipeline
-from badgers.generators.tabular_data.imbalance import RandomSamplingClassesGenerator
-from badgers.generators.tabular_data.noise import GaussianNoiseGenerator
+from badgers.generators.tabular_data.imbalance.imbalance import RandomSamplingClassesGenerator
+from badgers.generators.tabular_data.noise.noise import GaussianNoiseGenerator
 
 
 def test_pipeline__preserves_shape():
