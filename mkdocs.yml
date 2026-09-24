@@ -15,6 +15,11 @@ nav:
                     -   Generating Noise: tutorials/tabular-data/Noise-Tabular-Data.ipynb
                     -   Generating Outliers: tutorials/tabular-data/Outliers-Tabular-Data.ipynb
                     -   Generating Outliers (Using Causal Graphs): tutorials/tabular-data/Causal-Outlier-Propagation.ipynb
+                    -   Generating Missing Data (Causal): tutorials/tabular-data/Causal-Missingness.ipynb
+                    -   Generating Noise (Causal): tutorials/tabular-data/Causal-Noise.ipynb
+                    -   Generating Drift (Causal): tutorials/tabular-data/Causal-Drift.ipynb
+                    -   Generating Imbalanced Data (Causal): tutorials/tabular-data/Causal-Imbalance.ipynb
+                    -   Perturbing Edge Strength (Causal): tutorials/tabular-data/Causal-Edge-Perturbation.ipynb
             -   Text Data:
                     -   Generating Typos: tutorials/text/Typos-Text.ipynb
             -   Time Series Data:
