@@ -71,9 +71,14 @@ class CausalImbalanceGenerator(CausalGenerator):
         if y is not None:
             y = y[keep]
         affected = np.ones(X.shape[0], dtype=bool)
+        rows_original = X.copy()
 
-        # Recompute descendants via the structural equations (forward pass).
-        self.propagate(X, perturbation_nodes, self.random_generator)
+        # Recompute descendants via the structural equations: descendant_new
+        # = descendant_orig + beta @ delta_parents. Since the parents of the
+        # kept rows are unchanged, the delta is 0 and descendants keep their
+        # original (truncated) values -- the imbalance is a pure subset.
+        self.propagate(X, perturbation_nodes, self.random_generator,
+                       rows_original=rows_original)
 
         self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)

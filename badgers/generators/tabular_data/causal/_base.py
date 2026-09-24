@@ -34,10 +34,13 @@ class CausalGenerator(GeneratorMixin):
     #: Subclasses set this to the deficit name used in labels.
     deficit_name = "causal"
 
-    #: The "combine rule" for the default ``propagate``. Categories whose
-    #: defect is systematic (drift) set this to False; noise-like categories
-    #: keep the per-row residual.
-    add_residual = True
+    #: Whether the propagation recomputes the child's value from the
+    #: structural equation (recompute semantics, used by edge perturbation
+    #: where the equation itself changes) or adds the propagated delta on
+    #: top of the original values (delta semantics, used by noise, drift
+    #: and imbalance). Delta semantics preserves each node's exogenous
+    #: shock exactly: v_new = v_orig + beta @ (parents_new - parents_old).
+    delta_propagation = True
 
     def __init__(self, random_generator=default_rng(seed=0), dgp=None):
         self.random_generator = random_generator
@@ -93,17 +96,64 @@ class CausalGenerator(GeneratorMixin):
         return [node for node in order if node in descendants]
 
     def propagate(self, rows, perturbation_nodes, rng, **kwargs):
-        """Default: value forward pass over the descendants of the nodes.
+        """Propagate the perturbation to the descendants of the nodes.
 
-        This is the shared implementation for every category whose defect
-        propagates as a value change (noise, drift, imbalance). Categories
-        whose propagation is *not* a forward pass override this method
-        (missingness = absorbing NaN mask; edge perturbation = recompute with
-        beta').
+        Default implementation: **delta propagation** (``delta_propagation``
+        is True). For each descendant node ``v`` in topological order:
+
+            delta_v = beta_v @ (parents_new - parents_orig)
+            rows[v] = rows_orig[v] + delta_v
+
+        This preserves each node's own exogenous shock exactly (it lives in
+        ``rows_orig``) and leaves a node untouched whenever its parents did
+        not change. ``rows`` holds the ORIGINAL values with only the
+        perturbation applied to the perturbation-node columns; the
+        pre-perturbation values must be passed as ``rows_original``.
+
+        Generators with different propagation semantics override this
+        method: missingness (absorbing NaN mask pass) and edge perturbation
+        (recompute the child with the modified coefficient, delta for its
+        descendants).
+        """
+        if not self.delta_propagation:
+            return self._propagate_recompute(rows, perturbation_nodes)
+        rows_original = kwargs.get("rows_original")
+        if rows_original is None:
+            raise ValueError(
+                "delta propagation requires rows_original: the "
+                "pre-perturbation values of rows (callers mutate rows in "
+                "place, so pass a copy taken before the perturbation)"
+            )
+        return self._propagate_delta(rows, rows_original, perturbation_nodes)
+
+    def _propagate_delta(self, rows, rows_original, perturbation_nodes):
+        """Delta pass: add propagated deltas on top of the original values.
+
+        For each descendant node v (topological order):
+            rows[v] = rows_original[v] + beta_v @ (rows[parents] -
+                                                   rows_original[parents])
+        """
+        graph = self.graph
+        for node in self._ordered_descendants(perturbation_nodes):
+            col = self.column_mapping[node]
+            parents = get_parents(graph, node)
+            parent_cols = [self.column_mapping[p] for p in parents]
+            beta = self.dgp._beta_mean[node]
+            parent_delta = rows[:, parent_cols] - rows_original[:, parent_cols]
+            delta = parent_delta @ beta
+            rows[:, col] = rows_original[:, col] + delta
+        return rows
+
+    def _propagate_recompute(self, rows, perturbation_nodes):
+        """Value forward pass over the descendants (recompute semantics).
+
+        Recomputes each descendant from its (possibly perturbed) parents:
+            rows[v] = beta_v @ rows[parents] + eps_new
+        Used when the structural equation itself changes (edge perturbation).
         """
         nodes = self._ordered_descendants(perturbation_nodes)
         return self.dgp.forward_pass(
-            rows, nodes, rng, add_residual=self.add_residual
+            rows, nodes, self.random_generator, add_residual=True
         )
 
     def _sample(self, n_samples):

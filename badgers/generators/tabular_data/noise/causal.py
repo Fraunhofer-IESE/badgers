@@ -71,6 +71,7 @@ class CausalNoiseGenerator(CausalGenerator):
 
         # Expand: each seed row -> n_copies copies (n_copies=1 = in-place).
         rows = np.repeat(X, n_copies, axis=0)
+        rows_original = np.repeat(X, n_copies, axis=0)
         affected = np.ones(rows.shape[0], dtype=bool)
 
         # Inject noise at the perturbation nodes (gated by the mechanism).
@@ -86,8 +87,13 @@ class CausalNoiseGenerator(CausalGenerator):
                         0, noise_scale[j] * col_stds[col]
                     )
 
-        # Propagate to descendants (with per-row residual).
-        self.propagate(rows, perturbation_nodes, self.random_generator)
+        # Propagate the delta to the descendants via the structural
+        # equations: descendant_new = descendant_orig + beta @ delta_parents.
+        # Each expanded row's "original" is the seed row it was copied from
+        # (so the descendants keep the seed's exogenous noise); only the
+        # injected noise delta propagates.
+        self.propagate(rows, perturbation_nodes, self.random_generator,
+                       rows_original=rows_original)
 
         if y is not None:
             y = np.repeat(y, n_copies)

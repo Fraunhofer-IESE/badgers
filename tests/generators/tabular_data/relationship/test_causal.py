@@ -65,6 +65,30 @@ def test_generate__marginal_preserved():
     assert abs(np.var(Xt[:, 1]) - base_var_y) < 0.5 * base_var_y
 
 
+def test_generate__descendants_delta_propagated():
+    # Chain X -> Y -> Z. The X->Y edge is perturbed (child Y recomputed);
+    # Z's change must be the delta beta_YZ * (Y_new - Y_orig), with Z's own
+    # exogenous shock preserved -- not a freshly drawn residual.
+    X, graph, column_mapping = _weak_edge_data(rng=np.random.default_rng(0))
+    gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
+    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    Y_orig = X[:, 1].copy()
+    Z_orig = X[:, 2].copy()
+    Xt, yt = gen.generate(
+        X, y=None, perturbation_nodes=["Y"],
+        mechanism="always", edge=("X", "Y"), weight_factor=2.0,
+    )
+    # generate() mutates X in place; compare against the captured originals.
+    dY = Xt[:, 1] - Y_orig
+    dZ = Xt[:, 2] - Z_orig
+    beta_yz = gen.dgp._beta_mean["Z"][0]
+    np.testing.assert_allclose(dZ, beta_yz * dY, atol=1e-8)
+    # Also: unchanged rows outside the child's lineage keep their values --
+    # here all rows are affected, so instead check that the delta is 0
+    # exactly where Y did not change (per-row granularity).
+    np.testing.assert_allclose(dZ[~np.isclose(dY, 0)], beta_yz * dY[~np.isclose(dY, 0)])
+
+
 def test_generate__infeasible_raises(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(0))

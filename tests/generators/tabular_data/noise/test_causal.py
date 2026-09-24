@@ -40,11 +40,44 @@ def test_generate__noise_magnitude(chain_data):
         X, y=None, perturbation_nodes=["X"], n_copies=1,
         mechanism="always", noise_std=1.0,
     )
-    # The injected noise (std ~ noise_std * col_std) is added ON TOP of the
-    # DGP forward-pass recompute of X, so the marginal std of Xt must be
-    # strictly inflated relative to the original. (The exact total also
-    # depends on the fitted latent std, so we check inflation, not equality.)
+    # The injected noise (std ~ noise_std * col_std) is added directly to
+    # the original values (delta propagation), so the marginal std of Xt
+    # must be strictly inflated relative to the original.
     assert np.std(Xt[:, 0]) > np.std(X[:, 0])
+
+
+def test_generate__noise_zero_is_identity(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
+    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    Xt, yt = gen.generate(
+        X, y=None, perturbation_nodes=["X"], n_copies=1,
+        mechanism="always", noise_std=0.0,
+    )
+    # noise_std=0 -> no injected delta -> delta propagation adds exactly 0:
+    # the output must equal the original data (exogenous noise preserved).
+    np.testing.assert_allclose(Xt, X, atol=1e-9)
+
+
+def test_generate__noise_propagates_exact_delta(chain_data):
+    # Known-coefficients chain: Y = 2 X + eps_Y, Z = 0.5 Y + eps_Z.
+    # Noise injected at X on row i: delta_X = eps_X[i]. The delta model
+    # requires delta_Y = beta_XY * delta_X and delta_Z = beta_YZ * delta_Y
+    # EXACTLY (the nodes' own exogenous noise stays untouched).
+    X, graph, column_mapping = chain_data
+    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(7))
+    gen.fit(X, graph, column_mapping, n_samples_mcmc=200)
+    Xt, yt = gen.generate(
+        X, y=None, perturbation_nodes=["X"], n_copies=1,
+        mechanism="always", noise_std=0.5,
+    )
+    dX = Xt[:, 0] - X[:, 0]
+    dB = Xt[:, 1] - X[:, 1]
+    dC = Xt[:, 2] - X[:, 2]
+    beta_xy = gen.dgp._beta_mean["Y"][0]
+    beta_yz = gen.dgp._beta_mean["Z"][0]
+    np.testing.assert_allclose(dB, beta_xy * dX, atol=1e-8)
+    np.testing.assert_allclose(dC, beta_yz * dB, atol=1e-8)
 
 
 def test_generate__noise_per_column(chain_data):

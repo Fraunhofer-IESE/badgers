@@ -36,6 +36,22 @@ def test_generate__descendants_skewed(chain_data):
     assert np.mean(Xt[:, 1]) > np.mean(X[:, 1])
 
 
+def test_generate__descendants_are_pure_subset(chain_data):
+    # Imbalance only filters rows; since the kept rows' parents are
+    # unchanged, the propagated delta is 0 and every value (including the
+    # descendants') must be bit-identical to the filtered original.
+    X, graph, column_mapping = chain_data
+    gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
+    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    Xt, yt = gen.generate(
+        X, y=None, perturbation_nodes=["X"],
+        mechanism="always", quantile_range=(0.5, 1.0),
+    )
+    lo = np.quantile(X[:, 0], 0.5)
+    keep = X[:, 0] >= lo
+    np.testing.assert_array_equal(Xt, X[keep])
+
+
 def test_generate__multi_node_intersection(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))

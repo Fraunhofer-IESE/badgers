@@ -1,9 +1,11 @@
 """Causal edge-perturbation generator (relationship-level defect).
 
 Perturbs the fitted coefficient of a single edge (beta -> beta' =
-weight_factor * beta) and recomputes the child and its descendants. The child's
-residual variance is adjusted so the child's marginal variance is preserved
-(marginal-preserving perturbation).
+weight_factor * beta). The structural equation of the child itself changes,
+so the child is RECOMPUTED with beta' and an adjusted residual std (variance
+marginal-preserving); the child's descendants are then propagated as deltas:
+    v_new = v_orig + beta_v @ (parents_new - parents_orig)
+which preserves each descendant's own exogenous shock.
 """
 
 import numpy as np
@@ -92,10 +94,12 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         new_resid_std = np.sqrt(new_resid_var)
 
         # Recompute the child with beta' and the adjusted residual, then
-        # propagate to the child's descendants.
+        # delta-propagate the child's change to its descendants.
+        rows_original = X.copy()
         self.propagate(
             X, perturbation_nodes, self.random_generator,
             edge=edge, beta_prime=beta_prime, new_resid_std=new_resid_std,
+            rows_original=rows_original,
         )
 
         affected = np.ones(n_samples, dtype=bool)
@@ -104,37 +108,44 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         return X, yt
 
     def propagate(self, rows, perturbation_nodes, rng, **kwargs):
-        """Recompute the child with beta' and propagate to its descendants.
+        """Recompute the child with beta', then delta-propagate its descendants.
 
-        Overrides the default forward pass because the edge weight itself
-        changes (relationship-level defect), not just a value.
+        Overrides the default delta propagation because the edge weight
+        itself changes (relationship-level defect): the child's structural
+        equation changed, so the child is recomputed. The child's descendants
+        are handled with the standard delta pass so their own exogenous
+        shocks are preserved.
         """
         edge = kwargs["edge"]
         beta_prime = kwargs["beta_prime"]
         new_resid_std = kwargs["new_resid_std"]
+        rows_original = kwargs.get("rows_original")
+        if rows_original is None:
+            raise ValueError(
+                "edge perturbation requires rows_original (a copy of the "
+                "pre-perturbation rows)"
+            )
         parent, child = edge
         order = topological_order(self.graph)
         child_descendants = get_descendants(self.graph, child)
-        for node in order:
-            col = self.column_mapping[node]
-            if node != child and node not in child_descendants:
-                continue
-            parents = get_parents(self.graph, node)
-            if not parents:
-                continue
-            parent_cols = [self.column_mapping[p] for p in parents]
-            coefs = np.array([
-                (beta_prime if p == parent else self._edge_beta(node, p))
-                for p in parents
-            ])
-            predicted = rows[:, parent_cols] @ coefs
-            if node == child:
-                resid_std = new_resid_std
-            else:
-                resid_std = self.dgp._residual_std.get(node, 0.0)
-            rows[:, col] = predicted + rng.normal(
-                0, resid_std, size=rows.shape[0]
-            )
+
+        # 1) Recompute ONLY the child with the new coefficient.
+        child_col = self.column_mapping[child]
+        parents = get_parents(self.graph, child)
+        parent_cols = [self.column_mapping[p] for p in parents]
+        coefs = np.array([
+            (beta_prime if p == parent else self._edge_beta(child, p))
+            for p in parents
+        ])
+        predicted = rows[:, parent_cols] @ coefs
+        rows[:, child_col] = predicted + rng.normal(
+            0, new_resid_std, size=rows.shape[0]
+        )
+
+        # 2) Delta-propagate the child's change to its descendants
+        #    (_propagate_delta excludes the perturbation node itself).
+        if rows_original is not None and child_descendants:
+            self._propagate_delta(rows, rows_original, [child])
         return rows
 
     def _edge_beta(self, node, parent):

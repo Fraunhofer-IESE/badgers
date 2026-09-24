@@ -2,7 +2,9 @@
 
 Injects a systematic distributional shift at perturbation nodes (drawn once,
 applied to all rows) and propagates it to descendants via the structural
-equations WITHOUT a per-row residual (drift is systematic, not random).
+equations. The shift at the perturbation node is systematic (not per-row
+random), but each descendant still has its own exogenous residual noise,
+which is re-added during the forward pass.
 """
 
 import numpy as np
@@ -31,8 +33,6 @@ class CausalDriftGenerator(CausalGenerator):
     """
 
     deficit_name = "drift"
-    #: Drift is systematic: the forward pass adds no per-row residual.
-    add_residual = False
 
     @preprocess_inputs
     def generate(
@@ -52,6 +52,7 @@ class CausalDriftGenerator(CausalGenerator):
             X, perturbation_nodes
         )
         n_samples = X.shape[0]
+        rows_original = X.copy()
         col_stds = np.std(X, axis=0)
         col_stds[col_stds == 0] = 1.0
 
@@ -84,8 +85,13 @@ class CausalDriftGenerator(CausalGenerator):
                     X[i, node_to_col[node]] += shifts[node_to_col[node]]
                     affected[i] = True
 
-        # Propagate to descendants WITHOUT a per-row residual (systematic).
-        self.propagate(X, perturbation_nodes, self.random_generator)
+        # Propagate the delta to the descendants via the structural
+        # equations: descendant_new = descendant_orig + beta @ delta_parents.
+        # The descendant's own exogenous noise is preserved (it lives in
+        # rows_original); only the drift at the perturbation node is
+        # systematic (a single shift applied to all affected rows).
+        self.propagate(X, perturbation_nodes, self.random_generator,
+                       rows_original=rows_original)
 
         self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)

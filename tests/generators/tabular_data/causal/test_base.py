@@ -1,4 +1,4 @@
-"""Tests for the CausalGenerator base class (validation + mechanism gating)."""
+"""Tests for the CausalGenerator base class (validation + mechanism gating + delta propagation)."""
 
 import networkx as nx
 import numpy as np
@@ -138,3 +138,78 @@ def test_labels_expanded__y_none(chain_data):
     affected = np.array([True, True, False, False])
     yt = gen._labels_expanded(None, affected, "noise")
     assert list(yt) == ["noise", "noise", "original", "original"]
+
+
+class _FakeDGP:
+    """Minimal stand-in for PyMCDGP exposing only _beta_mean."""
+
+    def __init__(self, graph, beta_mean):
+        self.graph = graph
+        self._beta_mean = beta_mean
+
+
+def test_propagate__delta_requires_rows_original(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalGenerator()
+    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.dgp = _FakeDGP(graph, {})
+    with pytest.raises(ValueError, match="rows_original"):
+        gen.propagate(X.copy(), ["X"], np.random.default_rng(0))
+
+
+def test_propagate__delta_linear_chain(chain_data):
+    # Delta semantics: descendant_new = descendant_orig + beta @ delta_parents,
+    # for ALL descendants in topological order (multi-hop chains compose).
+    X, graph, column_mapping = chain_data
+    beta_mean = {"Y": np.array([2.0]), "Z": np.array([0.5])}
+    gen = CausalGenerator()
+    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.dgp = _FakeDGP(graph, beta_mean)
+    rng = np.random.default_rng(0)
+    rows = X.copy()
+    rows[:, 0] += 3.0  # perturb the root in place: +3 on X
+    rows_original = X.copy()
+    out = gen.propagate(rows, ["X"], rng, rows_original=rows_original)
+    np.testing.assert_allclose(out[:, 1], X[:, 1] + 2.0 * 3.0)  # Y += beta_XY * dX
+    np.testing.assert_allclose(out[:, 2], X[:, 2] + 0.5 * (2.0 * 3.0))  # Z += beta_YZ * dY
+    # Root column untouched by propagation
+    np.testing.assert_allclose(out[:, 0], X[:, 0] + 3.0)
+
+
+def test_propagate__zero_parent_delta_is_identity(chain_data):
+    # A descendant whose parents did not change must keep its original value
+    # exactly (exogenous shock preserved, no recompute noise).
+    X, graph, column_mapping = chain_data
+    beta_mean = {"Y": np.array([2.0]), "Z": np.array([0.5])}
+    gen = CausalGenerator()
+    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.dgp = _FakeDGP(graph, beta_mean)
+    rng = np.random.default_rng(0)
+    rows = X.copy()
+    rows_original = X.copy()
+    out = gen.propagate(rows, ["X"], rng, rows_original=rows_original)
+    np.testing.assert_array_equal(out, X)
+
+
+def test_propagate__recompute_semantics(chain_data):
+    # delta_propagation=False -> recompute via DGP forward_pass with residuals.
+    X, graph, column_mapping = chain_data
+    beta_mean = {"Y": np.array([2.0]), "Z": np.array([0.5])}
+    gen = CausalGenerator()
+    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.dgp = _FakeDGP(graph, beta_mean)
+    gen.delta_propagation = False
+
+    calls = {}
+
+    class _FakeForward:
+        def forward_pass(self, rows, nodes, rng, add_residual=True):
+            calls["nodes"] = list(nodes)
+            calls["add_residual"] = add_residual
+            return rows
+
+    gen.dgp.forward_pass = _FakeForward().forward_pass
+    out = gen.propagate(X.copy(), ["X"], np.random.default_rng(0))
+    assert calls["nodes"] == ["Y", "Z"]
+    assert calls["add_residual"] is True
+    assert out is not None
