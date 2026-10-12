@@ -67,7 +67,7 @@ class CausalMissingnessGenerator(CausalGenerator):
             )
         self._require_fitted()
         if missingness_rule == "all":
-            self._require_dgp()
+            self._require_dgp(X)
         order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
             X, perturbation_nodes
         )
@@ -138,27 +138,18 @@ class CausalMissingnessGenerator(CausalGenerator):
         return rows
 
     def _compute_recoverable(self, rows, row_idx, node, parents, node_to_col):
-        """Fill recoverable child values from observed parents.
+        """Recompute recoverable child values from their observed parents.
 
-        Uses the DGP's posterior-mean beta to compute the child value
-        directly from the structural equation (not via ``forward_pass``, which
-        skips the perturbation node itself).
+        Uses the DGP's fitted mechanism directly (not ``forward_pass``):
+        predicted = f(node, parent values), with missing parents zeroed
+        (linear zero-intercept convention) plus the node's own redrawn
+        noise for the unexplained variance.
         """
         col = node_to_col[node]
-        parent_cols = [node_to_col[p] for p in parents]
+        scol = [node_to_col[p] for p in parents]
         # Only use observed (non-NaN) parents in the computation.
-        # For a linear structural equation, missing parents contribute 0
-        # (the child is partially determined by the observed parents).
-        beta = self.dgp._beta_mean[node]
-        # Build the parent value matrix, replacing NaN with 0.
-        # Two-step indexing: rows[row_idx] selects the rows, then
-        # [:, parent_cols] selects the parent columns (avoids a
-        # broadcast error between the 1-D row index and the column list).
-        parent_vals = rows[row_idx][:, parent_cols].copy()
+        parent_vals = rows[row_idx][:, scol].copy()
         parent_vals[np.isnan(parent_vals)] = 0.0
-        predicted = parent_vals @ beta
-        # Add a per-row residual for the unexplained variance.
-        resid_std = self.dgp._residual_std.get(node, 0.0)
-        rows[row_idx, col] = predicted + self.random_generator.normal(
-            0, resid_std, size=len(row_idx)
-        )
+        predicted = self.dgp.response(node, parent_vals)
+        noise = self.dgp.draw_noise(node, self.random_generator, len(row_idx))
+        rows[row_idx, col] = predicted + noise

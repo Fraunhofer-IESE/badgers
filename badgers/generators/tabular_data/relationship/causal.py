@@ -2,20 +2,16 @@
 
 Perturbs the fitted coefficient of a single edge (beta -> beta' =
 weight_factor * beta). The structural equation of the child itself changes,
-so the child is RECOMPUTED with beta' and an adjusted residual std (variance
-marginal-preserving); the child's descendants are then propagated as deltas:
-    v_new = v_orig + beta_v @ (parents_new - parents_orig)
-which preserves each descendant's own exogenous shock.
+so the child is RECOMPUTED through the scaled mechanism (variance
+marginal-preserving); the child's descendants are then propagated as
+deltas, preserving each descendant's own exogenous shock.
 """
 
 import numpy as np
 
-from badgers.core.causal_graph import (
-    get_descendants,
-    get_parents,
-    topological_order,
-)
+from badgers.core.causal_graph import get_parents
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.dgp import ScaledEdgeDGP, do
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -59,7 +55,7 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
             raise ValueError("edge parameter is required")
         parent, child = edge
         self._require_fitted()
-        self._require_dgp()
+        self._require_dgp(X)
         if not self.graph.has_edge(parent, child):
             raise ValueError(f"edge ({parent}, {child}) not in graph")
         if perturbation_nodes != [child]:
@@ -72,33 +68,13 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         )
         n_samples = X.shape[0]
 
-        # Fitted coefficient for the edge (parent -> child).
-        child_parents = list(self.graph.predecessors(child))
-        parent_idx = child_parents.index(parent)
-        beta = self.dgp._beta_mean[child][parent_idx]
-        beta_prime = weight_factor * beta
-
-        # Marginal-preserving: adjust the child's residual variance so the
-        # child's marginal variance is preserved.
-        child_col = node_to_col[child]
-        parent_col = node_to_col[parent]
-        var_child = np.var(X[:, child_col])
-        var_parent = np.var(X[:, parent_col])
-        # New residual variance: var_child - beta'^2 * var_parent
-        new_resid_var = var_child - (beta_prime ** 2) * var_parent
-        if new_resid_var < 0:
-            raise ValueError(
-                f"Edge perturbation is infeasible: beta'^2 * var({parent}) "
-                f"> var({child}). Reduce weight_factor."
-            )
-        new_resid_std = np.sqrt(new_resid_var)
-
-        # Recompute the child with beta' and the adjusted residual, then
-        # delta-propagate the child's change to its descendants.
+        # Recompute the child through the SCALED edge (raises ValueError if
+        # the variance budget is infeasible), then delta-cascade its change
+        # to its descendants (each descendant keeps its own exogenous shock).
         rows_original = X.copy()
         self.propagate(
             X, perturbation_nodes, self.random_generator,
-            edge=edge, beta_prime=beta_prime, new_resid_std=new_resid_std,
+            edge=edge, weight_factor=weight_factor,
             rows_original=rows_original,
         )
 
@@ -108,17 +84,15 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         return X, yt
 
     def propagate(self, rows, perturbation_nodes, rng, **kwargs):
-        """Recompute the child with beta', then delta-propagate its descendants.
+        """Recompute the child through the scaled edge, then delta-cascade.
 
-        Overrides the default delta propagation because the edge weight
-        itself changes (relationship-level defect): the child's structural
-        equation changed, so the child is recomputed. The child's descendants
-        are handled with the standard delta pass so their own exogenous
-        shocks are preserved.
+        Overrides the default delta propagation: the edge weight itself
+        changes (relationship-level defect), so the child's value is
+        recomputed via the scaled mechanism; its descendants follow with
+        the standard delta pass (their own exogenous shocks preserved).
         """
         edge = kwargs["edge"]
-        beta_prime = kwargs["beta_prime"]
-        new_resid_std = kwargs["new_resid_std"]
+        weight_factor = kwargs["weight_factor"]
         rows_original = kwargs.get("rows_original")
         if rows_original is None:
             raise ValueError(
@@ -126,30 +100,13 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
                 "pre-perturbation rows)"
             )
         parent, child = edge
-        order = topological_order(self.graph)
-        child_descendants = get_descendants(self.graph, child)
-
-        # 1) Recompute ONLY the child with the new coefficient.
-        child_col = self.column_mapping[child]
-        parents = get_parents(self.graph, child)
-        parent_cols = [self.column_mapping[p] for p in parents]
-        coefs = np.array([
-            (beta_prime if p == parent else self._edge_beta(child, p))
-            for p in parents
-        ])
-        predicted = rows[:, parent_cols] @ coefs
-        rows[:, child_col] = predicted + rng.normal(
-            0, new_resid_std, size=rows.shape[0]
+        scaled = ScaledEdgeDGP(self.dgp, child, parent, weight_factor)
+        # Raises ValueError('...infeasible...') when the variance budget fails.
+        scaled.calibrate(rows)
+        pcols = [self.column_mapping[p] for p in get_parents(self.graph, child)]
+        child_new = (
+            scaled.response(child, rows[:, pcols])
+            + scaled.draw_noise(child, rng, rows.shape[0])
         )
-
-        # 2) Delta-propagate the child's change to its descendants
-        #    (_propagate_delta excludes the perturbation node itself).
-        if rows_original is not None and child_descendants:
-            self._propagate_delta(rows, rows_original, [child])
-        return rows
-
-    def _edge_beta(self, node, parent):
-        """Fitted coefficient for edge (parent -> node) from the DGP."""
-        node_parents = list(self.graph.predecessors(node))
-        idx = node_parents.index(parent)
-        return self.dgp._beta_mean[node][idx]
+        return do(self.dgp, rows, [child], values=[child_new], mode="delta",
+                  rows_original=rows_original)

@@ -51,7 +51,7 @@ class CausalNoiseGenerator(CausalGenerator):
         if n_copies < 1:
             raise ValueError(f"n_copies must be >= 1, got {n_copies}")
         self._require_fitted()
-        self._require_dgp()
+        self._require_dgp(X)
         order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
             X, perturbation_nodes
         )

@@ -11,7 +11,7 @@ from badgers.generators.tabular_data.missingness.causal import (
 def test_generate__any_rule_propagates(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         mechanism="always", missingness_rule="any",
@@ -30,7 +30,7 @@ def test_generate__any_rule_propagates(chain_data):
 def test_generate__all_rule_recoverable_child_computed(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         mechanism="always", missingness_rule="all",
@@ -55,7 +55,7 @@ def test_generate__all_rule_diamond_recoverable(chain_data):
     graph.add_edges_from([("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")])
     X, column_mapping = _generate_linear_data(graph, 100, rng)
     gen = CausalMissingnessGenerator(random_generator=rng)
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["A"],
         mechanism="always", missingness_rule="all",
@@ -80,7 +80,7 @@ def test_generate__all_rule_recoverable_child_computed_from_observed_parent():
         graph, 100, rng, coefficients=coefs
     )
     gen = CausalMissingnessGenerator(random_generator=rng)
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         mechanism="always", missingness_rule="all",
@@ -101,7 +101,7 @@ def test_generate__mcar_mask_independent_of_values(chain_data):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         mechanism="random", mechanism_rate=0.5, missingness_rule="any",
@@ -119,7 +119,7 @@ def test_generate__self_mnar_mask_depends_on_own_value(chain_data):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         mechanism="self", mechanism_rate=0.3, missingness_rule="any",
@@ -138,7 +138,7 @@ def test_generate__observed_mar_depends_on_cause(chain_data):
     # (The cause must not be a descendant of the perturbation node, or the
     # cause column itself would be NaN-propagated.)
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
         mechanism="observed", mechanism_cause="X", mechanism_rate=0.5,
@@ -159,7 +159,7 @@ def test_generate__validation_errors(chain_data):
     with pytest.raises(RuntimeError, match="not fitted"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
     # unknown perturbation node
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     with pytest.raises(ValueError, match="not found in graph"):
         gen.generate(X, y=None, perturbation_nodes=["NOPE"])
 
@@ -167,7 +167,7 @@ def test_generate__validation_errors(chain_data):
 def test_generate__mar_requires_cause(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     with pytest.raises(ValueError, match="mechanism_cause"):
         gen.generate(
             X, y=None, perturbation_nodes=["X"],

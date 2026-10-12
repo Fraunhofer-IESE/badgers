@@ -5,7 +5,6 @@ fitting, mechanism gating (which rows get the defect), and label building.
 Subclasses define the defect injection and propagation.
 """
 
-import networkx as nx
 import numpy as np
 from numpy.random import default_rng
 
@@ -13,11 +12,10 @@ from badgers.core.base import GeneratorMixin
 from badgers.core.causal_graph import (
     get_ancestors,
     get_descendants,
-    get_parents,
     topological_order,
     validate_dag,
 )
-from badgers.core.dgp import PyMCDGP
+from badgers.core.dgp import OlsDGP, do, ordered_descendants
 
 
 class CausalGenerator(GeneratorMixin):
@@ -28,43 +26,37 @@ class CausalGenerator(GeneratorMixin):
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
     dgp : DGP or None, default=None
-        A fitted-or-fittable DGP. If None, a ``PyMCDGP`` is created on demand.
+        DGP instance. If None, the default OLS backend (``OlsDGP``) is
+        created on demand and fitted lazily by ``_require_dgp``.
     """
 
     #: Subclasses set this to the deficit name used in labels.
     deficit_name = "causal"
-
-    #: Whether the propagation recomputes the child's value from the
-    #: structural equation (recompute semantics, used by edge perturbation
-    #: where the equation itself changes) or adds the propagated delta on
-    #: top of the original values (delta semantics, used by noise, drift
-    #: and imbalance). Delta semantics preserves each node's exogenous
-    #: shock exactly: v_new = v_orig + beta @ (parents_new - parents_old).
-    delta_propagation = True
 
     def __init__(self, random_generator=default_rng(seed=0), dgp=None):
         self.random_generator = random_generator
         self.dgp = dgp
         self.graph = None
         self.column_mapping = None
+        self.observation_graph = None
         self.affected_mask_ = None
 
     # -- DGP plumbing -------------------------------------------------------
 
-    def fit(self, X, graph, column_mapping, n_samples_mcmc=1000, fit_dgp=True):
-        """Fit the DGP on the ORIGINAL data (explicit fit phase).
+    def fit(self, X, graph, column_mapping, observation_graph=None, dgp=None):
+        """Fit phase: store the structure; fit an injected DGP if given.
 
-        Stores ``self.graph`` / ``self.column_mapping`` so ``generate()`` does
-        not need them. Set ``fit_dgp=False`` for generators that do not need
-        the structural equations (e.g. missingness with rule="any").
+        Stores ``self.graph`` / ``self.column_mapping`` /
+        ``self.observation_graph`` so ``generate()`` does not need them.
+        A DGP backend passed as ``dgp`` is fitted here (explicit fit
+        phase); when ``dgp`` is None, the default ``OlsDGP`` is created
+        lazily by ``_require_dgp`` on first use.
         """
         self.graph = graph
         self.column_mapping = column_mapping
-        if fit_dgp:
-            if self.dgp is None:
-                self.dgp = PyMCDGP(
-                    graph, column_mapping, n_samples_mcmc=n_samples_mcmc
-                )
+        self.observation_graph = observation_graph
+        if dgp is not None:
+            self.dgp = dgp
             self.dgp.fit(X)
 
     def use_dgp(self, dgp):
@@ -80,84 +72,45 @@ class CausalGenerator(GeneratorMixin):
                 "or use_dgp(dgp) before generate()."
             )
 
-    def _require_dgp(self):
+    def _require_dgp(self, X=None):
+        """Require a fitted DGP; create the default OLS backend on demand.
+
+        Call ``_require_dgp(X)`` before any column mutation so the default
+        backend is fitted on the ORIGINAL data. Generators that need no
+        structural equation simply never call it (no DGP is created).
+        """
         if self.dgp is None:
-            raise RuntimeError(
-                "This generator needs a fitted DGP: call fit(...) with "
-                "fit_dgp=True, or use_dgp(dgp)."
-            )
+            if X is None:
+                raise RuntimeError(
+                    "This generator needs a fitted DGP: call fit(X, graph, "
+                    "column_mapping, dgp=<backend>) or use_dgp(dgp) before "
+                    "generate()."
+                )
+            self.dgp = OlsDGP(self.graph, self.column_mapping).fit(X)
 
     def _ordered_descendants(self, perturbation_nodes):
-        """Return the descendants of the perturbation nodes, topologically ordered."""
-        descendants = set()
-        for node in perturbation_nodes:
-            descendants |= get_descendants(self.dgp.graph, node)
-        order = topological_order(self.dgp.graph)
-        return [node for node in order if node in descendants]
+        """Descendants of the perturbation nodes, topologically ordered."""
+        return ordered_descendants(self.dgp.graph, perturbation_nodes)
 
-    def propagate(self, rows, perturbation_nodes, rng, **kwargs):
-        """Propagate the perturbation to the descendants of the nodes.
+    def propagate(self, rows, perturbation_nodes, rng, rows_original=None,
+                  mode="delta"):
+        """Cascade an applied perturbation to the descendants.
 
-        Default implementation: **delta propagation** (``delta_propagation``
-        is True). For each descendant node ``v`` in topological order:
-
-            delta_v = beta_v @ (parents_new - parents_orig)
-            rows[v] = rows_orig[v] + delta_v
-
-        This preserves each node's own exogenous shock exactly (it lives in
-        ``rows_orig``) and leaves a node untouched whenever its parents did
-        not change. ``rows`` holds the ORIGINAL values with only the
-        perturbation applied to the perturbation-node columns; the
-        pre-perturbation values must be passed as ``rows_original``.
-
-        Generators with different propagation semantics override this
-        method: missingness (absorbing NaN mask pass) and edge perturbation
-        (recompute the child with the modified coefficient, delta for its
-        descendants).
+        Delegates to the library-level do-operation (backend-blind):
+        ``mode="delta"`` preserves each node's exogenous shock exactly
+        (requires ``rows_original``); ``mode="recompute"`` redraws
+        descendant noise (requires ``rng``).
         """
-        if not self.delta_propagation:
-            return self._propagate_recompute(rows, perturbation_nodes)
-        rows_original = kwargs.get("rows_original")
-        if rows_original is None:
-            raise ValueError(
-                "delta propagation requires rows_original: the "
-                "pre-perturbation values of rows (callers mutate rows in "
-                "place, so pass a copy taken before the perturbation)"
-            )
-        return self._propagate_delta(rows, rows_original, perturbation_nodes)
-
-    def _propagate_delta(self, rows, rows_original, perturbation_nodes):
-        """Delta pass: add propagated deltas on top of the original values.
-
-        For each descendant node v (topological order):
-            rows[v] = rows_original[v] + beta_v @ (rows[parents] -
-                                                   rows_original[parents])
-        """
-        graph = self.graph
-        for node in self._ordered_descendants(perturbation_nodes):
-            col = self.column_mapping[node]
-            parents = get_parents(graph, node)
-            parent_cols = [self.column_mapping[p] for p in parents]
-            beta = self.dgp._beta_mean[node]
-            parent_delta = rows[:, parent_cols] - rows_original[:, parent_cols]
-            delta = parent_delta @ beta
-            rows[:, col] = rows_original[:, col] + delta
-        return rows
-
-    def _propagate_recompute(self, rows, perturbation_nodes):
-        """Value forward pass over the descendants (recompute semantics).
-
-        Recomputes each descendant from its (possibly perturbed) parents:
-            rows[v] = beta_v @ rows[parents] + eps_new
-        Used when the structural equation itself changes (edge perturbation).
-        """
-        nodes = self._ordered_descendants(perturbation_nodes)
-        return self.dgp.forward_pass(
-            rows, nodes, self.random_generator, add_residual=True
-        )
+        return do(self.dgp, rows, perturbation_nodes, mode=mode, rng=rng,
+                  rows_original=rows_original)
 
     def _sample(self, n_samples):
-        """Delegate sampling to the DGP."""
+        """Delegate sampling to the fitted DGP."""
+        if self.dgp is None:
+            raise RuntimeError(
+                "_sample requires a fitted DGP: call fit(X, graph, "
+                "column_mapping, dgp=<backend>) first."
+            )
         return self.dgp.sample(self.random_generator, n_samples)
 
     # -- Mechanism gating (Distinction 3) -----------------------------------

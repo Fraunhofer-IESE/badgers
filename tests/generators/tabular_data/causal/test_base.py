@@ -19,7 +19,7 @@ class _Probe(CausalGenerator):
 def test_validate__returns_sets(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     order, node_to_col, descendants, exogenous, perturb_cols = gen._validate(
         X, ["X"]
     )
@@ -40,7 +40,7 @@ def test_validate__missing_graph_raises(chain_data):
 def test_validate__missing_column_mapping_raises(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator()
-    gen.fit(X, graph, None, fit_dgp=False)
+    gen.fit(X, graph, None)
     with pytest.raises(ValueError, match="column_mapping"):
         gen._validate(X, ["X"])
 
@@ -48,7 +48,7 @@ def test_validate__missing_column_mapping_raises(chain_data):
 def test_validate__unknown_perturbation_node_raises(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
+    gen.fit(X, graph, column_mapping)
     with pytest.raises(ValueError, match="not found in graph"):
         gen._validate(X, ["NOPE"])
 
@@ -141,18 +141,28 @@ def test_labels_expanded__y_none(chain_data):
 
 
 class _FakeDGP:
-    """Minimal stand-in for PyMCDGP exposing only _beta_mean."""
+    """Minimal stand-in for a DGP backend: deterministic linear mechanisms."""
 
-    def __init__(self, graph, beta_mean):
+    def __init__(self, graph, column_mapping, beta, noise_std=0.0):
         self.graph = graph
-        self._beta_mean = beta_mean
+        self.column_mapping = column_mapping
+        self._beta = beta          # node -> {parent: coef}
+        self._noise_std = noise_std
+
+    def response(self, node, parent_values):
+        parents = list(self.graph.predecessors(node))
+        coefs = np.array([self._beta[node][p] for p in parents])
+        return parent_values @ coefs
+
+    def draw_noise(self, node, rng, n):
+        return rng.normal(0, self._noise_std, size=n)
 
 
 def test_propagate__delta_requires_rows_original(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
-    gen.dgp = _FakeDGP(graph, {})
+    gen.fit(X, graph, column_mapping)
+    gen.dgp = _FakeDGP(graph, column_mapping, {})
     with pytest.raises(ValueError, match="rows_original"):
         gen.propagate(X.copy(), ["X"], np.random.default_rng(0))
 
@@ -161,10 +171,10 @@ def test_propagate__delta_linear_chain(chain_data):
     # Delta semantics: descendant_new = descendant_orig + beta @ delta_parents,
     # for ALL descendants in topological order (multi-hop chains compose).
     X, graph, column_mapping = chain_data
-    beta_mean = {"Y": np.array([2.0]), "Z": np.array([0.5])}
     gen = CausalGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
-    gen.dgp = _FakeDGP(graph, beta_mean)
+    gen.fit(X, graph, column_mapping)
+    gen.dgp = _FakeDGP(graph, column_mapping,
+                       {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
     rng = np.random.default_rng(0)
     rows = X.copy()
     rows[:, 0] += 3.0  # perturb the root in place: +3 on X
@@ -180,10 +190,10 @@ def test_propagate__zero_parent_delta_is_identity(chain_data):
     # A descendant whose parents did not change must keep its original value
     # exactly (exogenous shock preserved, no recompute noise).
     X, graph, column_mapping = chain_data
-    beta_mean = {"Y": np.array([2.0]), "Z": np.array([0.5])}
     gen = CausalGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
-    gen.dgp = _FakeDGP(graph, beta_mean)
+    gen.fit(X, graph, column_mapping)
+    gen.dgp = _FakeDGP(graph, column_mapping,
+                       {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
     rng = np.random.default_rng(0)
     rows = X.copy()
     rows_original = X.copy()
@@ -192,24 +202,17 @@ def test_propagate__zero_parent_delta_is_identity(chain_data):
 
 
 def test_propagate__recompute_semantics(chain_data):
-    # delta_propagation=False -> recompute via DGP forward_pass with residuals.
+    # mode="recompute" -> descendants = f(child, parents_new) + fresh noise.
     X, graph, column_mapping = chain_data
-    beta_mean = {"Y": np.array([2.0]), "Z": np.array([0.5])}
     gen = CausalGenerator()
-    gen.fit(X, graph, column_mapping, fit_dgp=False)
-    gen.dgp = _FakeDGP(graph, beta_mean)
-    gen.delta_propagation = False
-
-    calls = {}
-
-    class _FakeForward:
-        def forward_pass(self, rows, nodes, rng, add_residual=True):
-            calls["nodes"] = list(nodes)
-            calls["add_residual"] = add_residual
-            return rows
-
-    gen.dgp.forward_pass = _FakeForward().forward_pass
-    out = gen.propagate(X.copy(), ["X"], np.random.default_rng(0))
-    assert calls["nodes"] == ["Y", "Z"]
-    assert calls["add_residual"] is True
-    assert out is not None
+    gen.fit(X, graph, column_mapping)
+    gen.dgp = _FakeDGP(graph, column_mapping,
+                       {"Y": {"X": 2.0}, "Z": {"Y": 0.5}}, noise_std=0.3)
+    rows = X.copy()
+    rows[:, 0] += 3.0  # perturb the root in place
+    out = gen.propagate(rows, ["X"], np.random.default_rng(0),
+                        mode="recompute")
+    # descendants are recomputed from the perturbed parents WITH noise:
+    # not the noise-free delta result.
+    deterministic_y = 2.0 * (X[:, 0] + 3.0)
+    assert np.std(out[:, 1] - deterministic_y) > 0.15

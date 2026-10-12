@@ -32,7 +32,7 @@ def test_generate__edge_relationship_strengthened():
     # Distinct seed from the data rng: the residual drawn during propagate
     # must not be a scaled copy of X (a shared seed would inflate the result).
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     base_corr = abs(np.corrcoef(X[:, 0], X[:, 1])[0, 1])
     base_var_y = np.var(X[:, 1])
     Xt, yt = gen.generate(
@@ -55,7 +55,7 @@ def test_generate__marginal_preserved():
     # Distinct seed from the data rng: the residual drawn during propagate
     # must not be a scaled copy of X (a shared seed would inflate the result).
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     base_var_y = np.var(X[:, 1])
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
@@ -71,7 +71,7 @@ def test_generate__descendants_delta_propagated():
     # exogenous shock preserved -- not a freshly drawn residual.
     X, graph, column_mapping = _weak_edge_data(rng=np.random.default_rng(0))
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     Y_orig = X[:, 1].copy()
     Z_orig = X[:, 2].copy()
     Xt, yt = gen.generate(
@@ -81,18 +81,18 @@ def test_generate__descendants_delta_propagated():
     # generate() mutates X in place; compare against the captured originals.
     dY = Xt[:, 1] - Y_orig
     dZ = Xt[:, 2] - Z_orig
-    beta_yz = gen.dgp._beta_mean["Z"][0]
-    np.testing.assert_allclose(dZ, beta_yz * dY, atol=1e-8)
-    # Also: unchanged rows outside the child's lineage keep their values --
-    # here all rows are affected, so instead check that the delta is 0
-    # exactly where Y did not change (per-row granularity).
-    np.testing.assert_allclose(dZ[~np.isclose(dY, 0)], beta_yz * dY[~np.isclose(dY, 0)])
+    # Oracle through the fitted mechanism itself (fitted-beta noise cancels).
+    dZ_exact = (
+        gen.dgp.response("Z", Xt[:, [1]])
+        - gen.dgp.response("Z", Y_orig[:, None])
+    )
+    np.testing.assert_allclose(dZ, dZ_exact, rtol=1e-12, atol=1e-12)
 
 
 def test_generate__infeasible_raises(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     # weight_factor huge -> beta'^2 * var(X) > var(Y) -> infeasible
     with pytest.raises(ValueError, match="infeasible"):
         gen.generate(
@@ -104,7 +104,7 @@ def test_generate__infeasible_raises(chain_data):
 def test_generate__perturbation_nodes_must_be_child(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     with pytest.raises(ValueError, match="perturbation_nodes"):
         gen.generate(
             X, y=None, perturbation_nodes=["X"],
@@ -119,7 +119,7 @@ def test_generate__validation_errors(chain_data):
         gen.generate(
             X, y=None, perturbation_nodes=["Y"], edge=("X", "Y"),
         )
-    gen.fit(X, graph, column_mapping, n_samples_mcmc=50)
+    gen.fit(X, graph, column_mapping)
     with pytest.raises(ValueError, match="edge"):
         gen.generate(
             X, y=None, perturbation_nodes=["Y"], edge=None,

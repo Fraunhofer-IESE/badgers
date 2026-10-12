@@ -47,7 +47,7 @@ class CausalDriftGenerator(CausalGenerator):
     ):
         """Inject causally-propagated systematic drift in place."""
         self._require_fitted()
-        self._require_dgp()
+        self._require_dgp(X)
         order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
             X, perturbation_nodes
         )

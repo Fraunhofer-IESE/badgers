@@ -53,7 +53,7 @@ class CausalImbalanceGenerator(CausalGenerator):
                 f"got {quantile_range}"
             )
         self._require_fitted()
-        self._require_dgp()
+        self._require_dgp(X)
         order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
             X, perturbation_nodes
         )
