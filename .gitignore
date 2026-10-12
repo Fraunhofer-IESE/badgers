@@ -1,4 +1,5 @@
 /site/
+.worktrees/
 
 # Benchmark outputs (generated, not committed)
 .benchmarks/
