@@ -133,4 +133,97 @@ def get_leaf_nodes(graph: nx.DiGraph) -> list:
     return [n for n in graph.nodes if graph.out_degree(n) == 0]
 
 
+def indicator_nodes(observation_graph: nx.DiGraph) -> list:
+    """
+    Return the indicator nodes of an observation graph with their monitored
+    variables, in topological order.
+
+    An indicator is a node named ``R_<variable>``. It monitors the variable
+    given by its optional ``monitors`` attribute, or ``<variable>`` by the
+    naming convention. The monitored variable must appear in the graph
+    (measurement nodes share the structural node names).
+
+    Parameters
+    ----------
+    observation_graph : nx.DiGraph
+        The observation-process DAG (must be acyclic).
+
+    Returns
+    -------
+    list of (indicator, monitored) tuples
+        In topological order.
+
+    Raises
+    ------
+    ValueError
+        If an indicator name does not resolve to a monitored variable.
+    """
+    result = []
+    for node in topological_order(observation_graph):
+        if not str(node).startswith("R_"):
+            continue
+        monitored = observation_graph.nodes[node].get("monitors")
+        if monitored is None:
+            monitored = str(node)[2:]
+        if monitored not in observation_graph.nodes:
+            raise ValueError(
+                f"indicator '{node}' does not resolve to a monitored "
+                f"variable: set a 'monitors' attribute or add node "
+                f"'{monitored}'"
+            )
+        result.append((node, monitored))
+    return result
+
+
+def validate_observation_graph(observation_graph: nx.DiGraph,
+                               structural_graph: nx.DiGraph) -> None:
+    """
+    Validate an observation graph against the structural graph.
+
+    Checks:
+
+    - the observation graph is a DAG;
+    - every measurement node exists in the structural graph (measurement
+      nodes share the structural node names; indicator nodes ``R_*`` are
+      observation-process nodes and are exempt);
+    - indicator nodes (``R_*``) are leaves (no outgoing edges);
+    - derivation edges (measurement -> measurement) mirror the structural
+      graph, so the fitted mechanisms stay consistent (v1 contract; the
+      artifact-column extension relaxes this in a later round).
+
+    Raises
+    ------
+    ValueError
+        On cycles, unknown measurement nodes, unresolvable indicators,
+        non-leaf indicators, or non-mirroring derivation edges.
+    """
+    validate_dag(observation_graph)
+    structural = set(structural_graph.nodes)
+    unknown = {
+        node for node in observation_graph.nodes
+        if not str(node).startswith("R_") and node not in structural
+    }
+    if unknown:
+        raise ValueError(
+            f"observation graph has node(s) not in the structural graph: "
+            f"{sorted(unknown)}"
+        )
+    for node, _ in indicator_nodes(observation_graph):
+        if observation_graph.out_degree(node) > 0:
+            raise ValueError(
+                f"indicator '{node}' must be a leaf (no outgoing edges)"
+            )
+    derivations = {
+        (s, t) for s, t in observation_graph.edges
+        if not str(s).startswith("R_") and not str(t).startswith("R_")
+    }
+    if derivations != set(structural_graph.edges):
+        raise ValueError(
+            "derivation edges must mirror the structural graph (v1 "
+            "contract): got "
+            f"{sorted(derivations)}, expected "
+            f"{sorted(structural_graph.edges)}"
+        )
+
+
 
