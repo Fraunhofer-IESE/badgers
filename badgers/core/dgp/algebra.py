@@ -108,3 +108,110 @@ def do(dgp, rows, nodes, values=None, mode="delta", rng=None,
                 child, rng, rows.shape[0]
             )
     return rows
+
+
+class ScaledEdgeDGP:
+    """Read-only view of a base DGP with ONE edge's contribution scaled.
+
+    For a child with parents ``P`` and a perturbed edge ``(p, child)``
+    scaled by ``k`` (zero-intercept additive mechanisms), the modified
+    response is derived without exposing coefficients::
+
+        contribution(p) = f(P) - f(P with p zeroed)
+        f'(P)           = f(P) + (k - 1) * contribution(p)
+
+    The child's noise is rescaled to preserve the child's marginal
+    variance (evaluated on the fit data via :meth:`calibrate`)::
+
+        scaled_pred   = f'(P)                      (on the fit data)
+        new_resid_var = var(child) - var(scaled_pred)
+        (ValueError if new_resid_var < 0 -- infeasible)
+
+        noise_ratio   = sqrt(new_resid_var) / std(child - f(child, P))
+
+    For a single-parent child ``f'(P) = k * contribution(p)`` and the
+    budget reduces to ``var(child) - k^2 * var(contribution)``; with
+    several parents, subtracting the full scaled response is what keeps
+    the marginal variance exact (the untouched parents' contribution is
+    not double-counted).
+
+    Everything else (graph, column_mapping, fit_node, sample) is
+    delegated to the base DGP.
+    """
+
+    def __init__(self, base, child, parent, k):
+        self._base = base
+        self._child = child
+        self._parent = parent
+        self._k = float(k)
+        child_parents = list(base.graph.predecessors(child))
+        if parent not in child_parents:
+            raise ValueError(f"edge ({parent}, {child}) not in graph")
+        self._pidx = child_parents.index(parent)
+        self._noise_ratio = None
+
+    # -- variance budget ----------------------------------------------------
+
+    def calibrate(self, data):
+        """Evaluate the variance budget on the fit data; set the child's
+        noise-rescale ratio. Raises ``ValueError`` if infeasible."""
+        col = self._base.column_mapping[self._child]
+        pcols = [
+            self._base.column_mapping[p]
+            for p in self._base.graph.predecessors(self._child)
+        ]
+        y = data[:, col]
+        base_pred = self._base.response(self._child, data[:, pcols])
+        zeroed = data[:, pcols].copy()
+        zeroed[:, self._pidx] = 0.0
+        contribution = base_pred - self._base.response(self._child, zeroed)
+        scaled_pred = base_pred + (self._k - 1.0) * contribution
+        new_resid_var = float(np.var(y)) - float(np.var(scaled_pred))
+        if new_resid_var < 0:
+            raise ValueError(
+                "Edge perturbation is infeasible: var(f'(P)) exceeds "
+                "var(child). Reduce k."
+            )
+        base_resid_std = float(np.std(y - base_pred))
+        self._noise_ratio = (
+            float(np.sqrt(new_resid_var) / base_resid_std)
+            if base_resid_std > 0
+            else 0.0
+        )
+        return self
+
+    # -- protocol views -----------------------------------------------------
+
+    @property
+    def graph(self):
+        return self._base.graph
+
+    @property
+    def column_mapping(self):
+        return self._base.column_mapping
+
+    def fit_node(self, node, parents, data):
+        self._base.fit_node(node, parents, data)
+
+    def fit(self, X):
+        """Fit the base DGP, then calibrate the variance budget on ``X``."""
+        self._base.fit(X)
+        return self.calibrate(X)
+
+    def response(self, node, parent_values):
+        base_pred = self._base.response(node, parent_values)
+        if node != self._child:
+            return base_pred
+        zeroed = parent_values.copy()
+        zeroed[:, self._pidx] = 0.0
+        contribution = base_pred - self._base.response(node, zeroed)
+        return base_pred + (self._k - 1.0) * contribution
+
+    def draw_noise(self, node, rng, n):
+        shocks = self._base.draw_noise(node, rng, n)
+        if node == self._child and self._noise_ratio is not None:
+            return shocks * self._noise_ratio
+        return shocks
+
+    def sample(self, rng, n):
+        return self._base.sample(rng, n)
