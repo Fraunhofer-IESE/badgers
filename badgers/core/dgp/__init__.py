@@ -12,8 +12,14 @@ modules**; they are never imported by this package.
 """
 
 from badgers.core.dgp.algebra import do, ordered_descendants
+from badgers.core.dgp.backends.ols import OlsDGP
+from badgers.core.dgp.base import DGPMixin
+from badgers.core.dgp.protocol import DGP
 
 __all__ = [
+    "DGP",
+    "DGPMixin",
+    "OlsDGP",
     "do",
     "ordered_descendants",
 ]

@@ -1,9 +1,14 @@
-"""Unit tests for the PyMC-based DGP (PyMCDGP)."""
+"""Backend contract tests for the default OLS DGP.
+
+The OLS backend is deterministic, so response recovery is exact (no MCMC
+tolerance). These tests define the contract every backend must satisfy.
+"""
 
 import networkx as nx
 import numpy as np
+import pytest
 
-from badgers.core.dgp import PyMCDGP
+from badgers.core.dgp import OlsDGP
 
 
 def _make_chain_data(n=100, seed=0):
@@ -19,68 +24,75 @@ def _make_chain_data(n=100, seed=0):
     return data, graph, column_mapping
 
 
-def test_fit__chain_beta_close_to_true():
+def test_fit__response_recovers_true_mechanism():
     data, graph, column_mapping = _make_chain_data()
-    dgp = PyMCDGP(graph, column_mapping, n_samples_mcmc=50)
-    dgp.fit(data)
-    assert dgp._fitted
-    # beta for Y (parent X) close to 2.0
-    assert abs(dgp._beta_mean["Y"][0] - 2.0) < 0.5
-    # beta for Z (parent Y) close to 0.5
-    assert abs(dgp._beta_mean["Z"][0] - 0.5) < 0.5
+    dgp = OlsDGP(graph, column_mapping).fit(data)
+    # deterministic least squares: response(parents) recovers the TRUE
+    # mechanism (beta = 2.0 / 0.5) up to estimation error; the raw child
+    # column only matches up to its residual (noise std = 0.1)
+    np.testing.assert_allclose(
+        dgp.response("Y", data[:, [0]]), 2.0 * data[:, 0], atol=0.05
+    )
+    np.testing.assert_allclose(
+        dgp.response("Z", data[:, [1]]), 0.5 * data[:, 1], atol=0.05
+    )
 
 
-def test_forward_pass__chain_descendants_filled():
+def test_response__root_returns_fitted_mean():
     data, graph, column_mapping = _make_chain_data()
-    dgp = PyMCDGP(graph, column_mapping, n_samples_mcmc=50)
-    dgp.fit(data)
-    rows = np.full((5, 3), np.nan)
-    rows[:, 0] = 10.0  # perturb X
-    dgp.forward_pass(rows, ["Y", "Z"], np.random.default_rng(0),
-                     add_residual=False)
-    # Y and Z (descendants) are filled
-    assert np.all(np.isfinite(rows[:, 1]))
-    assert np.all(np.isfinite(rows[:, 2]))
-    # Y shifted well above its original mean (X=10 -> Y ~ 2*10)
-    assert np.mean(rows[:, 1]) > np.mean(data[:, 1]) + 5.0
+    dgp = OlsDGP(graph, column_mapping).fit(data)
+    mean = dgp.response("X", np.zeros((7, 0)))
+    assert mean.shape == (7,)
+    np.testing.assert_allclose(mean, np.mean(data[:, 0]), atol=0.05)
 
 
-def test_forward_pass__empty_nodes_noop():
+def test_response__before_fit_raises():
+    _, graph, column_mapping = _make_chain_data()
+    dgp = OlsDGP(graph, column_mapping)
+    with pytest.raises(RuntimeError, match="before fit"):
+        dgp.response("X", np.zeros((3, 0)))
+
+
+def test_draw_noise__shape_and_spread():
     data, graph, column_mapping = _make_chain_data()
-    dgp = PyMCDGP(graph, column_mapping, n_samples_mcmc=50)
-    dgp.fit(data)
-    rows = np.full((5, 3), np.nan)
-    rows[:, 2] = 10.0  # perturb Z (leaf)
-    dgp.forward_pass(rows, [], np.random.default_rng(0), add_residual=False)
-    # Ancestors X, Y remain NaN (no backward propagation)
-    assert np.all(np.isnan(rows[:, 0]))
-    assert np.all(np.isnan(rows[:, 1]))
+    dgp = OlsDGP(graph, column_mapping).fit(data)
+    shocks = dgp.draw_noise("Z", np.random.default_rng(0), 5000)
+    assert shocks.shape == (5000,)
+    # fitted residual std ~ 0.1
+    assert 0.05 < np.std(shocks) < 0.2
 
 
-def test_forward_pass__add_residual_varies_rows():
+def test_fit_node__isolation():
     data, graph, column_mapping = _make_chain_data()
-    dgp = PyMCDGP(graph, column_mapping, n_samples_mcmc=50)
-    dgp.fit(data)
-    rows = np.full((50, 3), np.nan)
-    rows[:, 0] = 10.0
-    dgp.forward_pass(rows, ["Y", "Z"], np.random.default_rng(0),
-                     add_residual=True)
-    # With residual, Y values are not all identical
-    assert np.std(rows[:, 1]) > 0.0
+    dgp = OlsDGP(graph, column_mapping).fit(data)
+    z_before = dgp.response("Z", data[:, [1]]).copy()
+    # refit ONLY node Y on different data: Z's fitted mechanism is untouched
+    other = np.column_stack(
+        [np.random.default_rng(9).normal(size=len(data)),
+         np.full(len(data), 7.0), np.zeros(len(data))]
+    )
+    dgp.fit_node("Y", ["X"], other)
+    np.testing.assert_allclose(dgp.response("Z", data[:, [1]]), z_before)
 
 
-def test_sample__shape():
+def test_fit__loop_equals_per_node_fits():
     data, graph, column_mapping = _make_chain_data()
-    dgp = PyMCDGP(graph, column_mapping, n_samples_mcmc=50)
-    dgp.fit(data)
+    a = OlsDGP(graph, column_mapping).fit(data)
+    b = OlsDGP(graph, column_mapping)
+    for node in nx.topological_sort(graph):
+        b.fit_node(node, list(graph.predecessors(node)), data)
+    np.testing.assert_allclose(
+        a.response("Y", data[:, [0]]), b.response("Y", data[:, [0]])
+    )
+    np.testing.assert_allclose(
+        a.response("Z", data[:, [1]]), b.response("Z", data[:, [1]])
+    )
+
+
+def test_sample__shape_and_root_mean():
+    data, graph, column_mapping = _make_chain_data()
+    dgp = OlsDGP(graph, column_mapping).fit(data)
     X_sampled = dgp.sample(np.random.default_rng(0), 50)
     assert X_sampled.shape == (50, 3)
-
-
-def test_sample__marginal_mean_close():
-    data, graph, column_mapping = _make_chain_data()
-    dgp = PyMCDGP(graph, column_mapping, n_samples_mcmc=50)
-    dgp.fit(data)
-    X_sampled = dgp.sample(np.random.default_rng(0), 2000)
-    # Root X mean close to original
-    assert abs(np.mean(X_sampled[:, 0]) - np.mean(data[:, 0])) < 0.5
+    X_big = dgp.sample(np.random.default_rng(0), 2000)
+    assert abs(np.mean(X_big[:, 0]) - np.mean(data[:, 0])) < 0.5
