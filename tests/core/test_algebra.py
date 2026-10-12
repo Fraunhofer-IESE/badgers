@@ -68,6 +68,7 @@ def test_do_delta_linear_chain_composes():
              rows_original=rows_original)
     # do() mutates rows in place: the oracles must compare against the
     # pre-perturbation snapshot (rows_original), not the mutated rows.
+    assert out is rows  # in-place contract: the same array is returned
     np.testing.assert_allclose(out[:, 1], rows_original[:, 1] + 2.0 * 3.0)
     np.testing.assert_allclose(out[:, 2], rows_original[:, 2] + 0.5 * (2.0 * 3.0))
     np.testing.assert_allclose(out[:, 0], rows_original[:, 0] + 3.0)

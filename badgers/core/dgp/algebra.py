@@ -77,6 +77,8 @@ def do(dgp, rows, nodes, values=None, mode="delta", rng=None,
         The same ``rows`` array, with the cascade applied.
     """
     nodes = _as_node_list(nodes)
+    if mode not in ("delta", "recompute"):
+        raise ValueError(f"Unknown propagation mode '{mode}'")
     if rows_original is None:
         if mode == "delta":
             raise ValueError(
@@ -105,6 +107,4 @@ def do(dgp, rows, nodes, values=None, mode="delta", rng=None,
             rows[:, ccol] = new_pred + dgp.draw_noise(
                 child, rng, rows.shape[0]
             )
-        else:
-            raise ValueError(f"Unknown propagation mode '{mode}'")
     return rows
