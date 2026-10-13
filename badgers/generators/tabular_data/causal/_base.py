@@ -15,7 +15,7 @@ from badgers.core.causal_graph import (
     topological_order,
     validate_dag,
 )
-from badgers.core.dgp import OlsDGP, do, ordered_descendants
+from badgers.core.dgp import OlsDGP, do
 
 
 class CausalGenerator(GeneratorMixin):
@@ -87,10 +87,6 @@ class CausalGenerator(GeneratorMixin):
                     "generate()."
                 )
             self.dgp = OlsDGP(self.graph, self.column_mapping).fit(X)
-
-    def _ordered_descendants(self, perturbation_nodes):
-        """Descendants of the perturbation nodes, topologically ordered."""
-        return ordered_descendants(self.dgp.graph, perturbation_nodes)
 
     def propagate(self, rows, perturbation_nodes, rng, rows_original=None,
                   mode="delta"):

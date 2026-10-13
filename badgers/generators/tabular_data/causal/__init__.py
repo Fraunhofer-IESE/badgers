@@ -2,10 +2,13 @@
 
 The causal defect family generates bad data by perturbing the *structure*
 (causal graph + data generation process) of the data, rather than the raw
-values. Each generator fits a ``PyMCDGP`` to the data, applies a structural
+values. Each generator fits a per-node DGP to the data (the default OLS
+backend is pure NumPy and needs no extra dependencies), applies a structural
 perturbation, then propagates the effect through the descendants.
 
-This subpackage requires the optional ``causal`` extra (PyMC + PyTensor)::
+Custom estimation backends (e.g. PyMC-based) can be provided via the ``dgp``
+argument of ``fit``; the optional ``causal`` extra (PyMC + PyTensor) is only
+needed for writing such backends::
 
     pip install "badgers[causal]"
 """
