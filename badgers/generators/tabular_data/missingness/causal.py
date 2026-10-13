@@ -258,10 +258,10 @@ class CausalMissingnessGenerator(CausalGenerator):
     def _compute_recoverable(self, rows, row_idx, node, parents, node_to_col):
         """Recompute recoverable child values from their observed parents.
 
-        Uses the DGP's fitted mechanism directly (not ``forward_pass``):
-        predicted = f(node, parent values), with missing parents zeroed
-        (linear zero-intercept convention) plus the node's own redrawn
-        noise for the unexplained variance.
+        Uses the DGP's fitted mechanism directly: predicted =
+        f(node, parent values), with missing parents zeroed (linear
+        zero-intercept convention) plus the node's own redrawn noise for the
+        unexplained variance.
         """
         col = node_to_col[node]
         scol = [node_to_col[p] for p in parents]
