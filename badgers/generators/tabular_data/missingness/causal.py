@@ -14,7 +14,9 @@ import numpy as np
 from badgers.core.causal_graph import (
     get_descendants,
     get_parents,
+    indicator_nodes,
     topological_order,
+    validate_observation_graph,
 )
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.generators.tabular_data.causal._base import CausalGenerator
@@ -66,6 +68,16 @@ class CausalMissingnessGenerator(CausalGenerator):
                 f"missingness_rule must be 'any' or 'all', got '{missingness_rule}'"
             )
         self._require_fitted()
+        if self.observation_graph is not None:
+            if perturbation_nodes is not None:
+                raise ValueError(
+                    "perturbation_nodes must be None when an "
+                    "observation_graph is provided (the graph declares the "
+                    "monitoring)"
+                )
+            return self._generate_from_observation_graph(
+                X, y, mechanism_rate
+            )
         if missingness_rule == "all":
             self._require_dgp(X)
         order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
@@ -98,6 +110,103 @@ class CausalMissingnessGenerator(CausalGenerator):
         self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt
+
+    def _generate_from_observation_graph(self, rows, y, mechanism_rate):
+        """Derive the missingness indicators from the observation graph.
+
+        Walks the graph in topological order; each indicator ``R_*`` fires
+        per row:
+
+        - no parents (isolated indicator) -> MCAR: fires independently with
+          probability ``mechanism_rate``;
+        - parents present -> MAR/MNAR: fires on the top ``mechanism_rate``
+          fraction of the first driver's column.
+
+        The failure form here is NaN (dropout); other forms (stuck, spike,
+        clip, bias) are the deficit's business (future work). Spread follows
+        the graph's derivation edges (``_propagate_observation``).
+        """
+        validate_observation_graph(self.observation_graph, self.graph)
+        n_samples = rows.shape[0]
+        # Nodes carrying derivation_rule="all" recover values through the
+        # fitted mechanism, so a DGP must exist BEFORE indicators fire
+        # (recovering from post-NaN data would fit on garbage).
+        # [controller pre-fix: without this, the "all" branch hits
+        # self.dgp=None -> AttributeError, or would fit on NaN data]
+        needs_dgp = any(
+            self.observation_graph.nodes[node].get("derivation_rule", "any")
+            == "all"
+            for node in self.observation_graph.nodes
+            if not str(node).startswith("R_")
+        )
+        if needs_dgp:
+            self._require_dgp(rows)
+        affected = np.zeros(n_samples, dtype=bool)
+        for indicator, monitored in indicator_nodes(self.observation_graph):
+            drivers = list(self.observation_graph.predecessors(indicator))
+            if not drivers:  # MCAR
+                fires = self.random_generator.random(n_samples) < mechanism_rate
+            else:            # MAR / MNAR: quantile rule on the first driver
+                col = self.column_mapping[drivers[0]]
+                threshold = np.quantile(rows[:, col], 1.0 - mechanism_rate)
+                fires = rows[:, col] >= threshold
+            rows[fires, self.column_mapping[monitored]] = np.nan
+            affected |= fires
+        self._propagate_observation(rows)
+        self.affected_mask_ = affected
+        yt = self._labels_inplace(y, affected, self.deficit_name)
+        return rows, yt
+
+    def _propagate_observation(self, rows):
+        """Absorbing NaN mask pass along the observation graph's derivation edges.
+
+        Only measurement -> measurement edges participate (trigger edges
+        into ``R_*`` nodes are skipped). The target's missingness follows
+        its own ``derivation_rule`` attribute (default ``"any"``):
+
+        - ``"any"``: missing if any derivation source is missing;
+        - ``"all"``: missing only if ALL sources are missing — and rows
+          with at least one observed source are recomputed from the still
+          observed sources (``_compute_recoverable``), keeping the deficit
+          recoverable.
+        """
+        for node in topological_order(self.observation_graph):
+            if str(node).startswith("R_"):
+                continue
+            sources = [
+                s for s in self.observation_graph.predecessors(node)
+                if not str(s).startswith("R_")
+            ]
+            if not sources:
+                continue
+            rule = self.observation_graph.nodes[node].get(
+                "derivation_rule", "any"
+            )
+            scol = [self.column_mapping[s] for s in sources]
+            ccol = self.column_mapping[node]
+            source_missing = np.isnan(rows[:, scol])
+            if rule == "any":
+                rows[source_missing.any(axis=1), ccol] = np.nan
+            else:  # "all"
+                all_missing = source_missing.all(axis=1)
+                rows[all_missing, ccol] = np.nan
+                recoverable = (~all_missing) & source_missing.any(axis=1)
+                if recoverable.any():
+                    # Structural order for the mechanism call: response()
+                    # expects parent columns in graph.predecessors(node)
+                    # order, while ``sources`` follow the observation
+                    # graph's edge order (they can differ).
+                    # [controller pre-fix: passing obs-source order can
+                    # silently misalign the mechanism's coefficients]
+                    parents = [
+                        p for p in get_parents(self.graph, node)
+                        if p in set(sources)
+                    ]
+                    self._compute_recoverable(
+                        rows, np.where(recoverable)[0], node, parents,
+                        self.column_mapping,
+                    )
+        return rows
 
     def propagate(self, rows, perturbation_nodes, rng, **kwargs):
         """Absorbing NaN mask pass (overrides the default forward pass).
