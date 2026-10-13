@@ -186,15 +186,19 @@ def test_generate__observation_graph_mcar_dropout(chain_data):
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
     gen.fit(X, graph, column_mapping, observation_graph=obs)
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
-    Xt, yt = gen.generate(X, y=None, mechanism="always", mechanism_rate=1.0)
-    # isolated R_X fires on every row -> X missing (dropout preserves values)
-    assert np.all(np.isnan(Xt[:, 0]))
-    # "any" derivation default: Y and Z missing
-    assert np.all(np.isnan(Xt[:, 1]))
-    assert np.all(np.isnan(Xt[:, 2]))
-    assert list(yt) == ["missingness"] * X.shape[0]
-    # dropout: observed values equal the originals
-    observed = ~np.isnan(Xt[:, 0])
+    Xt, yt = gen.generate(X, y=None, mechanism="always", mechanism_rate=0.5)
+    mask_x = np.isnan(Xt[:, 0])
+    # MCAR R_X fires on ~50% of the rows (both halves non-empty)
+    assert 0.2 < mask_x.mean() < 0.8
+    # "any" derivation default: Y and Z missing EXACTLY where X is missing
+    np.testing.assert_array_equal(np.isnan(Xt[:, 1]), mask_x)
+    np.testing.assert_array_equal(np.isnan(Xt[:, 2]), mask_x)
+    # labels: exactly the fired rows
+    np.testing.assert_array_equal(yt == "missingness", mask_x)
+    # dropout: observed values equal the originals (mask non-empty, so this
+    # pins real values, not two empty arrays)
+    observed = ~mask_x
+    assert observed.any()
     np.testing.assert_allclose(Xt[observed, 0], X_orig[observed, 0])
 
 
@@ -304,3 +308,34 @@ def test_generate__observation_graph_rule_all_recovers():
     np.testing.assert_allclose(y_miss, predicted, atol=0.5)
     # Loose sanity: recovered Y still tracks Z (beta_ZY ~ 0.5).
     assert np.corrcoef(y_miss, z_miss)[0, 1] > 0.8
+
+
+def test_generate__observation_graph_multi_indicator_independent_masks(chain_data):
+    # Two indicators driven by the SAME column (X): R_X (self-driven) and
+    # R_Y (also driven by X, monitoring Y). Under a single-pass firing loop,
+    # R_X's NaN writes would contaminate R_Y's quantile threshold (computed
+    # on post-NaN X) and R_Y would silently never fire -- order-dependent.
+    # Both masks must be computed on the UN-mutated data: they come out
+    # identical (same driver, same rule) and both columns are dropped.
+    import networkx as nx
+    X, graph, column_mapping = chain_data
+    obs = nx.DiGraph()
+    obs.add_nodes_from(["X", "Y", "Z", "R_X", "R_Y"])
+    obs.add_edges_from([("X", "R_X"), ("X", "R_Y"), ("X", "Y"), ("Y", "Z")])
+    gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
+    gen.fit(X, graph, column_mapping, observation_graph=obs)
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    Xt, yt = gen.generate(X, y=None, mechanism_rate=0.3)
+    mask_x = np.isnan(Xt[:, 0])
+    mask_y = np.isnan(Xt[:, 1])
+    # Both indicators fire on the SAME rows (same driver, same rule)
+    np.testing.assert_array_equal(mask_x, mask_y)
+    # ~30% of rows fire (quantile rule on the un-mutated X column)
+    assert 0.15 < mask_x.mean() < 0.45
+    # Z (fed by Y, "any" default) missing exactly where Y is missing
+    np.testing.assert_array_equal(np.isnan(Xt[:, 2]), mask_y)
+    # labels: exactly the fired rows
+    np.testing.assert_array_equal(yt == "missingness", mask_x)
+    # MNAR sanity: observed X mean shifted down (top 30% removed)
+    observed_x = Xt[:, 0][~mask_x]
+    assert np.mean(observed_x) < np.mean(X_orig[:, 0]) - 0.2

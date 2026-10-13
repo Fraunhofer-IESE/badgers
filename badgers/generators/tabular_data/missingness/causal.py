@@ -141,7 +141,12 @@ class CausalMissingnessGenerator(CausalGenerator):
         )
         if needs_dgp:
             self._require_dgp(rows)
-        affected = np.zeros(n_samples, dtype=bool)
+        # Compute ALL firing masks first (against the un-mutated data), then
+        # apply the NaN writes -- mirroring the structural path's invariant
+        # ("compute ALL masks first") so a later indicator's quantile rule is
+        # never evaluated on NaN-contaminated data, no matter the order in
+        # which the indicators fire.
+        fires_by_indicator = []
         for indicator, monitored in indicator_nodes(self.observation_graph):
             drivers = list(self.observation_graph.predecessors(indicator))
             if not drivers:  # MCAR
@@ -150,6 +155,9 @@ class CausalMissingnessGenerator(CausalGenerator):
                 col = self.column_mapping[drivers[0]]
                 threshold = np.quantile(rows[:, col], 1.0 - mechanism_rate)
                 fires = rows[:, col] >= threshold
+            fires_by_indicator.append((indicator, monitored, fires))
+        affected = np.zeros(n_samples, dtype=bool)
+        for indicator, monitored, fires in fires_by_indicator:
             rows[fires, self.column_mapping[monitored]] = np.nan
             affected |= fires
         self._propagate_observation(rows)
@@ -198,9 +206,10 @@ class CausalMissingnessGenerator(CausalGenerator):
                     # graph's edge order (they can differ).
                     # [controller pre-fix: passing obs-source order can
                     # silently misalign the mechanism's coefficients]
+                    source_set = set(sources)
                     parents = [
                         p for p in get_parents(self.graph, node)
-                        if p in set(sources)
+                        if p in source_set
                     ]
                     self._compute_recoverable(
                         rows, np.where(recoverable)[0], node, parents,
