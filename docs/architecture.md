@@ -343,3 +343,27 @@ python -m benchmarks compare --baseline v0.0.13
 **Regression thresholds:** >20% time increase or >30% memory increase triggers a flag in `comparator.py`.
 
 **Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.
+
+## Causal defect family: three-layer design
+
+1. **Structure** (static, user-provided): the structural `nx.DiGraph` (latent
+   variables), the `column_mapping` (node -> integer column), and an optional
+   observation `nx.DiGraph` (measurement nodes, `R_<name>` indicator nodes,
+   derivation edges). Validation is functions in `badgers.core.causal_graph`.
+2. **Fitted knowledge** (the `DGP` protocol): backends implement exactly one
+   operation — `fit_node(node, parents, data)` — and expose two views:
+   `response(node, parent_values)` (the fitted deterministic part) and
+   `draw_noise(node, rng, n)` (the node's own shock; parametric or empirical).
+   `fit(X)` is a provided topological loop; `sample(rng, n)` is tier 2,
+   standalone, and no generator depends on it.
+3. **Deficit algebra** (written once, backend-blind): the `do()` intervention
+   primitive (overwrite node columns, walk descendants in topological order,
+   propagate prediction differences in `delta` mode or redraw noise in
+   `recompute` mode) and the scaled-edge view for edge reweighting (no
+   coefficient access needed — `calibrate` rescales the child's noise to the
+   target variance). Indicator derivation from the observation graph lives in
+   the missingness generator (structure-layer helpers + generator-local
+   firing/spread logic).
+
+Backend selection is **object injection only** (`dgp=...` / `use_dgp`).
+Deficit semantics live in the generators; they never see which backend ran.
