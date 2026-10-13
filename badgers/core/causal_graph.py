@@ -157,6 +157,9 @@ def indicator_nodes(observation_graph: nx.DiGraph) -> list:
     ------
     ValueError
         If an indicator name does not resolve to a monitored variable.
+    networkx.NetworkXUnfeasible
+        If the observation graph has a cycle (``topological_order`` raises;
+        prefer ``validate_observation_graph`` first for a friendlier error).
     """
     result = []
     for node in topological_order(observation_graph):
@@ -187,6 +190,8 @@ def validate_observation_graph(observation_graph: nx.DiGraph,
       nodes share the structural node names; indicator nodes ``R_*`` are
       observation-process nodes and are exempt);
     - indicator nodes (``R_*``) are leaves (no outgoing edges);
+    - every ``derivation_rule`` attribute (measurement nodes) is
+      ``"any"`` or ``"all"``;
     - derivation edges (measurement -> measurement) mirror the structural
       graph, so the fitted mechanisms stay consistent (v1 contract; the
       artifact-column extension relaxes this in a later round).
@@ -195,7 +200,8 @@ def validate_observation_graph(observation_graph: nx.DiGraph,
     ------
     ValueError
         On cycles, unknown measurement nodes, unresolvable indicators,
-        non-leaf indicators, or non-mirroring derivation edges.
+        non-leaf indicators, non-mirroring derivation edges, or an
+        unknown derivation_rule value.
     """
     validate_dag(observation_graph)
     structural = set(structural_graph.nodes)
@@ -212,6 +218,15 @@ def validate_observation_graph(observation_graph: nx.DiGraph,
         if observation_graph.out_degree(node) > 0:
             raise ValueError(
                 f"indicator '{node}' must be a leaf (no outgoing edges)"
+            )
+    for node in observation_graph.nodes:
+        if str(node).startswith("R_"):
+            continue
+        rule = observation_graph.nodes[node].get("derivation_rule", "any")
+        if rule not in ("any", "all"):
+            raise ValueError(
+                f"node '{node}' has an unknown derivation_rule '{rule}' "
+                f"(expected 'any' or 'all')"
             )
     derivations = {
         (s, t) for s, t in observation_graph.edges

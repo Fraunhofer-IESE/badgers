@@ -55,6 +55,17 @@ def test_do_single_node_without_list():
     assert ordered_descendants(dgp.graph, "X") == ["Y", "Z"]
 
 
+def test_do_scalar_nodes_string():
+    # do() accepts a bare node (not wrapped in a list) end to end.
+    dgp, rows = _chain_dgp()
+    rows_original = rows.copy()
+    out = do(dgp, rows, "X", values=[rows[:, 0] + 3.0],
+             rows_original=rows_original)
+    np.testing.assert_allclose(out[:, 1], rows_original[:, 1] + 2.0 * 3.0)
+    np.testing.assert_allclose(out[:, 2], rows_original[:, 2] + 0.5 * (2.0 * 3.0))
+    np.testing.assert_allclose(out[:, 0], rows_original[:, 0] + 3.0)
+
+
 def test_do_delta_requires_rows_original():
     dgp, rows = _chain_dgp()
     with pytest.raises(ValueError, match="rows_original"):

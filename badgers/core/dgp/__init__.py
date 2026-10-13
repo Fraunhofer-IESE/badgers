@@ -2,7 +2,8 @@
 
 Public surface:
 
-- ``DGP`` — the backend-agnostic protocol;
+- ``DGP`` — the backend-agnostic protocol (``DGPMixin`` provides the
+  default ``fit``/``sample`` topological walk);
 - ``do`` / ``ordered_descendants`` — the generic deficit algebra;
 - ``OlsDGP`` — the default deterministic backend (pure NumPy);
 - ``ScaledEdgeDGP`` — a read-only view of a fitted DGP with one edge's

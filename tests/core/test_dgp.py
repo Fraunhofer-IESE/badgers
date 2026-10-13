@@ -53,6 +53,13 @@ def test_response__before_fit_raises():
         dgp.response("X", np.zeros((3, 0)))
 
 
+def test_draw_noise__before_fit_raises():
+    _, graph, column_mapping = _make_chain_data()
+    dgp = OlsDGP(graph, column_mapping)
+    with pytest.raises(RuntimeError, match="before fit"):
+        dgp.draw_noise("Z", np.random.default_rng(0), 3)
+
+
 def test_draw_noise__shape_and_spread():
     data, graph, column_mapping = _make_chain_data()
     dgp = OlsDGP(graph, column_mapping).fit(data)

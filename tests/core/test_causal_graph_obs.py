@@ -90,3 +90,15 @@ def test_validate_observation_graph__derivation_edges_must_mirror_structure():
     )
     with pytest.raises(ValueError, match="must mirror the structural graph"):
         validate_observation_graph(obs, _chain_structural())
+
+
+def test_validate_observation_graph__rejects_unknown_derivation_rule():
+    # derivation_rule must be "any" or "all" (a typo like "ol" used to slip
+    # past validation and die as an AttributeError deep in the generator).
+    obs = _obs_graph(
+        [("X", "Y"), ("Y", "Z"), ("X", "R_X")],
+        nodes=["X", "Y", "Z", "R_X"],
+    )
+    obs.nodes["Y"]["derivation_rule"] = "ol"
+    with pytest.raises(ValueError, match="unknown derivation_rule"):
+        validate_observation_graph(obs, _chain_structural())

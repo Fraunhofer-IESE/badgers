@@ -22,6 +22,16 @@ class DGP(Protocol):
     #: Node -> integer column index of its measurement.
     column_mapping: dict
 
+    def fit(self, X: np.ndarray) -> "DGP":
+        """Fit every node's mechanism in topological order; return ``self``.
+
+        ``DGPMixin`` provides the default topological walk over
+        ``fit_node``; backends that do not inherit it must implement
+        ``fit`` themselves. Generators call ``fit`` on any backend passed
+        via ``fit(dgp=...)``.
+        """
+        ...
+
     def fit_node(self, node: Hashable, parents: Iterable[Hashable],
                  data: np.ndarray) -> None:
         """Fit ONE node's mechanism from (data, parents).

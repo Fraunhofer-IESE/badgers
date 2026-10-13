@@ -43,11 +43,9 @@ def do(dgp, rows, nodes, values=None, mode="delta", rng=None,
 
     Steps:
 
-    1. Snapshot ``rows_original`` (defaults to a copy of ``rows`` when
-       ``mode="recompute"``).
-    2. If ``values`` is given, overwrite each node's column (the
+    1. If ``values`` is given, overwrite each node's column (the
        intervention itself).
-    3. Walk the descendants of ``nodes`` in topological order. For each
+    2. Walk the descendants of ``nodes`` in topological order. For each
        child:
 
        - ``mode="delta"`` — preserve the child's exogenous shock exactly::
@@ -86,9 +84,8 @@ def do(dgp, rows, nodes, values=None, mode="delta", rng=None,
                 "pre-perturbation values of rows (callers mutate rows in "
                 "place, so pass a copy taken before the perturbation)"
             )
-        rows_original = rows.copy()
     if values is not None:
-        for node, vals in zip(nodes, values):
+        for node, vals in zip(nodes, values, strict=True):
             rows[:, dgp.column_mapping[node]] = vals
     for child in ordered_descendants(dgp.graph, nodes):
         ccol = dgp.column_mapping[child]

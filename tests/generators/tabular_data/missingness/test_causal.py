@@ -180,9 +180,9 @@ def test_generate__observation_graph_mcar_dropout(chain_data):
     X, graph, column_mapping = chain_data
     obs = nx.DiGraph()
     obs.add_nodes_from(["X", "Y", "Z", "R_X"])
-    obs.add_edges_from([("X", "Y"), ("Y", "Z")])  # derivation edges (mirror
-    # the structural graph); without them Y and Z would stay observed and
-    # the assertions below would be unsatisfiable. [controller pre-fix]
+    obs.add_edges_from([("X", "Y"), ("Y", "Z")])  # derivation edges must
+    # mirror the structural graph (v1 contract: validate_observation_graph
+    # rejects the graph otherwise).
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
     gen.fit(X, graph, column_mapping, observation_graph=obs)
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)

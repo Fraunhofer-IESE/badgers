@@ -21,7 +21,7 @@ def test_generate__noise_expands(chain_data):
     assert list(yt) == ["noise"] * (X.shape[0] * 3)
 
 
-def test_generate__n_copies_one_is_inplace(chain_data):
+def test_generate__n_copies_one_keeps_shape(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
     gen.fit(X, graph, column_mapping)

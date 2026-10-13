@@ -69,7 +69,7 @@ class CausalNoiseGenerator(CausalGenerator):
                     "noise_std array must have one entry per perturbation node"
                 )
 
-        # Expand: each seed row -> n_copies copies (n_copies=1 = in-place).
+        # Expand: each seed row -> n_copies copies (n_copies=1 keeps the shape).
         rows = np.repeat(X, n_copies, axis=0)
         rows_original = np.repeat(X, n_copies, axis=0)
         affected = np.ones(rows.shape[0], dtype=bool)

@@ -148,6 +148,11 @@ class _FakeDGP:
         self.column_mapping = column_mapping
         self._beta = beta          # node -> {parent: coef}
         self._noise_std = noise_std
+        self._fit_called = False
+
+    def fit(self, X):
+        self._fit_called = True
+        return self
 
     def response(self, node, parent_values):
         parents = list(self.graph.predecessors(node))
@@ -216,3 +221,55 @@ def test_propagate__recompute_semantics(chain_data):
     # not the noise-free delta result.
     deterministic_y = 2.0 * (X[:, 0] + 3.0)
     assert np.std(out[:, 1] - deterministic_y) > 0.15
+
+
+def test_fit__fits_and_uses_injected_dgp(chain_data):
+    # fit(dgp=...) stores the structure AND fits the injected backend
+    # (explicit fit phase) — the advertised object-injection path.
+    X, graph, column_mapping = chain_data
+    fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
+    gen = CausalGenerator()
+    gen.fit(X, graph, column_mapping, dgp=fake)
+    assert gen.dgp is fake
+    assert fake._fit_called is True
+    assert gen.graph is graph
+    assert gen.column_mapping is column_mapping
+    # the injected backend is USED: propagate runs delta semantics on it
+    rows = X.copy()
+    rows[:, 0] += 3.0
+    out = gen.propagate(rows, ["X"], np.random.default_rng(0),
+                        rows_original=X.copy())
+    np.testing.assert_allclose(out[:, 1], X[:, 1] + 2.0 * 3.0)
+
+
+def test_use_dgp__attaches_fitted_dgp(chain_data):
+    # use_dgp(dgp) attaches an already-fitted backend and syncs the
+    # structure from it (shared-across-a-pipeline contract).
+    X, graph, column_mapping = chain_data
+    fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
+    fake.fit(X)
+    gen = CausalGenerator()
+    gen.use_dgp(fake)
+    assert gen.dgp is fake
+    assert gen.graph is fake.graph
+    assert gen.column_mapping is fake.column_mapping
+    gen._require_fitted()  # structure came from the DGP: no fit() needed
+    rows = X.copy()
+    rows[:, 0] += 3.0
+    out = gen.propagate(rows, ["X"], np.random.default_rng(0),
+                        rows_original=X.copy())
+    np.testing.assert_allclose(out[:, 1], X[:, 1] + 2.0 * 3.0)
+
+
+def test_fit__constructor_dgp_is_used_as_is_not_fitted(chain_data):
+    # A constructor-injected DGP is NEVER fitted by fit() (only the dgp=
+    # fit argument is); _require_dgp only fits when self.dgp is None, so a
+    # constructor-passed backend must already be fitted — documented
+    # contract, pinned here (fake.fit must NOT have been called).
+    X, graph, column_mapping = chain_data
+    fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
+    gen = CausalGenerator(dgp=fake)
+    gen.fit(X, graph, column_mapping)
+    assert gen.dgp is fake
+    assert fake._fit_called is False
+    assert gen.graph is graph

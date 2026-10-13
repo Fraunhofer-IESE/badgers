@@ -30,8 +30,18 @@ class CausalMissingnessGenerator(CausalGenerator):
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
     dgp : DGP or None, default=None
-        DGP instance. Used only when ``missingness_rule="all"`` (recoverable
-        children are computed from observed parents).
+        DGP instance. Used when ``missingness_rule="all"`` (recoverable
+        children are computed from observed parents) or when an
+        observation graph declares a ``derivation_rule="all"`` node.
+
+    An optional observation graph can be passed to ``fit`` (second plain
+    ``nx.DiGraph``: measurement nodes + ``R_<name>`` indicator nodes +
+    derivation edges). When given, the indicators are derived from the
+    graph's shape (MCAR = isolated indicator, MAR = another reading drives
+    it, MNAR = the monitored node's own value drives it) and ``mechanism``,
+    ``mechanism_cause`` and ``missingness_rule`` are IGNORED on the
+    generate() call — ``mechanism_rate`` is the only knob (dropout
+    probability / quantile fraction).
 
     generate() parameters (passed via **params)
     ----------
@@ -218,7 +228,7 @@ class CausalMissingnessGenerator(CausalGenerator):
         return rows
 
     def propagate(self, rows, perturbation_nodes, rng, **kwargs):
-        """Absorbing NaN mask pass (overrides the default forward pass).
+        """Absorbing NaN mask pass (overrides the default delta propagation).
 
         Missingness does not flow through the structural equation: a child is
         missing if any parent is missing (``rule="any"``, non-recoverable) or
