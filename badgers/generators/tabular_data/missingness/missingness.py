@@ -6,6 +6,7 @@ from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.selectors import ExactCountSelector
 from badgers.core.utils import normalize_proba
 
 
@@ -89,6 +90,9 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
     A generator that removes values completely at random (MCAR [1]) (uniform distribution over all data).
 
     See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
+
+    Routes the row selection through the shared ``ExactCountSelector``
+    preset (exact-count, optional soft probabilities).
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -116,18 +120,15 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
         """
         assert 0 <= percentage_missing <= 1
-        # compute number of missing values per column
-        nb_missing = int(X.shape[0] * percentage_missing)
-        # generate row indices per column (must use choice for no-replacement),
-        # then assign all NaNs in one vectorized shot via .values
-        row_idx = np.array([
-            self.random_generator.choice(X.shape[0], size=nb_missing, replace=False)
-            for _ in range(X.shape[1])
-        ])
-        col_idx = np.arange(X.shape[1])[:, np.newaxis].repeat(nb_missing, axis=1)
-        self.missing_values_indices_ = list(zip(row_idx.ravel(), col_idx.ravel()))
-        # vectorized assignment via .values
-        X[row_idx.ravel(), col_idx.ravel()] = np.nan
+        # Route the row selection through the shared ExactCountSelector
+        # preset (uniform draws, exact count per column) and write the
+        # NaNs from the returned {variable: bool-mask} dict.
+        selector = ExactCountSelector(
+            percentage_missing, self._positional_names(X),
+            rng=self.random_generator,
+        )
+        masks = selector(X, y)
+        self._write_missing(X, masks)
 
         return X, y
 
@@ -139,6 +140,9 @@ class DummyMissingAtRandom(MissingValueGenerator):
     where j is randomly chosen.
 
     See also [1] https://stefvanbuuren.name/fimd/sec-MCAR.html
+
+    Routes the row selection through the shared ``ExactCountSelector``
+    preset (exact-count, optional soft probabilities).
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -168,30 +172,18 @@ class DummyMissingAtRandom(MissingValueGenerator):
         :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
         """
         assert 0 <= percentage_missing <= 1
-        # initialize probability with zeros
-        p = np.zeros_like(X)
-        # normalize values between 0 and 1
-        X_norm = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0)))
-        # make columns i depends on all the other
-        if X.shape[1] > 1:
-            for i in range(X.shape[1]):
-                j = self.random_generator.choice([x for x in range(X.shape[1]) if x != i])
-                p[:, i] = X_norm[:, j]
-        else:
-            p = X_norm
-        p = normalize_proba(p)
-
-        # compute number of missing values per column
-        nb_missing = int(X.shape[0] * percentage_missing)
-        # generate all row indices at once using per-column probabilities
-        row_idx = np.array([
-            self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:, col])
-            for col in range(X.shape[1])
-        ])
-        col_idx = np.arange(X.shape[1])[:, np.newaxis].repeat(nb_missing, axis=1)
-        self.missing_values_indices_ = list(zip(row_idx.ravel(), col_idx.ravel()))
-        # vectorized assignment via .values
-        X[row_idx.ravel(), col_idx.ravel()] = np.nan
+        # Route the row selection through the shared ExactCountSelector
+        # preset. The soft coupling (per-column driver drawn uniformly
+        # among the OTHER columns) enters via per-row weights; the driver
+        # draws happen inside the weights callable, BEFORE the row draws
+        # -- exactly the legacy RNG call order.
+        selector = ExactCountSelector(
+            percentage_missing, self._positional_names(X),
+            weights=lambda X_, y_=None: _mar_weights(X_, self.random_generator),
+            rng=self.random_generator,
+        )
+        masks = selector(X, y)
+        self._write_missing(X, masks)
 
         return X, y
 
@@ -202,6 +194,9 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
     where the probability of a data instance X[i,j] missing depends linearly upon its own value.
     A data point X[i,j] = max(X[:,j]) has a missing probability of 1.
     A data point X[i,j] = min(X[:,j]) has a missing probability of 0.
+
+    Routes the row selection through the shared ``ExactCountSelector``
+    preset (exact-count, optional soft probabilities).
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -231,22 +226,15 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
         """
         assert 0 <= percentage_missing <= 1
-
-        # normalize values between 0 and 1
-        p = ((X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0)))
-        # make the sum of each column = 1
-        p = normalize_proba(p)
-
-        # compute number of missing values per column
-        nb_missing = int(X.shape[0] * percentage_missing)
-        # generate all row indices at once using per-column probabilities
-        row_idx = np.array([
-            self.random_generator.choice(X.shape[0], size=nb_missing, replace=False, p=p[:, col])
-            for col in range(X.shape[1])
-        ])
-        col_idx = np.arange(X.shape[1])[:, np.newaxis].repeat(nb_missing, axis=1)
-        self.missing_values_indices_ = list(zip(row_idx.ravel(), col_idx.ravel()))
-        # vectorized assignment
-        X[row_idx.ravel(), col_idx.ravel()] = np.nan
+        # Route the row selection through the shared ExactCountSelector
+        # preset. The self-coupling (probability of missing grows with the
+        # own value) enters via per-row weights.
+        selector = ExactCountSelector(
+            percentage_missing, self._positional_names(X),
+            weights=lambda X_, y_=None: _mnar_weights(X_),
+            rng=self.random_generator,
+        )
+        masks = selector(X, y)
+        self._write_missing(X, masks)
 
         return X, y
