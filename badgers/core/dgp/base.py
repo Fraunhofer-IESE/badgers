@@ -17,11 +17,12 @@ class DGPMixin:
     graph: nx.DiGraph
     column_mapping: dict
 
-    def fit(self, X: np.ndarray) -> "DGPMixin":
+    def fit(self, X: np.ndarray) -> DGPMixin:
         """Fit every structural node's mechanism, in topological order."""
         for node in topological_order(self.graph):
             self.fit_node(node, get_parents(self.graph, node), X)
         return self
+
 
     def sample(self, rng: np.random.Generator, n: int) -> np.ndarray:
         """Sample ``n`` joint rows.

@@ -22,7 +22,7 @@ class DGP(Protocol):
     #: Node -> integer column index of its measurement.
     column_mapping: dict
 
-    def fit(self, X: np.ndarray) -> "DGP":
+    def fit(self, X: np.ndarray) -> DGP:
         """Fit every node's mechanism in topological order; return ``self``.
 
         ``DGPMixin`` provides the default topological walk over
