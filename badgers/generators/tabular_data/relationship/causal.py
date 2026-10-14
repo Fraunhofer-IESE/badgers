@@ -27,8 +27,8 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
 
     generate() parameters (passed via **params)
     ----------
-    perturbation_nodes, mechanism, mechanism_cause, mechanism_rate :
-        see CausalGenerator.
+    perturbation_nodes : list of str
+        Must be exactly ``[child]`` -- the child of the perturbed edge.
     edge : tuple of (str, str), required
         The (parent, child) edge to perturb.
     weight_factor : float, default=2.0
@@ -44,9 +44,6 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         X,
         y,
         perturbation_nodes=None,
-        mechanism="always",
-        mechanism_cause=None,
-        mechanism_rate=0.5,
         edge=None,
         weight_factor=2.0,
     ):

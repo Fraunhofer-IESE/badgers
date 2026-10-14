@@ -37,7 +37,7 @@ def test_generate__edge_relationship_strengthened():
     base_var_y = np.var(X[:, 1])
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
-        mechanism="always", edge=("X", "Y"), weight_factor=2.0,
+        edge=("X", "Y"), weight_factor=2.0,
     )
     # in-place: same shape, all finite
     assert Xt.shape == X.shape
@@ -59,7 +59,7 @@ def test_generate__marginal_preserved():
     base_var_y = np.var(X[:, 1])
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
-        mechanism="always", edge=("X", "Y"), weight_factor=2.0,
+        edge=("X", "Y"), weight_factor=2.0,
     )
     # Marginal-preserving: Y's variance is preserved (within tolerance)
     assert abs(np.var(Xt[:, 1]) - base_var_y) < 0.5 * base_var_y
@@ -76,7 +76,7 @@ def test_generate__descendants_delta_propagated():
     Z_orig = X[:, 2].copy()
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
-        mechanism="always", edge=("X", "Y"), weight_factor=2.0,
+        edge=("X", "Y"), weight_factor=2.0,
     )
     # generate() mutates X in place; compare against the captured originals.
     dY = Xt[:, 1] - Y_orig
@@ -97,7 +97,7 @@ def test_generate__infeasible_raises(chain_data):
     with pytest.raises(ValueError, match="infeasible"):
         gen.generate(
             X, y=None, perturbation_nodes=["Y"],
-            mechanism="always", edge=("X", "Y"), weight_factor=100.0,
+            edge=("X", "Y"), weight_factor=100.0,
         )
 
 
@@ -108,7 +108,7 @@ def test_generate__perturbation_nodes_must_be_child(chain_data):
     with pytest.raises(ValueError, match="perturbation_nodes"):
         gen.generate(
             X, y=None, perturbation_nodes=["X"],
-            mechanism="always", edge=("X", "Y"), weight_factor=2.0,
+            edge=("X", "Y"), weight_factor=2.0,
         )
 
 

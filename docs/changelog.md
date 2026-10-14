@@ -18,6 +18,11 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 - **`fit` signature change** for the causal defect family:
   `fit(X, graph, column_mapping, dgp=None)` — `n_samples_mcmc` and
   `fit_dgp` are gone.
+- **`CausalEdgePerturbationGenerator.generate` drops the dead
+  `mechanism`/`mechanism_cause`/`mechanism_rate` parameters** — they were
+  accepted but ignored (the edge generator's gate is always "all rows").
+  The signature is now
+  `generate(X, y, perturbation_nodes=None, edge=None, weight_factor=2.0)`.
 
 ### Added
 
