@@ -100,6 +100,5 @@ class CausalNoiseGenerator(CausalGenerator):
 
         if y is not None:
             y = np.repeat(y, n_copies)
-        self.affected_mask_ = affected
         yt = self._labels_expanded(y, affected, self.deficit_name)
         return rows, yt

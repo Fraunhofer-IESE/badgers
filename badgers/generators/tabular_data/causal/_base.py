@@ -39,7 +39,6 @@ class CausalGenerator(GeneratorMixin):
         self.dgp = dgp
         self.graph = None
         self.column_mapping = None
-        self.affected_mask_ = None
 
     # -- DGP plumbing -------------------------------------------------------
 
@@ -286,8 +285,7 @@ class CausalGenerator(GeneratorMixin):
         """Labels for an in-place defect (same length as the output rows).
 
         If ``y`` is None, returns a label array ("original"/deficit name).
-        Otherwise returns ``y`` unchanged (the defect does not change targets);
-        the affected-row mask is available as ``self.affected_mask_``.
+        Otherwise returns ``y`` unchanged (the defect does not change targets).
         """
         if y is None:
             return np.where(affected_mask, deficit_name, "original")

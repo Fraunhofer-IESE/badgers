@@ -71,6 +71,5 @@ class CausalImbalanceGenerator(CausalGenerator):
             y = y[keep]
         affected = np.ones(X.shape[0], dtype=bool)
 
-        self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt

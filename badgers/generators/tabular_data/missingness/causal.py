@@ -91,7 +91,6 @@ class CausalMissingnessGenerator(CausalGenerator):
             missingness_rule=missingness_rule,
         )
 
-        self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt
 

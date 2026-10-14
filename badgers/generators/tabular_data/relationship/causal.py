@@ -76,7 +76,6 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         )
 
         affected = np.ones(n_samples, dtype=bool)
-        self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt
 

@@ -94,6 +94,5 @@ class CausalDriftGenerator(CausalGenerator):
         self.propagate(X, perturbation_nodes, self.random_generator,
                        rows_original=rows_original)
 
-        self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt
