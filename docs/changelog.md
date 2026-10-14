@@ -16,17 +16,11 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   follow-ups (the `causal` extra still installs PyMC + PyTensor for writing
   them).
 - **`fit` signature change** for the causal defect family:
-  `fit(X, graph, column_mapping, observation_graph=None, dgp=None)` —
-  `n_samples_mcmc` and `fit_dgp` are gone.
+  `fit(X, graph, column_mapping, dgp=None)` — `n_samples_mcmc` and
+  `fit_dgp` are gone.
 
 ### Added
 
-- **Observation graph** (new capability): `fit` accepts a second plain
-  `nx.DiGraph` describing the sensing process (measurement nodes +
-  `R_<name>` indicator nodes + derivation edges). When provided, the
-  missingness generator derives its indicators from the graph's shape
-  (MCAR = isolated indicator, MAR = another reading drives it, MNAR = the
-  monitored node's own value drives it).
 - **Per-node DGP protocol** (`badgers.core.dgp` package): `DGP` protocol and
   `DGPMixin` (topological `fit`/`sample` walk) — backends implement exactly
   one operation, `fit_node(node, parents, data)`, and expose
@@ -38,8 +32,6 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   redraw their noise (`mode="recompute"`); backend-blind.
 - **`ScaledEdgeDGP`** view for edge reweighting without coefficient access
   (calibrate on the fitted base DGP, then `response` + `draw_noise`).
-- **Observation-graph helpers** (`badgers.core.causal_graph`):
-  `indicator_nodes`, `validate_observation_graph`.
 - **Causal defect family** (five generators sharing `CausalGenerator`, an
   explicit `fit(X, graph, column_mapping)` phase followed by `generate(...)`
   with mechanism gating `mechanism`/`mechanism_cause`/`mechanism_rate`):

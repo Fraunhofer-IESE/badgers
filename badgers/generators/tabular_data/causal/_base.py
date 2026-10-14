@@ -39,23 +39,20 @@ class CausalGenerator(GeneratorMixin):
         self.dgp = dgp
         self.graph = None
         self.column_mapping = None
-        self.observation_graph = None
         self.affected_mask_ = None
 
     # -- DGP plumbing -------------------------------------------------------
 
-    def fit(self, X, graph, column_mapping, observation_graph=None, dgp=None):
+    def fit(self, X, graph, column_mapping, dgp=None):
         """Fit phase: store the structure; fit an injected DGP if given.
 
-        Stores ``self.graph`` / ``self.column_mapping`` /
-        ``self.observation_graph`` so ``generate()`` does not need them.
-        A DGP backend passed as ``dgp`` is fitted here (explicit fit
-        phase); when ``dgp`` is None, the default ``OlsDGP`` is created
-        lazily by ``_require_dgp`` on first use.
+        Stores ``self.graph`` / ``self.column_mapping`` so ``generate()``
+        does not need them. A DGP backend passed as ``dgp`` is fitted here
+        (explicit fit phase); when ``dgp`` is None, the default ``OlsDGP``
+        is created lazily by ``_require_dgp`` on first use.
         """
         self.graph = graph
         self.column_mapping = column_mapping
-        self.observation_graph = observation_graph
         if dgp is not None:
             self.dgp = dgp
             self.dgp.fit(X)
