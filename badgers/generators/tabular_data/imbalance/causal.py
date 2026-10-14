@@ -2,8 +2,9 @@
 
 Injects selection bias by removing rows whose perturbation-node values fall
 outside a truncated quantile range (the intersection across multiple
-perturbation nodes), then recomputes descendants via the structural equations
-so the selection skews their marginals.
+perturbation nodes). The result is a pure subset of the input rows: the kept
+rows' parents are unchanged, so no structural equation is re-evaluated and
+no DGP is needed.
 """
 
 import numpy as np
@@ -13,19 +14,21 @@ from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
 class CausalImbalanceGenerator(CausalGenerator):
-    """Generates causally-propagated selection bias (imbalance).
+    """Generates selection bias as a quantile-range truncation (imbalance).
+
+    The row selection is observation-side only: rows whose perturbation-node
+    values fall outside ``quantile_range`` are removed; kept rows are
+    returned untouched (a pure subset). No DGP is required.
 
     Parameters
     ----------
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
-    dgp : DGP or None, default=None
-        DGP instance (attached via fit() or use_dgp()).
 
     generate() parameters (passed via **params)
     ----------
-    perturbation_nodes, mechanism, mechanism_cause, mechanism_rate :
-        see CausalGenerator.
+    perturbation_nodes : list of str
+        Nodes whose quantile ranges define the kept set.
     quantile_range : tuple of (float, float), default=(0.5, 1.0)
         Quantile range of the perturbation node's values that is KEPT. With
         multiple perturbation nodes, the kept set is the intersection of all
@@ -40,9 +43,6 @@ class CausalImbalanceGenerator(CausalGenerator):
         X,
         y,
         perturbation_nodes=None,
-        mechanism="always",
-        mechanism_cause=None,
-        mechanism_rate=0.5,
         quantile_range=(0.5, 1.0),
     ):
         """Inject causally-propagated imbalance in place (subset of rows)."""
@@ -53,7 +53,6 @@ class CausalImbalanceGenerator(CausalGenerator):
                 f"got {quantile_range}"
             )
         self._require_fitted()
-        self._require_dgp(X)
         order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
             X, perturbation_nodes
         )
@@ -71,14 +70,6 @@ class CausalImbalanceGenerator(CausalGenerator):
         if y is not None:
             y = y[keep]
         affected = np.ones(X.shape[0], dtype=bool)
-        rows_original = X.copy()
-
-        # Recompute descendants via the structural equations: descendant_new
-        # = descendant_orig + beta @ delta_parents. Since the parents of the
-        # kept rows are unchanged, the delta is 0 and descendants keep their
-        # original (truncated) values -- the imbalance is a pure subset.
-        self.propagate(X, perturbation_nodes, self.random_generator,
-                       rows_original=rows_original)
 
         self.affected_mask_ = affected
         yt = self._labels_inplace(y, affected, self.deficit_name)

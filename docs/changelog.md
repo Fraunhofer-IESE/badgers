@@ -23,6 +23,15 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   accepted but ignored (the edge generator's gate is always "all rows").
   The signature is now
   `generate(X, y, perturbation_nodes=None, edge=None, weight_factor=2.0)`.
+- **`CausalImbalanceGenerator` no longer requires a DGP** (breaking): the
+  generator is a pure row-subset (quantile-range truncation); the kept
+  rows' parents are unchanged, so no structural equation is re-evaluated.
+  The dead `mechanism`/`mechanism_cause`/`mechanism_rate` parameters, the
+  on-demand OLS fit, and the no-op propagate pass are removed — the
+  signature is now
+  `generate(X, y, perturbation_nodes=None, quantile_range=(0.5, 1.0))`.
+  This is the first generator in the causal family whose `generate` needs
+  neither a DGP nor any random numbers (selection-side only).
 
 ### Added
 
