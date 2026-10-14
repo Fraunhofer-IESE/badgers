@@ -28,7 +28,12 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
-__all__ = ["Selector", "BernoulliSelector", "ExactCountSelector"]
+__all__ = [
+    "Selector",
+    "BernoulliSelector",
+    "ExactCountSelector",
+    "TopQuantileSelector",
+]
 
 
 @runtime_checkable
@@ -267,4 +272,115 @@ class ExactCountSelector:
             f"ExactCountSelector(rate={self.rate!r}, "
             f"variables={self.variables!r}, "
             f"weights={'callable' if callable(self.weights) else self.weights!r})"
+        )
+
+
+class TopQuantileSelector:
+    """Selector: fires rows in the top ``rate`` fraction of a column.
+
+    Deterministic, value-driven rule: for each gated variable the threshold
+    is ``quantile(col, 1 - rate)`` and a row fires when the compared value
+    is ``>= threshold``. Like the other presets, the class name describes
+    the RULE (top-quantile thresholding), never the deficit that follows.
+
+    Two modes:
+
+    - **self** (``drivers=None``): each variable fires rows where its OWN
+      value is in its own top ``rate`` fraction.
+    - **driver** (``drivers=...``): each variable fires rows where a DRIVER
+      column's value is in the driver's top ``rate`` fraction. A single
+      string is broadcast to all variables (one driver gates everything);
+      a sequence gives one driver per variable (same length as
+      ``variables``).
+
+    Because the rule is deterministic, no ``rng`` is needed.
+
+    Parameters
+    ----------
+    rate : float
+        Fraction of rows that fire (``0 <= rate <= 1``). With ``rate=0``
+        the threshold is the column maximum, so rows equal to the max
+        still fire (``>=`` comparison).
+    variables : str or sequence of str
+        Names of the gated variables (the returned dict's keys).
+    column_mapping : dict mapping str -> int
+        Maps each variable/driver name to its column index in ``X``.
+        Required because this preset READS values (unlike the other
+        presets, which are value-blind).
+    drivers : str, sequence of str, or None, default=None
+        The driver columns as described above.
+
+    Calling
+    -------
+    ``__call__(X, y=None, stats=None)`` returns
+    ``{variable: bool mask of len(X)}``. ``stats`` (optional) is the row set
+    on which the QUANTILE THRESHOLDS are computed; comparisons are always
+    against ``X``. Defaults to ``X`` itself. This supports generators that
+    gate expanded rows against the original columns' statistics (e.g. a
+    row-duplication noise generator): pass ``stats=original_rows``.
+    """
+
+    def __init__(
+        self,
+        rate: float,
+        variables: str | Sequence[str],
+        column_mapping: dict[str, int],
+        drivers: str | Sequence[str] | None = None,
+    ):
+        if not (0.0 <= rate <= 1.0):
+            raise ValueError(
+                f"rate must be within [0, 1], got {rate}"
+            )
+        variables = (variables,) if isinstance(variables, str) else tuple(variables)
+        if len(variables) == 0:
+            raise ValueError("variables must be a non-empty sequence")
+        if len(set(variables)) != len(variables):
+            raise ValueError(
+                f"variable names must be unique, got {variables}"
+            )
+        for name in variables:
+            if name not in column_mapping:
+                raise ValueError(
+                    f"variable {name!r} not in column_mapping"
+                )
+        if isinstance(drivers, str):
+            drivers = (drivers,) * len(variables)
+        elif drivers is not None:
+            drivers = tuple(drivers)
+            if len(drivers) != len(variables):
+                raise ValueError(
+                    f"drivers must be a single str or one driver per "
+                    f"variable ({len(variables)}), got {len(drivers)}"
+                )
+        if drivers is not None:
+            for name in drivers:
+                if name not in column_mapping:
+                    raise ValueError(
+                        f"driver {name!r} not in column_mapping"
+                    )
+        self.rate = rate
+        self.variables = variables
+        self.column_mapping = column_mapping
+        self.drivers = drivers
+
+    def __call__(
+        self,
+        X: np.ndarray,
+        y: np.ndarray | None = None,
+        *,
+        stats: np.ndarray | None = None,
+    ) -> dict[str, np.ndarray]:
+        stats = X if stats is None else stats
+        masks = {}
+        for name, driver in zip(self.variables, self.drivers or self.variables):
+            dcol = self.column_mapping[driver]
+            threshold = np.quantile(stats[:, dcol], 1.0 - self.rate)
+            masks[name] = X[:, dcol] >= threshold
+        return masks
+
+    def __repr__(self) -> str:
+        return (
+            f"TopQuantileSelector(rate={self.rate!r}, "
+            f"variables={self.variables!r}, "
+            f"drivers={self.drivers!r})"
         )

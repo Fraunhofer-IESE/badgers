@@ -61,6 +61,16 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   "badgers[causal]"`) — only needed for writing custom PyMC-based backends;
   the default OLS path is pure NumPy.
 
+- **`TopQuantileSelector`** preset (`badgers.core.selectors`): fires rows in
+  the top ``rate`` fraction of a column — self mode (own column) or driver
+  mode (a driver column, optionally broadcast to all gated variables).
+  Deterministic (no rng); thresholds computed on the called rows or on a
+  separate ``stats`` row set (for generators gating expanded rows against
+  the original columns' statistics). All four mechanism knobs of the causal
+  defect family are now backed by selector presets (`BernoulliSelector`,
+  `TopQuantileSelector`, or the inline all-True rule); the legacy per-row
+  `_should_defect` API is removed.
+
 ## dev_0_0_14 (unreleased)
 
 ### Added
