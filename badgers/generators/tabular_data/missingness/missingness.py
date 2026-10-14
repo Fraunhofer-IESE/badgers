@@ -124,10 +124,9 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         # preset (uniform draws, exact count per column) and write the
         # NaNs from the returned {variable: bool-mask} dict.
         selector = ExactCountSelector(
-            percentage_missing, self._positional_names(X),
-            rng=self.random_generator,
+            self._positional_names(X), rng=self.random_generator,
         )
-        masks = selector(X, y)
+        masks = selector(X, y, rate=percentage_missing)
         self._write_missing(X, masks)
 
         return X, y
@@ -178,11 +177,11 @@ class DummyMissingAtRandom(MissingValueGenerator):
         # draws happen inside the weights callable, BEFORE the row draws
         # -- exactly the legacy RNG call order.
         selector = ExactCountSelector(
-            percentage_missing, self._positional_names(X),
+            self._positional_names(X),
             weights=lambda X_, y_=None: _mar_weights(X_, self.random_generator),
             rng=self.random_generator,
         )
-        masks = selector(X, y)
+        masks = selector(X, y, rate=percentage_missing)
         self._write_missing(X, masks)
 
         return X, y
@@ -230,11 +229,11 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         # preset. The self-coupling (probability of missing grows with the
         # own value) enters via per-row weights.
         selector = ExactCountSelector(
-            percentage_missing, self._positional_names(X),
+            self._positional_names(X),
             weights=lambda X_, y_=None: _mnar_weights(X_),
             rng=self.random_generator,
         )
-        masks = selector(X, y)
+        masks = selector(X, y, rate=percentage_missing)
         self._write_missing(X, masks)
 
         return X, y

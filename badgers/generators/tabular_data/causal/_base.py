@@ -131,7 +131,8 @@ class CausalGenerator(GeneratorMixin):
         row-major fill reproduces the legacy per-row draws exactly).
         ``mechanism="observed"`` and ``mechanism="self"`` delegate to the
         ``TopQuantileSelector`` preset (driver mode / self mode; a
-        deterministic threshold rule, so no draw-order concerns). Only
+        deterministic threshold rule at the ``1 - mechanism_rate``
+        quantile, so no draw-order concerns). Only
         ``mechanism="always"`` is computed inline (all-True masks).
 
         Parameters
@@ -156,10 +157,9 @@ class CausalGenerator(GeneratorMixin):
         stats = rows if stats_rows is None else stats_rows
         if mechanism == "random":
             selector = BernoulliSelector(
-                mechanism_rate, tuple(perturbation_nodes),
-                rng=self.random_generator,
+                tuple(perturbation_nodes), rng=self.random_generator,
             )
-            return selector(rows, None)
+            return selector(rows, None, rate=mechanism_rate)
         if mechanism == "always":
             return {
                 node: np.ones(n_rows, dtype=bool)
@@ -170,16 +170,20 @@ class CausalGenerator(GeneratorMixin):
                 raise ValueError(
                     "mechanism_cause is required for mechanism='observed'"
                 )
+            # legacy semantics: mechanism_rate = TOP FRACTION that fires ->
+            # quantile threshold = 1 - mechanism_rate
             selector = TopQuantileSelector(
-                mechanism_rate, tuple(perturbation_nodes), node_to_col,
+                tuple(perturbation_nodes), node_to_col,
                 drivers=mechanism_cause,
             )
-            return selector(rows, None, stats=stats)
+            return selector(rows, None, quantile=1.0 - mechanism_rate,
+                            stats=stats)
         if mechanism == "self":
             selector = TopQuantileSelector(
-                mechanism_rate, tuple(perturbation_nodes), node_to_col,
+                tuple(perturbation_nodes), node_to_col,
             )
-            return selector(rows, None, stats=stats)
+            return selector(rows, None, quantile=1.0 - mechanism_rate,
+                            stats=stats)
         raise ValueError(f"Unknown mechanism '{mechanism}'")
 
     # -- Validation ---------------------------------------------------------

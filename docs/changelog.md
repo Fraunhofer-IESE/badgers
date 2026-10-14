@@ -61,12 +61,19 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   "badgers[causal]"`) — only needed for writing custom PyMC-based backends;
   the default OLS path is pure NumPy.
 
-- **`TopQuantileSelector`** preset (`badgers.core.selectors`): fires rows in
-  the top ``rate`` fraction of a column — self mode (own column) or driver
+- **`TopQuantileSelector`** preset (`badgers.core.selectors`): fires rows at
+  or above the ``quantile`` of a column — self mode (own column) or driver
   mode (a driver column, optionally broadcast to all gated variables).
   Deterministic (no rng); thresholds computed on the called rows or on a
   separate ``stats`` row set (for generators gating expanded rows against
-  the original columns' statistics). All four mechanism knobs of the causal
+  the original columns' statistics). The fire-intensity knob is a REQUIRED
+  keyword argument of ``__call__`` for every preset (``rate=`` for
+  ``BernoulliSelector``/``ExactCountSelector``, ``quantile=`` for
+  ``TopQuantileSelector``) — not a constructor parameter — so one configured
+  selector can be swept over intensities. The ``quantile`` is the direct
+  quantile of the column (``quantile=0.75`` = everything at or above Q3);
+  the legacy ``mechanism_rate`` (top-fraction) knob maps to it via
+  ``quantile = 1 - mechanism_rate``. All four mechanism knobs of the causal
   defect family are now backed by selector presets (`BernoulliSelector`,
   `TopQuantileSelector`, or the inline all-True rule); the legacy per-row
   `_should_defect` API is removed.
