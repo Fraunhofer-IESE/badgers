@@ -9,6 +9,31 @@ from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.utils import normalize_proba
 
 
+def _mar_weights(X, rng):
+    """Per-column selection probabilities for classic MAR: for each column
+    i a random OTHER column j is drawn (uniform, one rng.choice per column,
+    in column order) and p[:, i] = normalized (reversed) values of j.
+    Single-column input: p = normalized own values, no driver draw."""
+    k = X.shape[1]
+    X_norm = (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
+    p = np.zeros_like(X)
+    if k > 1:
+        for i in range(k):
+            j = rng.choice([x for x in range(k) if x != i])
+            p[:, i] = X_norm[:, j]
+    else:
+        p = X_norm
+    return normalize_proba(p)
+
+
+def _mnar_weights(X):
+    """Per-column selection probabilities for classic MNAR: normalized
+    (reversed) own-column values (no randomness, no driver)."""
+    return normalize_proba(
+        (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
+    )
+
+
 class MissingValueGenerator(GeneratorMixin):
     """
     Base class for missing values transformer
@@ -20,6 +45,27 @@ class MissingValueGenerator(GeneratorMixin):
         """
         self.random_generator = random_generator
         self.missing_values_indices_ = None
+
+    def _positional_names(self, X):
+        """Synthesized variable names for graph-less data:
+        ("x0", ..., "x{k-1}")."""
+        return tuple(f"x{i}" for i in range(X.shape[1]))
+
+    def _write_missing(self, X, masks):
+        """Write NaNs from ``{name: bool-mask}``; populate
+        ``missing_values_indices_``.
+
+        Column-major order matches the legacy index list. The caller
+        guarantees exactly one mask per column, in column order.
+        """
+        indices = []
+        for col, (name, mask) in enumerate(masks.items()):
+            X[mask, col] = np.nan
+            indices.extend(
+                zip(np.where(mask)[0].tolist(), [col] * int(mask.sum()))
+            )
+        self.missing_values_indices_ = indices
+        return X
 
     @abc.abstractmethod
     def generate(self, X, y, **params):
