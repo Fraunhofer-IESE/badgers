@@ -19,6 +19,7 @@ from badgers.core.causal_graph import (
     validate_observation_graph,
 )
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.selectors import BernoulliSelector
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -95,21 +96,17 @@ class CausalMissingnessGenerator(CausalGenerator):
         )
         n_samples = X.shape[0]
 
-        # Gate the defect by the mechanism. Compute ALL masks first, so the
-        # quantile thresholds are computed on the un-mutated data.
-        masks = [
-            self._should_defect(
-                X[i], mechanism, mechanism_cause, mechanism_rate,
-                perturbation_nodes, node_to_col, X,
-            )
-            for i in range(n_samples)
-        ]
+        # Gate the defect by the mechanism: fire masks for ALL rows at once
+        # (vectorized; quantile thresholds computed on the un-mutated data).
+        fires = self._fire_masks(
+            X, perturbation_nodes, node_to_col, mechanism, mechanism_cause,
+            mechanism_rate,
+        )
         affected = np.zeros(n_samples, dtype=bool)
-        for i, mask in enumerate(masks):
-            for j, node in enumerate(perturbation_nodes):
-                if mask[j]:
-                    X[i, node_to_col[node]] = np.nan
-                    affected[i] = True
+        for node in perturbation_nodes:
+            mask = fires[node]
+            X[mask, node_to_col[node]] = np.nan
+            affected |= mask
 
         # Propagate the mask to descendants (absorbing NaN mask pass).
         self.propagate(
@@ -127,8 +124,8 @@ class CausalMissingnessGenerator(CausalGenerator):
         Walks the graph in topological order; each indicator ``R_*`` fires
         per row:
 
-        - no parents (isolated indicator) -> MCAR: fires independently with
-          probability ``mechanism_rate``;
+        - no parents (isolated indicator) -> the ``Bernoulli`` chooser
+          preset: fires independently with probability ``mechanism_rate``;
         - parents present -> MAR/MNAR: fires on the top ``mechanism_rate``
           fraction of the first driver's column.
 
@@ -159,8 +156,10 @@ class CausalMissingnessGenerator(CausalGenerator):
         fires_by_indicator = []
         for indicator, monitored in indicator_nodes(self.observation_graph):
             drivers = list(self.observation_graph.predecessors(indicator))
-            if not drivers:  # MCAR
-                fires = self.random_generator.random(n_samples) < mechanism_rate
+            if not drivers:  # MCAR: the isolated-indicator Bernoulli preset
+                fires = BernoulliSelector(
+                    mechanism_rate, monitored, rng=self.random_generator
+                )(rows, None)[monitored]
             else:            # MAR / MNAR: quantile rule on the first driver
                 col = self.column_mapping[drivers[0]]
                 threshold = np.quantile(rows[:, col], 1.0 - mechanism_rate)

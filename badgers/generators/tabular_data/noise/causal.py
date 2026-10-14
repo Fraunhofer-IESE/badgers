@@ -72,20 +72,23 @@ class CausalNoiseGenerator(CausalGenerator):
         # Expand: each seed row -> n_copies copies (n_copies=1 keeps the shape).
         rows = np.repeat(X, n_copies, axis=0)
         rows_original = np.repeat(X, n_copies, axis=0)
-        affected = np.ones(rows.shape[0], dtype=bool)
-
-        # Inject noise at the perturbation nodes (gated by the mechanism).
-        for i in range(rows.shape[0]):
-            mask = self._should_defect(
-                rows[i], mechanism, mechanism_cause, mechanism_rate,
-                perturbation_nodes, node_to_col, X,
-            )
-            for j, node in enumerate(perturbation_nodes):
-                if mask[j]:
-                    col = node_to_col[node]
-                    rows[i, col] += self.random_generator.normal(
-                        0, noise_scale[j] * col_stds[col]
-                    )
+        # Inject noise at the perturbation nodes (gated by the mechanism:
+        # fire masks for ALL expanded rows at once; quantile thresholds are
+        # computed on the UN-EXPANDED input so expanded rows are gated
+        # against the original columns' statistics).
+        fires = self._fire_masks(
+            rows, perturbation_nodes, node_to_col, mechanism, mechanism_cause,
+            mechanism_rate, stats_rows=X,
+        )
+        affected = np.zeros(rows.shape[0], dtype=bool)
+        for j, node in enumerate(perturbation_nodes):
+            mask = fires[node]
+            col = node_to_col[node]
+            if mask.any():
+                rows[mask, col] += self.random_generator.normal(
+                    0, noise_scale[j] * col_stds[col], size=int(mask.sum())
+                )
+            affected |= mask
 
         # Propagate the delta to the descendants via the structural
         # equations: descendant_new = descendant_orig + beta @ delta_parents.

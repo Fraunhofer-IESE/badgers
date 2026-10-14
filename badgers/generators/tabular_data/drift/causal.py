@@ -73,17 +73,18 @@ class CausalDriftGenerator(CausalGenerator):
                 0, drift_scale[j] * col_stds[col]
             )
 
-        # Apply the shift to the perturbation nodes (gated by the mechanism).
+        # Apply the shift to the perturbation nodes (gated by the mechanism:
+        # fire masks for ALL rows at once, thresholds on the un-mutated data).
+        fires = self._fire_masks(
+            X, perturbation_nodes, node_to_col, mechanism, mechanism_cause,
+            mechanism_rate,
+        )
         affected = np.zeros(n_samples, dtype=bool)
-        for i in range(n_samples):
-            mask = self._should_defect(
-                X[i], mechanism, mechanism_cause, mechanism_rate,
-                perturbation_nodes, node_to_col, X,
-            )
-            for j, node in enumerate(perturbation_nodes):
-                if mask[j]:
-                    X[i, node_to_col[node]] += shifts[node_to_col[node]]
-                    affected[i] = True
+        for node in perturbation_nodes:
+            mask = fires[node]
+            col = node_to_col[node]
+            X[mask, col] += shifts[col]
+            affected |= mask
 
         # Propagate the delta to the descendants via the structural
         # equations: descendant_new = descendant_orig + beta @ delta_parents.

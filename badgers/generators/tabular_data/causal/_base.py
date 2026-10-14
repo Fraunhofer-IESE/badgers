@@ -16,6 +16,7 @@ from badgers.core.causal_graph import (
     validate_dag,
 )
 from badgers.core.dgp import OlsDGP, do
+from badgers.core.selectors import BernoulliSelector
 
 
 class CausalGenerator(GeneratorMixin):
@@ -131,6 +132,10 @@ class CausalGenerator(GeneratorMixin):
           ``mechanism_rate`` fraction.
         - ``self``: each perturbation node independently True if its own value
           is in its top ``mechanism_rate`` fraction.
+
+        Superseded by :meth:`_fire_masks` (vectorized, chooser-based): the
+        generators no longer call this per row. Kept as the legacy per-row
+        API for backward compatibility and direct tests.
         """
         n_perturb = len(perturbation_nodes)
         if mechanism == "always":
@@ -153,6 +158,77 @@ class CausalGenerator(GeneratorMixin):
                 threshold = np.quantile(X[:, col], 1.0 - mechanism_rate)
                 mask[i] = bool(latent_row[col] >= threshold)
             return mask
+        raise ValueError(f"Unknown mechanism '{mechanism}'")
+
+    def _fire_masks(
+        self,
+        rows,
+        perturbation_nodes,
+        node_to_col,
+        mechanism,
+        mechanism_cause,
+        mechanism_rate,
+        stats_rows=None,
+    ):
+        """Fire masks for ALL rows at once: dict {node: bool row-mask}.
+
+        The vectorized, chooser-based replacement for the per-row
+        ``_should_defect`` loop (one dict per node instead of one small
+        array per row; quantile thresholds computed ONCE, not per row).
+
+        ``mechanism="random"`` delegates to the ``BernoulliSelector``
+        preset (one vectorized ``(n_rows, n_variables)`` draw, whose
+        row-major fill reproduces the legacy per-row draws exactly). The
+        other mechanisms are vectorized equivalents of the legacy rules
+        and will migrate to preset objects as those are introduced.
+
+        Parameters
+        ----------
+        rows : array to gate (the generator's working rows -- for the noise
+            generator these are the n_copies-EXPANDED rows).
+        perturbation_nodes : list of str, non-empty (pre-validated).
+        node_to_col : column_mapping dict (node name -> column index).
+        mechanism, mechanism_cause, mechanism_rate : the legacy knobs.
+        stats_rows : array or None, default None
+            Rows on which quantile thresholds are computed; defaults to
+            ``rows``. The noise generator passes the UN-EXPANDED input so
+            expanded rows are gated against the original columns'
+            statistics (legacy behavior).
+
+        Note: masks are computed against ``rows`` BEFORE any mutation
+        (callers write NaNs/noise afterwards), which makes the gate
+        order-independent -- the "compute ALL masks first" invariant the
+        legacy missingness path already documented.
+        """
+        n_rows = rows.shape[0]
+        stats = rows if stats_rows is None else stats_rows
+        if mechanism == "random":
+            selector = BernoulliSelector(
+                mechanism_rate, tuple(perturbation_nodes),
+                rng=self.random_generator,
+            )
+            return selector(rows, None)
+        if mechanism == "always":
+            return {
+                node: np.ones(n_rows, dtype=bool)
+                for node in perturbation_nodes
+            }
+        if mechanism == "observed":
+            if mechanism_cause is None:
+                raise ValueError(
+                    "mechanism_cause is required for mechanism='observed'"
+                )
+            cause_col = node_to_col[mechanism_cause]
+            threshold = np.quantile(stats[:, cause_col], 1.0 - mechanism_rate)
+            fires = rows[:, cause_col] >= threshold
+            return {node: fires for node in perturbation_nodes}
+        if mechanism == "self":
+            fires = {}
+            for node in perturbation_nodes:
+                col = node_to_col[node]
+                threshold = np.quantile(stats[:, col], 1.0 - mechanism_rate)
+                fires[node] = rows[:, col] >= threshold
+            return fires
         raise ValueError(f"Unknown mechanism '{mechanism}'")
 
     # -- Validation ---------------------------------------------------------
