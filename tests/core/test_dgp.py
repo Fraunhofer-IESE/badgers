@@ -103,3 +103,34 @@ def test_sample__shape_and_root_mean():
     assert X_sampled.shape == (50, 3)
     X_big = dgp.sample(np.random.default_rng(0), 2000)
     assert abs(np.mean(X_big[:, 0]) - np.mean(data[:, 0])) < 0.5
+
+
+# -- G9: complete-case fit on NaN-contaminated data --------------------------
+
+def test_fit__nan_rows_complete_case():
+    # G9: a NaN-contaminated matrix (e.g. the output of a missingness
+    # stage) must NOT crash the fit with a cryptic LinAlgError: NaN rows
+    # are dropped for the ESTIMATION (complete case) only.
+    data, graph, column_mapping = _make_chain_data()
+    dirty = data.copy()
+    dirty[:50, 0] = np.nan  # contaminates X, hence Y and Z rows too
+    dgp = OlsDGP(graph, column_mapping).fit(dirty)
+    clean = OlsDGP(graph, column_mapping).fit(data)
+    # beta estimated from the 50 complete-case rows ~= beta from all rows
+    np.testing.assert_allclose(
+        dgp._beta["Y"], clean._beta["Y"], atol=0.05
+    )
+    np.testing.assert_allclose(
+        dgp._beta["Z"], clean._beta["Z"], atol=0.1
+    )
+
+
+def test_fit__fully_nan_column_raises():
+    # A fully NaN column cannot identify its equation -> a CLEAR ValueError
+    # (not the cryptic SVD LinAlgError).
+    data, graph, column_mapping = _make_chain_data()
+    dirty = data.copy()
+    dirty[:, 1] = np.nan
+    dgp = OlsDGP(graph, column_mapping)
+    with pytest.raises(ValueError, match="complete-case|too many NaNs"):
+        dgp.fit(dirty)

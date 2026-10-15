@@ -19,6 +19,21 @@ from badgers.core.dgp import OlsDGP, do
 from badgers.core.selectors import BernoulliSelector, TopQuantileSelector
 
 
+def _column_stds(X):
+    """NaN-safe per-column stds (G9b): a finite scale for every column.
+
+    NaNs are ignored (``np.nanstd``); a constant or all-NaN column gets a
+    scale of 1.0 so a drawn offset stays finite -- a NaN-bearing column
+    must never silently poison the whole output column (G9b).
+    """
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN slice
+        std = np.nanstd(X, axis=0)
+    return np.where(np.isfinite(std) & (std > 0), std, 1.0)
+
+
 class CausalGenerator(GeneratorMixin):
     """Base class for causal defect generators.
 
@@ -29,6 +44,32 @@ class CausalGenerator(GeneratorMixin):
     dgp : DGP or None, default=None
         DGP instance. If None, the default OLS backend (``OlsDGP``) is
         created on demand and fitted lazily by ``_require_dgp``.
+
+    Notes
+    -----
+    Fitting in a pipeline
+        In a pipeline, each causal stage receives the PREVIOUS stage's
+        output as input. Fitting the DGP lazily on that contaminated input
+        would refit the world per stage (and, with NaN-bearing columns,
+        trigger complete-case filtering). Instead, fit the world ONCE on
+        the clean entry data and share the fitted instance::
+
+            world = CausalDriftGenerator(rng=...)
+            world.fit(X, graph, column_mapping,
+                      dgp=OlsDGP(graph, column_mapping))  # fit on clean X
+
+            missingness = CausalMissingnessGenerator(rng=...)
+            missingness.fit(X, graph, column_mapping)
+            Xm, _ = missingness.generate(X, None, ...)
+
+            drift = CausalDriftGenerator(rng=...)
+            drift.use_dgp(world.dgp)  # share the fitted world
+            Xt, _ = drift.generate(Xm, None, ...)
+
+        The OLS backend fits with complete-case filtering and all
+        per-stage scale computations are NaN-safe, so even the lazy
+        refit path behaves sensibly; the explicit ``dgp=`` + ``use_dgp``
+        pattern simply guarantees ONE world for the whole pipeline.
     """
 
     #: Subclasses set this to the deficit name used in labels.

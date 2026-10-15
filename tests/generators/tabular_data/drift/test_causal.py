@@ -9,6 +9,7 @@ own exogenous noise is preserved exactly.
 import numpy as np
 import pytest
 
+from badgers.core.dgp import OlsDGP
 from badgers.generators.tabular_data.drift.causal import CausalDriftGenerator
 
 
@@ -137,3 +138,55 @@ def test_generate__validation_errors(chain_data):
     gen = CausalDriftGenerator()
     with pytest.raises(RuntimeError, match="not fitted"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
+
+
+def test_generate__nan_input_does_not_poison(chain_data):
+    # G9b: the drift scale is computed from the stage input. A NaN-bearing
+    # perturbation column must not turn the WHOLE column NaN (NaN scale ->
+    # NaN shift). NaN semantics: NaN rows stay NaN; the delta propagates to
+    # descendants (Z becomes NaN where the Y delta was NaN) -- the same
+    # NaN-cascade semantics as the missingness generator.
+    X, graph, column_mapping = chain_data
+    world_src = CausalDriftGenerator(random_generator=np.random.default_rng(2))
+    world_src.fit(X, graph, column_mapping, dgp=OlsDGP(graph, column_mapping))
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(1))
+    gen.use_dgp(world_src.dgp)
+    Xn = X.copy()
+    Xn[:50, 1] = np.nan  # stage 1 (e.g. missingness) wrote NaNs into Y
+    before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
+    n_nan_y = int(np.isnan(Xn[:, 1]).sum())
+    Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
+                         mechanism="always", drift_std=0.5)
+    # The perturbed column gains NO new NaN cells (finite scale).
+    assert int(np.isnan(Xt[:, 1]).sum()) == n_nan_y
+    # Column X (untouched upstream) gains no NaNs either.
+    np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))
+    # Finite Y rows received the shift.
+    finite = np.isfinite(Xt[:, 1])
+    assert finite.any()
+    assert not np.allclose(Xt[finite, 1], before[finite, 1])
+    # Descendant Z: NaN exactly where the Y delta was NaN (Y was NaN) or
+    # Z was already NaN -- no OTHER new NaNs.
+    expected_z_nan = np.isnan(before[:, 2]) | np.isnan(before[:, 1])
+    np.testing.assert_array_equal(np.isnan(Xt[:, 2]), expected_z_nan)
+
+
+def test_generate__all_nan_column_does_not_crash(chain_data):
+    # G9b edge: a fully NaN column has no finite scale; the generator must
+    # fall back to a finite scale (1.0) instead of producing a NaN shift
+    # (which would silently poison the column).
+    X, graph, column_mapping = chain_data
+    world_src = CausalDriftGenerator(random_generator=np.random.default_rng(2))
+    world_src.fit(X, graph, column_mapping, dgp=OlsDGP(graph, column_mapping))
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
+    gen.use_dgp(world_src.dgp)
+    Xn = X.copy()
+    Xn[:, 1] = np.nan
+    before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
+    Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
+                         mechanism="always", drift_std=0.5)
+    # No crash; no NEW NaNs in the perturbed or upstream columns.
+    assert int(np.isnan(Xt[:, 1]).sum()) == before.shape[0]
+    np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))
+    # Descendant Z is NaN exactly where the Y delta was NaN.
+    np.testing.assert_array_equal(np.isnan(Xt[:, 2]), np.isnan(before[:, 1]))

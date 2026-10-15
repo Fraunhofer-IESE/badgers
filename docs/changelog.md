@@ -32,6 +32,15 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `generate(X, y, perturbation_nodes=None, quantile_range=(0.5, 1.0))`.
   This is the first generator in the causal family whose `generate` needs
   neither a DGP nor any random numbers (selection-side only).
+- **`CausalMissingnessGenerator` is chooser-only (breaking)**: missingness is
+  an observation-layer defect — it only hides cells (writes NaN) and does
+  NOT cascade to descendants. The `missingness_rule` mechanism parameter,
+  the on-demand DGP fit, and the `any`/`all` NaN-propagation passes are
+  removed; the fire mask comes from the selector presets
+  (`mechanism="random"` → `BernoulliSelector`, `"mcar"` → the inline
+  all-rows rule, `"self_mnar"`/`"observed_mar"` → `TopQuantileSelector`).
+  Signature: `generate(X, y, perturbation_nodes=None, mechanism="random",
+  mechanism_cause=None, mechanism_rate=0.3)`.
 
 ### Added
 

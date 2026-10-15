@@ -29,18 +29,33 @@ class OlsDGP(DGPMixin):
 
     def fit_node(self, node, parents, data):
         col = self.column_mapping[node]
+        # Complete-case fit (G9): NaN-contaminated rows (e.g. the output of
+        # a missingness stage in a pipeline) are dropped for the ESTIMATION
+        # only -- lstsq on NaN rows fails with a cryptic LinAlgError, and
+        # NaN-contaminated moments silently poison the mechanism.
+        # Fewer rows than parents+1 cannot identify the equation.
+        mask = np.isfinite(data[:, col])
+        for p in parents:
+            mask &= np.isfinite(data[:, self.column_mapping[p]])
+        d = data[mask]
+        if d.shape[0] < len(parents) + 1:
+            raise ValueError(
+                f"Cannot fit node '{node}': only {d.shape[0]} complete-case "
+                f"rows available (need at least {len(parents) + 1}); the "
+                f"data contains too many NaNs."
+            )
         if not parents:
-            self._mu[node] = float(np.mean(data[:, col]))
-            self._sigma[node] = float(np.std(data[:, col]))
+            self._mu[node] = float(np.mean(d[:, col]))
+            self._sigma[node] = float(np.std(d[:, col]))
             return
         pcols = [self.column_mapping[p] for p in parents]
-        X_parents = data[:, pcols]
+        X_parents = d[:, pcols]
         beta, _, _, _ = np.linalg.lstsq(
-            X_parents, data[:, col], rcond=None
+            X_parents, d[:, col], rcond=None
         )
         self._beta[node] = beta
         self._residual_std[node] = float(
-            np.std(data[:, col] - X_parents @ beta)
+            np.std(d[:, col] - X_parents @ beta)
         )
 
     def _is_root(self, node):

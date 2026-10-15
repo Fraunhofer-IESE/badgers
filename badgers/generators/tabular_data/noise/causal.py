@@ -8,7 +8,10 @@ per-row residual).
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.generators.tabular_data.causal._base import CausalGenerator
+from badgers.generators.tabular_data.causal._base import (
+    CausalGenerator,
+    _column_stds,
+)
 
 
 class CausalNoiseGenerator(CausalGenerator):
@@ -56,8 +59,7 @@ class CausalNoiseGenerator(CausalGenerator):
             X, perturbation_nodes
         )
         n_features = X.shape[1]
-        col_stds = np.std(X, axis=0)
-        col_stds[col_stds == 0] = 1.0
+        col_stds = _column_stds(X)
 
         # noise_std scalar or per-perturbation-node array
         if np.isscalar(noise_std):

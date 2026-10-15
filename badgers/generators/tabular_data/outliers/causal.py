@@ -19,6 +19,7 @@ from badgers.core.sampling import (
     create_out_of_distribution_sampler,
 )
 from badgers.core.utils import random_sign
+from badgers.generators.tabular_data.causal._base import _column_stds
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
 
@@ -244,8 +245,7 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
                 coefficients[(parent, node)] = beta[i]
 
         # Compute column stds for perturbation magnitude
-        col_stds = np.std(X, axis=0)
-        col_stds[col_stds == 0] = 1.0
+        col_stds = _column_stds(X)
 
         # ---- do()-style intervention algorithm ----
 

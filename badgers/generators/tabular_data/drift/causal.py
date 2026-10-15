@@ -10,7 +10,10 @@ which is re-added during the forward pass.
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.generators.tabular_data.causal._base import CausalGenerator
+from badgers.generators.tabular_data.causal._base import (
+    CausalGenerator,
+    _column_stds,
+)
 
 
 class CausalDriftGenerator(CausalGenerator):
@@ -53,8 +56,7 @@ class CausalDriftGenerator(CausalGenerator):
         )
         n_samples = X.shape[0]
         rows_original = X.copy()
-        col_stds = np.std(X, axis=0)
-        col_stds[col_stds == 0] = 1.0
+        col_stds = _column_stds(X)
 
         if np.isscalar(drift_std):
             drift_scale = np.full(len(perturbation_nodes), float(drift_std))
