@@ -20,6 +20,18 @@ Xt, yt = trf.generate(X, y, distribution=norm(scale=0.5))
 
 More examples are available in the [tutorials](../tutorials/tabular-data/Imbalance-Tabular-Data/) section.
 
-Those interested in developing their own generators and/or contribute to badgers can have a look at the [dev-tutorials](../dev/Create-New-Tabular-Generators/) section, the [architecture](architecture.md) and [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md).
+## Learn the concepts
+
+New to badgers? The [Understanding badgers](../tutorials/concepts/Badgers-Concepts/) notebook explains the underlying objects and contracts **step by step**: where generators live, how to create one (randomness), how to call `generate()`, what you get back (shape rules), what happens to your input, the `y` deprecation, and then selectors, data-generating processes (DGP), and pipelines.
+
+## Build your own
+
+Those interested in developing their own generators and/or contribute to badgers can have a look at the [dev-tutorials](../dev/Create-New-Tabular-Generators/) section — three notebooks:
+
+* [Creating Tabular Generators](../dev/Create-New-Tabular-Generators/)
+* [Creating Selectors](../dev/Create-New-Selectors/)
+* [Creating DGP Backends](../dev/Create-New-DGP-Backends/)
+
+For the big picture, see the [architecture](architecture.md) overview and [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md).
 
 The API documentation is also available in the [API](../reference/badgers/) section.

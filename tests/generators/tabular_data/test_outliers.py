@@ -7,7 +7,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-from badgers.generators.tabular_data.outliers import DecompositionAndOutlierGenerator
+from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
     ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
 )
@@ -284,7 +284,7 @@ def test_decomposition_and_outlier__generates_correct_shape():
         LowDensitySamplingGenerator(),
     ]
     for outlier_generator in outlier_generators:
-        generator = DecompositionAndOutlierGenerator(
+        generator = StructuredOutlierGenerator(
             dimension_reduction_transformer=PCA(n_components=3),
             outlier_generator=outlier_generator,
         )

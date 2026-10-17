@@ -27,12 +27,20 @@ class CausalImbalanceGenerator(CausalGenerator):
 
     generate() parameters (passed via **params)
     ----------
+    selector : Selector or None, default=None
+        Row-selection rule from ``badgers.core.selectors``. The rows FIRED
+        by the selector are dropped (subsampling polarity: ``True`` =
+        deficit applied = row removed); with multiple variables the union
+        of fired rows is dropped. ``None`` falls back to the
+        ``perturbation_nodes`` + ``quantile_range`` rule below.
     perturbation_nodes : list of str
-        Nodes whose quantile ranges define the kept set.
+        Nodes whose quantile ranges define the kept set (only used when
+        ``selector=None``).
     quantile_range : tuple of (float, float), default=(0.5, 1.0)
         Quantile range of the perturbation node's values that is KEPT. With
         multiple perturbation nodes, the kept set is the intersection of all
-        ranges. Rows outside are removed (in-place subset).
+        ranges. Rows outside are removed (in-place subset). Only used when
+        ``selector=None``.
     """
 
     deficit_name = "imbalance"
@@ -42,29 +50,39 @@ class CausalImbalanceGenerator(CausalGenerator):
         self,
         X,
         y,
+        selector=None,
         perturbation_nodes=None,
         quantile_range=(0.5, 1.0),
     ):
         """Inject causally-propagated imbalance in place (subset of rows)."""
-        lo, hi = quantile_range
-        if not (0.0 <= lo < hi <= 1.0):
-            raise ValueError(
-                f"quantile_range must satisfy 0 <= lo < hi <= 1, "
-                f"got {quantile_range}"
-            )
         self._require_fitted()
-        order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-            X, perturbation_nodes
-        )
         n_samples = X.shape[0]
 
-        # Keep rows inside the intersection of all perturbation-node ranges.
-        keep = np.ones(n_samples, dtype=bool)
-        for node in perturbation_nodes:
-            col = node_to_col[node]
-            b_lo = np.quantile(X[:, col], lo)
-            b_hi = np.quantile(X[:, col], hi)
-            keep &= (X[:, col] >= b_lo) & (X[:, col] <= b_hi)
+        if selector is not None:
+            # Explicit selector: rows FIRED by the selector are dropped
+            # (subsampling polarity). Union over the selector's variables.
+            dropped = np.zeros(n_samples, dtype=bool)
+            for mask in selector(X, y).values():
+                dropped |= np.asarray(mask, dtype=bool)
+            keep = ~dropped
+        else:
+            order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
+                X, perturbation_nodes
+            )
+            # Legacy quantile-range rule: keep rows inside the intersection
+            # of all perturbation-node ranges.
+            lo, hi = quantile_range
+            if not (0.0 <= lo < hi <= 1.0):
+                raise ValueError(
+                    f"quantile_range must satisfy 0 <= lo < hi <= 1, "
+                    f"got {quantile_range}"
+                )
+            keep = np.ones(n_samples, dtype=bool)
+            for node in perturbation_nodes:
+                col = node_to_col[node]
+                b_lo = np.quantile(X[:, col], lo)
+                b_hi = np.quantile(X[:, col], hi)
+                keep &= (X[:, col] >= b_lo) & (X[:, col] <= b_hi)
 
         X = X[keep]
         if y is not None:

@@ -117,7 +117,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `HypersphereSamplingGenerator`, `UniformInstanceAttributeSampling`,
   `IndependentHistogramsGenerator`, `HistogramSamplingGenerator`,
   `LowDensitySamplingGenerator`, `CausalOutlierPropagationGenerator`,
-  and `DecompositionAndOutlierGenerator`) now expose
+  and `StructuredOutlierGenerator`) now expose
   ``get_outliers_labels()``: a boolean vector aligned with the rows of
   the LAST generated output, ``True`` where the row is an outlier,
   ``False`` where it is an original row. ``generate()`` returns
@@ -282,8 +282,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   with `selector=` row gating):
   `CausalDriftGenerator` (single systematic shift, recomputed downstream),
   `CausalNoiseGenerator` (per-edge noise injection, `noise_std`),
-  `CausalImbalanceGenerator` (quantile-range truncation — pure subset,
-  descendants untouched), `CausalMissingnessGenerator` (m-graph missingness
+  `CausalImbalanceGenerator` (quantile-range truncation (pure subset,
+  descendants untouched) or explicit `selector=` — fired rows dropped), `CausalMissingnessGenerator` (m-graph missingness
   with `any`/`all` propagation, optional observation-graph derivation),
   `CausalEdgePerturbationGenerator` (marginal-preserving edge-weight
   perturbation; child recomputed with the new coefficient, descendants
@@ -305,6 +305,38 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   ``quantile`` is the direct quantile of the column (``quantile=0.75`` =
   everything at or above Q3). `AlwaysSelector` was added (the all-rows
   preset, the ``selector=None`` default of the causal generators).
+
+- **`CausalImbalanceGenerator` now accepts an explicit `selector=`**
+  (additive; the old `quantile_range` rule remains the `selector=None`
+  default): the rows FIRED by the selector are dropped (subsampling
+  polarity, union over the selector's variables);
+  `perturbation_nodes`/`quantile_range` are ignored when a selector is
+  given, and `perturbation_nodes` is no longer required in selector
+  mode.
+- **`DecompositionAndOutlierGenerator` renamed to
+  `StructuredOutlierGenerator`** (old name kept as a backwards-compatible
+  alias), with a new optional **`preprocessor=`** constructor argument:
+  any sklearn pipeline-like object with `transform`/`inverse_transform`
+  can replace the built-in standardization + decomposition —
+  preprocessing is no longer hardcoded inside the generator.
+
+### Documentation
+
+- **New "Understanding badgers" concepts notebook**
+  (`tutorials/concepts/Badgers-Concepts.ipynb`): a step-by-step
+  introduction — module structure, generator instantiation with an rng,
+  `generate()`, shape rules (appending / gating / subsampling), the
+  in-place mutation contract ("pass `X.copy()`"), the `y` deprecation,
+  selectors, DGP backends and pipelines.
+- **Tabular tutorials merged per deficit** (one notebook per deficit
+  instead of causal/non-causal pairs): `Outliers.ipynb`, `Noise.ipynb`,
+  `Missingness.ipynb`, `Imbalance.ipynb`, `Drift.ipynb`,
+  `Edge-Perturbation.ipynb`. Each has **Part A** (acting on the
+  observation process — no DGP) and **Part B** (acting on the DGP).
+  Visualizations use explicit `cls` class vectors and `labels` deficit
+  vectors (no `y`/`yt` placeholders); the outlier tutorial was
+  substantially shortened (the causal part no longer repeats the
+  concepts notebook).
 
 ## dev_0_0_14 (unreleased)
 

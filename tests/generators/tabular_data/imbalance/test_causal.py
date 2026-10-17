@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from badgers.core.dgp import OlsDGP
+from badgers.core.selectors import BernoulliSelector, TopQuantileSelector
 from badgers.generators.tabular_data.imbalance.causal import (
     CausalImbalanceGenerator,
 )
@@ -76,3 +77,36 @@ def test_generate__validation_errors(chain_data):
         gen.generate(
             X, y=None, perturbation_nodes=["X"], quantile_range=(0.9, 0.1),
         )
+
+
+def test_generate__explicit_selector_drops_fired_rows(chain_data):
+    # With an explicit selector, the FIRED rows are dropped (subsampling
+    # polarity) and perturbation_nodes/quantile_range are ignored.
+    X, graph, column_mapping = chain_data
+    gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+
+    sel = TopQuantileSelector(
+        variables="X", column_mapping=column_mapping, quantile=0.8
+    )
+    Xt, yt = gen.generate(X, y=None, selector=sel)
+
+    fired = sel(X, None)["X"]
+    np.testing.assert_array_equal(Xt, X[~fired])
+    assert Xt.shape[0] < X.shape[0]
+    assert list(yt) == ["imbalance"] * Xt.shape[0]
+
+
+def test_generate__explicit_selector_ignores_quantile_params(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+
+    sel = TopQuantileSelector(
+        variables="Y", column_mapping=column_mapping, quantile=0.7
+    )
+    Xt, _ = gen.generate(
+        X, y=None, selector=sel, quantile_range=(0.9, 0.1),  # invalid, ignored
+    )
+    fired = sel(X, None)["Y"]
+    np.testing.assert_array_equal(Xt, X[~fired])
