@@ -1,10 +1,9 @@
 """Causal drift generator.
 
 Injects a systematic distributional shift at perturbation nodes (drawn once,
-applied to all rows) and propagates it to descendants via the structural
-equations. The shift at the perturbation node is systematic (not per-row
-random), but each descendant still has its own exogenous residual noise,
-which is re-added during the forward pass.
+applied to all affected rows) and recomputes the descendants of the affected
+rows through the structural equations (Pearl surgery: each descendant is
+re-evaluated from its shifted parents with fresh noise).
 """
 
 import numpy as np
@@ -24,12 +23,19 @@ class CausalDriftGenerator(CausalGenerator):
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
     dgp : DGP or None, default=None
-        DGP instance (attached via fit() or use_dgp()).
+        DGP instance (passed via the constructor or use_dgp(); fitted
+        explicitly by the caller, or lazily inside generate() if
+        unfitted).
 
     generate() parameters (passed via **params)
     ----------
-    perturbation_nodes, mechanism, mechanism_cause, mechanism_rate :
-        see CausalGenerator.
+    perturbation_nodes : list of str
+        Nodes where the drift is injected (required).
+    selector : Selector or None, default=None
+        Row-selection rule from ``badgers.core.selectors``
+        (``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
+        ``TopQuantileSelector``, or any callable with the same signature).
+        ``None`` = every row fires.
     drift_std : float or np.ndarray, default=0.5
         Std of the systematic shift, relative to column std. Scalar or
         per-perturbation-node.
@@ -43,9 +49,7 @@ class CausalDriftGenerator(CausalGenerator):
         X,
         y,
         perturbation_nodes=None,
-        mechanism="always",
-        mechanism_cause=None,
-        mechanism_rate=0.5,
+        selector=None,
         drift_std=0.5,
     ):
         """Inject causally-propagated systematic drift in place."""
@@ -55,7 +59,6 @@ class CausalDriftGenerator(CausalGenerator):
             X, perturbation_nodes
         )
         n_samples = X.shape[0]
-        rows_original = X.copy()
         col_stds = _column_stds(X)
 
         if np.isscalar(drift_std):
@@ -75,11 +78,10 @@ class CausalDriftGenerator(CausalGenerator):
                 0, drift_scale[j] * col_stds[col]
             )
 
-        # Apply the shift to the perturbation nodes (gated by the mechanism:
+        # Apply the shift to the perturbation nodes (gated by the selector:
         # fire masks for ALL rows at once, thresholds on the un-mutated data).
         fires = self._fire_masks(
-            X, perturbation_nodes, node_to_col, mechanism, mechanism_cause,
-            mechanism_rate,
+            X, perturbation_nodes, node_to_col, selector=selector,
         )
         affected = np.zeros(n_samples, dtype=bool)
         for node in perturbation_nodes:
@@ -88,13 +90,18 @@ class CausalDriftGenerator(CausalGenerator):
             X[mask, col] += shifts[col]
             affected |= mask
 
-        # Propagate the delta to the descendants via the structural
-        # equations: descendant_new = descendant_orig + beta @ delta_parents.
-        # The descendant's own exogenous noise is preserved (it lives in
-        # rows_original); only the drift at the perturbation node is
-        # systematic (a single shift applied to all affected rows).
-        self.propagate(X, perturbation_nodes, self.random_generator,
-                       rows_original=rows_original)
+        # Recompute the descendants of the AFFECTED rows through the
+        # structural equations (Pearl surgery): descendant = f(new parents)
+        # + fresh noise. The shift at the perturbation node is systematic
+        # (a single shift applied to all affected rows); unaffected rows
+        # are left untouched.
+        affected_rows = np.flatnonzero(affected)
+        if affected_rows.size:
+            sub = X[affected_rows]
+            self.dgp.intervene(
+                sub, perturbation_nodes, rng=self.random_generator
+            )
+            X[affected_rows] = sub
 
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt

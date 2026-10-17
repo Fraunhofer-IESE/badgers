@@ -1,0 +1,14 @@
+active: true
+derived: false
+header: ''
+level: 1.6
+links: []
+normative: true
+ref: test_pipeline__generator_without_params_entry_is_still_called
+reviewed: null
+text: |
+  REQ-P-006 — Generator missing from params:
+  A generator whose name has no entry in `params` shall still be called, with
+  no additional keyword arguments. Parameters are optional per generator.
+
+  Verified by: test_pipeline__generator_without_params_entry_is_still_called

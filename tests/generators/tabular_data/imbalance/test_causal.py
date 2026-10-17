@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from badgers.core.dgp import OlsDGP
 from badgers.generators.tabular_data.imbalance.causal import (
     CausalImbalanceGenerator,
 )
@@ -11,7 +12,7 @@ from badgers.generators.tabular_data.imbalance.causal import (
 def test_generate__quantile_range_respected(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         quantile_range=(0.5, 1.0),
@@ -27,7 +28,7 @@ def test_generate__quantile_range_respected(chain_data):
 def test_generate__descendants_skewed(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         quantile_range=(0.5, 1.0),
@@ -42,7 +43,7 @@ def test_generate__descendants_are_pure_subset(chain_data):
     # descendants') must be bit-identical to the filtered original.
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         quantile_range=(0.5, 1.0),
@@ -55,7 +56,7 @@ def test_generate__descendants_are_pure_subset(chain_data):
 def test_generate__multi_node_intersection(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X", "Y"],
         quantile_range=(0.5, 1.0),
@@ -68,9 +69,9 @@ def test_generate__multi_node_intersection(chain_data):
 def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator()
-    with pytest.raises(RuntimeError, match="not fitted"):
+    with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="quantile_range"):
         gen.generate(
             X, y=None, perturbation_nodes=["X"], quantile_range=(0.9, 0.1),

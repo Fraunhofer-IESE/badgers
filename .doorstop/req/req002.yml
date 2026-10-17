@@ -1,0 +1,15 @@
+active: true
+derived: false
+header: ''
+level: 1.1
+links: []
+normative: true
+ref: test_pipeline__params_routed_by_generator_name
+reviewed: null
+text: |
+  REQ-P-002 — Parameter routing by name:
+  `Pipeline.generate(X, y, params)` shall call each generator as
+  `generator.generate(X, y, **params[name])` — each generator receives only
+  the keyword arguments stored under its own name in `params`.
+
+  Verified by: test_pipeline__params_routed_by_generator_name, test_pipeline__single_generator_boundary

@@ -99,6 +99,36 @@ def get_ancestors(graph: nx.DiGraph, node) -> set:
     return nx.ancestors(graph, node)
 
 
+def ordered_descendants(graph: nx.DiGraph, nodes) -> list:
+    """Return the descendants of ``nodes``, in topological order.
+
+    The nodes themselves are excluded (``nx.descendants`` semantics).
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        A directed acyclic graph.
+    nodes : one node or an iterable of nodes
+
+    Returns
+    -------
+    list
+        Descendants of ``nodes``, in topological order.
+    """
+    if isinstance(nodes, (str, bytes)):
+        nodes = [nodes]
+    else:
+        try:
+            nodes = list(nodes)
+        except TypeError:
+            nodes = [nodes]
+    descendants = set()
+    for node in nodes:
+        descendants |= nx.descendants(graph, node)
+    order = topological_order(graph)
+    return [node for node in order if node in descendants]
+
+
 def get_root_nodes(graph: nx.DiGraph) -> list:
     """
     Return nodes with no incoming edges (in-degree 0).

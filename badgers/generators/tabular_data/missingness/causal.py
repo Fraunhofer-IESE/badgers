@@ -4,9 +4,9 @@ Chooser-only: injects missingness (NaN) at the fired cells of the
 perturbation nodes. The deficit does NOT cascade to descendants --
 missingness is a property of the measurement process, not of the world.
 
-- **Cause** (``mechanism``): why/when a value is missing -- the m-graph $R$
-  mechanism (``random``=MCAR, ``observed``=MAR, ``self``=MNAR), backed by
-  the selector presets (BernoulliSelector / TopQuantileSelector).
+- **Cause** (``selector``): why/when a value is missing -- the m-graph $R$
+  mechanism (``BernoulliSelector``=MCAR, driver-mode ``TopQuantileSelector``
+  =MAR, self-mode =MNAR).
 """
 
 import numpy as np
@@ -27,13 +27,12 @@ class CausalMissingnessGenerator(CausalGenerator):
     ----------
     perturbation_nodes : list of str
         Nodes where missingness is injected.
-    mechanism : str, default="random"
-        Cause of missingness: ``"always"``, ``"random"`` (MCAR),
-        ``"observed"`` (MAR), ``"self"`` (MNAR).
-    mechanism_cause : str, default=None
-        Fully-observed node driving missingness (required for ``"observed"``).
-    mechanism_rate : float, default=0.3
-        Base missingness probability / range fraction.
+    selector : Selector or None, default=None
+        Row-selection rule from ``badgers.core.selectors``
+        (``BernoulliSelector`` = MCAR, ``TopQuantileSelector`` with
+        drivers = MAR, self mode = MNAR, ``ExactCountSelector``,
+        ``AlwaysSelector``, or any callable with the same signature).
+        ``None`` = every row fires.
     """
 
     deficit_name = "missingness"
@@ -44,15 +43,13 @@ class CausalMissingnessGenerator(CausalGenerator):
         X,
         y,
         perturbation_nodes=None,
-        mechanism="random",
-        mechanism_cause=None,
-        mechanism_rate=0.3,
+        selector=None,
     ):
         """Inject missingness at the fired cells (observation-layer).
 
-        Chooser-only: a Selector decides WHICH cells fire (value-blind
+        Chooser-only: a Selector decides WHICH cells fire (e.g. value-blind
         Bernoulli, own-value top-quantile, or driver top-quantile); the
-        mechanism writes NaN at the fired cells. NO propagation: the
+        generator writes NaN at the fired cells. NO propagation: the
         deficit does not cascade to descendants (observation semantics --
         missingness is a property of the measurement, not of the world).
         """
@@ -62,11 +59,10 @@ class CausalMissingnessGenerator(CausalGenerator):
         )
         n_samples = X.shape[0]
 
-        # Gate the defect by the mechanism: fire masks for ALL rows at once
+        # Gate the defect by the selector: fire masks for ALL rows at once
         # (vectorized; quantile thresholds computed on the un-mutated data).
         fires = self._fire_masks(
-            X, perturbation_nodes, node_to_col, mechanism, mechanism_cause,
-            mechanism_rate,
+            X, perturbation_nodes, node_to_col, selector=selector,
         )
         affected = np.zeros(n_samples, dtype=bool)
         for node in perturbation_nodes:

@@ -1,0 +1,14 @@
+active: true
+derived: false
+header: ''
+level: 1.4
+links: []
+normative: true
+ref: test_pipeline__executes_generators_in_insertion_order
+reviewed: null
+text: |
+  REQ-P-004 — Execution order:
+  Generators shall be executed in the insertion order of the `generators`
+  mapping (docstring: "Calls all generators generate function in the order").
+
+  Verified by: test_pipeline__executes_generators_in_insertion_order

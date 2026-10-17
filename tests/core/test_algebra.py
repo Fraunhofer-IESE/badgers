@@ -1,16 +1,20 @@
-"""Tests for the generic deficit algebra (do-operations), backend-blind.
+"""Tests for the value-level intervention (Pearl surgery on given rows).
 
 Uses a hand-built deterministic DGP so the expected values are exact.
+``intervene`` semantics: fix the nodes at ``values``, recompute ALL their
+descendants with fresh noise; upstream and non-descendant columns and rows
+untouched; intervened nodes stay pinned even if one is a descendant of
+another.
 """
 
 import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import do, ordered_descendants
+from badgers.core.dgp import DGPMixin, ordered_descendants
 
 
-class _FakeDGP:
+class _FakeDGP(DGPMixin):
     """Deterministic linear DGP: v = sum coef[p] * p + N(0, noise_std)."""
 
     def __init__(self, graph, column_mapping, beta, mu=None, noise_std=0.0):
@@ -50,80 +54,84 @@ def test_ordered_descendants_topological_order():
     assert ordered_descendants(graph, ["D"]) == []
 
 
-def test_do_single_node_without_list():
+def test_intervene_accepts_bare_node():
     dgp, _ = _chain_dgp()
     assert ordered_descendants(dgp.graph, "X") == ["Y", "Z"]
 
 
-def test_do_scalar_nodes_string():
-    # do() accepts a bare node (not wrapped in a list) end to end.
+def test_intervene_requires_rng():
     dgp, rows = _chain_dgp()
-    rows_original = rows.copy()
-    out = do(dgp, rows, "X", values=[rows[:, 0] + 3.0],
-             rows_original=rows_original)
-    np.testing.assert_allclose(out[:, 1], rows_original[:, 1] + 2.0 * 3.0)
-    np.testing.assert_allclose(out[:, 2], rows_original[:, 2] + 0.5 * (2.0 * 3.0))
-    np.testing.assert_allclose(out[:, 0], rows_original[:, 0] + 3.0)
+    with pytest.raises(ValueError, match="rng"):
+        dgp.intervene(rows.copy(), ["X"])
 
 
-def test_do_delta_requires_rows_original():
+def test_intervene_noise_free_is_deterministic():
+    # With a noise-free mechanism the recomputation is exact: the whole
+    # downstream chain is re-derived from the intervened value.
     dgp, rows = _chain_dgp()
-    with pytest.raises(ValueError, match="rows_original"):
-        do(dgp, rows.copy(), ["X"])
-
-
-def test_do_delta_linear_chain_composes():
-    dgp, rows = _chain_dgp()
-    rows_original = rows.copy()
-    out = do(dgp, rows, ["X"], values=[rows[:, 0] + 3.0],
-             rows_original=rows_original)
-    # do() mutates rows in place: the oracles must compare against the
-    # pre-perturbation snapshot (rows_original), not the mutated rows.
+    before = rows.copy()
+    out = dgp.intervene(rows, "X", values=[rows[:, 0] + 3.0],
+                        rng=np.random.default_rng(0))
     assert out is rows  # in-place contract: the same array is returned
-    np.testing.assert_allclose(out[:, 1], rows_original[:, 1] + 2.0 * 3.0)
-    np.testing.assert_allclose(out[:, 2], rows_original[:, 2] + 0.5 * (2.0 * 3.0))
-    np.testing.assert_allclose(out[:, 0], rows_original[:, 0] + 3.0)
+    np.testing.assert_allclose(out[:, 0], before[:, 0] + 3.0)   # pinned
+    np.testing.assert_allclose(out[:, 1], 2.0 * (before[:, 0] + 3.0))
+    np.testing.assert_allclose(out[:, 2], 0.5 * (2.0 * (before[:, 0] + 3.0)))
 
 
-def test_do_delta_zero_delta_is_identity():
+def test_intervene_values_none_keeps_pinned_columns():
+    # values=None: the current column values ARE the intervention (callers
+    # that pre-write their perturbation); the pinned nodes are not
+    # recomputed, the descendants are.
     dgp, rows = _chain_dgp()
-    rows_original = rows.copy()
-    out = do(dgp, rows, ["X"], values=[rows[:, 0]],
-             rows_original=rows_original)
-    np.testing.assert_array_equal(out, rows_original)
+    before = rows.copy()
+    rows[:, 0] += 3.0
+    out = dgp.intervene(rows, ["X"], rng=np.random.default_rng(0))
+    np.testing.assert_allclose(out[:, 0], before[:, 0] + 3.0)
+    np.testing.assert_allclose(out[:, 1], 2.0 * (before[:, 0] + 3.0))
+    np.testing.assert_allclose(out[:, 2], 0.5 * (2.0 * (before[:, 0] + 3.0)))
 
 
-def test_do_recompute_redraws_descendant_noise():
+def test_intervene_pinned_descendant_not_recomputed():
+    # X -> Y -> Z, intervene on BOTH X and Y: Y is pinned (its own value is
+    # the intervention) even though it is a descendant of X; only Z is
+    # recomputed, FROM Y's (intervened) value.
+    dgp, rows = _chain_dgp()
+    y_new = rows[:, 1] + 10.0
+    out = dgp.intervene(rows, ["X", "Y"], rng=np.random.default_rng(0),
+                        values=[rows[:, 0] + 3.0, y_new])
+    np.testing.assert_allclose(out[:, 1], y_new)  # pinned, not recomputed
+    np.testing.assert_allclose(out[:, 2], 0.5 * y_new)  # from pinned Y
+
+
+def test_intervene_recompute_redraws_descendant_noise():
     dgp, rows = _chain_dgp(noise_std=0.3)
-    rows_original = rows.copy()  # do() mutates rows in place: capture BEFORE
-    out = do(dgp, rows, ["X"], values=[rows[:, 0] + 3.0], mode="recompute",
-             rng=np.random.default_rng(1))
+    before = rows.copy()
+    out = dgp.intervene(rows, ["X"], values=[rows[:, 0] + 3.0],
+                        rng=np.random.default_rng(1))
     # descendants are recomputed from the perturbed parents with FRESH noise
-    deterministic_y = 2.0 * (rows_original[:, 0] + 3.0)
+    deterministic_y = 2.0 * (before[:, 0] + 3.0)
     residual = out[:, 1] - deterministic_y
     assert np.std(residual) > 0.15  # fitted noise std is 0.3
     np.testing.assert_allclose(np.mean(residual), 0.0, atol=0.1)
 
 
-def test_do_recompute_requires_rng():
-    dgp, rows = _chain_dgp(noise_std=0.3)
-    with pytest.raises(ValueError, match="rng"):
-        do(dgp, rows, ["X"], mode="recompute")
+def test_intervene_nondescendant_parent_contributes():
+    # X -> Y, W -> Y: intervening on X keeps W's contribution (only X's
+    # influence is re-derived).
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y"), ("W", "Y")])
+    column_mapping = {"W": 0, "X": 1, "Y": 2}
+    beta = {"Y": {"X": 2.0, "W": 0.5}}
+    dgp = _FakeDGP(graph, column_mapping, beta)
+    rows = np.array([[5.0, 1.0, 2.0 * 1.0 + 0.5 * 5.0]])
+    out = dgp.intervene(rows, ["X"], values=[np.array([4.0])],
+                        rng=np.random.default_rng(0))
+    np.testing.assert_allclose(out[:, 0], [5.0])   # W untouched
+    np.testing.assert_allclose(out[:, 2], [2.0 * 4.0 + 0.5 * 5.0])
 
 
-def test_do_unknown_mode_raises():
+def test_intervene_unknown_node_raises():
     dgp, rows = _chain_dgp()
-    rows_original = rows.copy()
-    with pytest.raises(ValueError, match="Unknown propagation mode"):
-        do(dgp, rows, ["X"], values=[rows[:, 0]], mode="bogus",
-           rows_original=rows_original)
-
-
-def test_do_requires_fitted_dgp_nodes():
-    # a node whose parent columns are not filled is the caller's contract;
-    # here we only verify that an unknown node raises a KeyError-style error
-    dgp, rows = _chain_dgp()
-    rows_original = rows.copy()
     with pytest.raises(KeyError):
-        do(dgp, rows, ["NOPE"], values=[rows[:, 0]],
-           rows_original=rows_original)
+        dgp.intervene(rows, ["NOPE"], values=[rows[:, 0]],
+                      rng=np.random.default_rng(0))

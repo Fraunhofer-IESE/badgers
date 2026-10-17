@@ -10,10 +10,10 @@ from badgers.generators.tabular_data.noise.causal import CausalNoiseGenerator
 def test_generate__noise_expands(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"], n_copies=3,
-        mechanism="always", noise_std=0.5,
+        noise_std=0.5,
     )
     # expand: n -> n * n_copies
     assert Xt.shape == (X.shape[0] * 3, 3)
@@ -25,10 +25,10 @@ def test_generate__noise_expands(chain_data):
 def test_generate__n_copies_one_keeps_shape(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"], n_copies=1,
-        mechanism="always", noise_std=0.5,
+        noise_std=0.5,
     )
     assert Xt.shape == X.shape
 
@@ -36,10 +36,10 @@ def test_generate__n_copies_one_keeps_shape(chain_data):
 def test_generate__noise_magnitude(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"], n_copies=1,
-        mechanism="always", noise_std=1.0,
+        noise_std=1.0,
     )
     # The injected noise (std ~ noise_std * col_std) is added directly to
     # the original values (delta propagation), so the marginal std of Xt
@@ -47,60 +47,72 @@ def test_generate__noise_magnitude(chain_data):
     assert np.std(Xt[:, 0]) > np.std(X[:, 0])
 
 
-def test_generate__noise_zero_is_identity(chain_data):
+def test_generate__noise_zero_recompute(chain_data):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"], n_copies=1,
-        mechanism="always", noise_std=0.0,
+        noise_std=0.0,
     )
-    # noise_std=0 -> no injected delta -> delta propagation adds exactly 0:
-    # the output must equal the original data (exogenous noise preserved).
-    np.testing.assert_allclose(Xt, X_orig, atol=1e-9)
+    # noise_std=0 -> no injected noise: the perturbed column is written
+    # back unchanged (bit-identical). The DESCENDANTS are recomputed with
+    # FRESH noise: statistically equivalent to the originals, not identical
+    # (Pearl surgery, not delta propagation).
+    np.testing.assert_array_equal(Xt[:, 0], X_orig[:, 0])
+    dY = Xt[:, 1] - X_orig[:, 1]
+    dZ = Xt[:, 2] - X_orig[:, 2]
+    assert np.std(dY) > 0  # fresh noise, not a no-op
+    np.testing.assert_allclose(np.mean(dY), 0.0, atol=0.1)
+    np.testing.assert_allclose(np.mean(dZ), 0.0, atol=0.1)
+    assert np.std(dY) < 0.5  # residual scale, not a structural shift
 
 
-def test_generate__noise_propagates_exact_delta(chain_data):
-    # Noise injected at X on row i: delta_X = eps_X[i]. The delta model
-    # requires delta_Y = beta_XY * delta_X and delta_Z = beta_YZ * delta_Y
-    # EXACTLY (the nodes' own exogenous noise stays untouched). The oracle
-    # goes through the FITTED mechanism itself (do()'s delta =
-    # response(parents_new) - response(parents_orig)), so fitted-beta noise
-    # cancels exactly.
+def test_generate__noise_propagates_recompute(chain_data):
+    # Noise injected at X: descendants are RECOMPUTED from the noisy
+    # parents with fresh noise (Pearl surgery), so the deterministic
+    # component comes through exactly in expectation, not row-wise. The
+    # oracle goes through the FITTED mechanism itself, so fitted-beta
+    # noise cancels in expectation.
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(7))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"], n_copies=1,
-        mechanism="always", noise_std=0.5,
+        noise_std=0.5,
     )
     dX = Xt[:, 0] - X_orig[:, 0]
     dB = Xt[:, 1] - X_orig[:, 1]
     dC = Xt[:, 2] - X_orig[:, 2]
-    dY_exact = (
+    dY_det = (
         gen.dgp.response("Y", Xt[:, [0]])
         - gen.dgp.response("Y", X_orig[:, [0]])
     )
-    np.testing.assert_allclose(dB, dY_exact, rtol=1e-12, atol=1e-12)
-    dZ_exact = (
+    dZ_det = (
         gen.dgp.response("Z", Xt[:, [1]])
         - gen.dgp.response("Z", X_orig[:, [1]])
     )
-    np.testing.assert_allclose(dC, dZ_exact, rtol=1e-12, atol=1e-12)
+    # Fresh-noise residual is zero-mean: the deterministic shift comes
+    # through exactly in expectation.
+    np.testing.assert_allclose(np.mean(dB - dY_det), 0.0, atol=0.1)
+    np.testing.assert_allclose(np.mean(dC - dZ_det), 0.0, atol=0.1)
+    # The fresh residual is small relative to the structural shift.
+    assert np.std(dB - dY_det) < 0.3
+    assert np.std(dC - dZ_det) < 0.3
     # Loose sanity: the fitted betas must be near the true coefficients.
-    np.testing.assert_allclose(dB, 2.0 * dX, rtol=0.05, atol=1e-12)
-    np.testing.assert_allclose(dC, 0.5 * dB, rtol=0.05, atol=1e-12)
+    np.testing.assert_allclose(np.mean(dB), 2.0 * np.mean(dX), rtol=0.1)
+    np.testing.assert_allclose(np.mean(dC), 0.5 * np.mean(dB), rtol=0.1)
 
 
 def test_generate__noise_per_column(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X", "Y"], n_copies=1,
-        mechanism="always", noise_std=np.array([0.1, 1.0]),
+        noise_std=np.array([0.1, 1.0]),
     )
     # Y (col 1) gets more noise than X (col 0)
     assert np.std(Xt[:, 1]) > np.std(Xt[:, 0])
@@ -109,9 +121,9 @@ def test_generate__noise_per_column(chain_data):
 def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalNoiseGenerator()
-    with pytest.raises(RuntimeError, match="not fitted"):
+    with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="n_copies"):
         gen.generate(X, y=None, perturbation_nodes=["X"], n_copies=0)
 
@@ -124,7 +136,7 @@ def test_generate__nan_input_does_not_poison(chain_data):
     # NaN-cascade semantics as the missingness generator.
     X, graph, column_mapping = chain_data
     world_src = CausalNoiseGenerator(random_generator=np.random.default_rng(1))
-    world_src.fit(X, graph, column_mapping, dgp=OlsDGP(graph, column_mapping))
+    world_src.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(world_src.dgp)
     Xn = X.copy()
@@ -132,7 +144,7 @@ def test_generate__nan_input_does_not_poison(chain_data):
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
     n_nan_y = int(np.isnan(Xn[:, 1]).sum())
     Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
-                         n_copies=1, mechanism="always", noise_std=0.5)
+                         n_copies=1, noise_std=0.5)
     # The perturbed column gains NO new NaN cells (finite scale).
     assert int(np.isnan(Xt[:, 1]).sum()) == n_nan_y
     # Column X (untouched upstream) gains no NaNs either.
@@ -153,16 +165,37 @@ def test_generate__all_nan_column_does_not_crash(chain_data):
     # (which would silently poison the column).
     X, graph, column_mapping = chain_data
     world_src = CausalNoiseGenerator(random_generator=np.random.default_rng(1))
-    world_src.fit(X, graph, column_mapping, dgp=OlsDGP(graph, column_mapping))
+    world_src.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(2))
     gen.use_dgp(world_src.dgp)
     Xn = X.copy()
     Xn[:, 1] = np.nan
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
     Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
-                         n_copies=1, mechanism="always", noise_std=0.5)
+                         n_copies=1, noise_std=0.5)
     # No crash; no NEW NaNs in the perturbed or upstream columns.
     assert int(np.isnan(Xt[:, 1]).sum()) == before.shape[0]
     np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))
     # Descendant Z is NaN exactly where the Y delta was NaN.
     np.testing.assert_array_equal(np.isnan(Xt[:, 2]), np.isnan(before[:, 1]))
+
+
+from badgers.core.selectors import BernoulliSelector, TopQuantileSelector
+
+
+def test_generate__selector_gates_expanded_rows(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    # Bernoulli on the ORIGINAL rows: each seed row's copies either all
+    # fire or all stay clean (masks replicated to the expansion)
+    Xt, yt = gen.generate(
+        X, y=None, perturbation_nodes=["X"], n_copies=3, noise_std=0.5,
+        selector=BernoulliSelector("X", rate=0.5, rng=gen.random_generator),
+    )
+    assert Xt.shape == (X.shape[0] * 3, 3)
+    fired = np.asarray(yt) == "noise"
+    # groups of n_copies share the same state
+    groups = fired.reshape(X.shape[0], 3)
+    assert np.all(groups[:, 0] == groups[:, 1]) and np.all(groups[:, 1] == groups[:, 2])
+    assert 0.2 < groups.mean() < 0.8

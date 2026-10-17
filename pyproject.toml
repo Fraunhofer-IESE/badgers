@@ -30,9 +30,12 @@ dependencies = [
     "scipy~=1.17.0",
 ]
 [project.optional-dependencies]
-causal = [
+pymc = [
     "pymc>=5.0",
     "pytensor>=2.0",
+]
+dowhy = [
+    "dowhy>=0.13",
 ]
 dev = [
     "tox>=4.34.1,<4.62.0",

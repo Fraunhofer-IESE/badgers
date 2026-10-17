@@ -3,15 +3,15 @@
 Perturbs the fitted coefficient of a single edge (beta -> beta' =
 weight_factor * beta). The structural equation of the child itself changes,
 so the child is RECOMPUTED through the scaled mechanism (variance
-marginal-preserving); the child's descendants are then propagated as
-deltas, preserving each descendant's own exogenous shock.
+marginal-preserving); the child's descendants are then recomputed through
+the base mechanisms (Pearl surgery, fresh noise).
 """
 
 import numpy as np
 
 from badgers.core.causal_graph import get_parents
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.dgp import ScaledEdgeDGP, do
+from badgers.core.dgp.edits import scale_edge
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -23,7 +23,9 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
     dgp : DGP or None, default=None
-        DGP instance (attached via fit() or use_dgp()).
+        DGP instance (passed via the constructor or use_dgp(); fitted
+        explicitly by the caller, or lazily inside generate() if
+        unfitted).
 
     generate() parameters (passed via **params)
     ----------
@@ -66,43 +68,19 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
         n_samples = X.shape[0]
 
         # Recompute the child through the SCALED edge (raises ValueError if
-        # the variance budget is infeasible), then delta-cascade its change
-        # to its descendants (each descendant keeps its own exogenous shock).
-        rows_original = X.copy()
-        self.propagate(
-            X, perturbation_nodes, self.random_generator,
-            edge=edge, weight_factor=weight_factor,
-            rows_original=rows_original,
+        # the variance budget is infeasible), then recompute its descendants
+        # through the base mechanisms (Pearl surgery, fresh noise).
+        scaled = scale_edge(self.dgp, child, parent, weight_factor)
+        # Raises ValueError('...infeasible...') when the variance budget fails.
+        scaled.calibrate(X)
+        pcols = [self.column_mapping[p] for p in get_parents(self.graph, child)]
+        child_new = (
+            scaled.response(child, X[:, pcols])
+            + scaled.draw_noise(child, self.random_generator, n_samples)
         )
+        self.dgp.intervene(X, [child], values=[child_new],
+                           rng=self.random_generator)
 
         affected = np.ones(n_samples, dtype=bool)
         yt = self._labels_inplace(y, affected, self.deficit_name)
         return X, yt
-
-    def propagate(self, rows, perturbation_nodes, rng, **kwargs):
-        """Recompute the child through the scaled edge, then delta-cascade.
-
-        Overrides the default delta propagation: the edge weight itself
-        changes (relationship-level defect), so the child's value is
-        recomputed via the scaled mechanism; its descendants follow with
-        the standard delta pass (their own exogenous shocks preserved).
-        """
-        edge = kwargs["edge"]
-        weight_factor = kwargs["weight_factor"]
-        rows_original = kwargs.get("rows_original")
-        if rows_original is None:
-            raise ValueError(
-                "edge perturbation requires rows_original (a copy of the "
-                "pre-perturbation rows)"
-            )
-        parent, child = edge
-        scaled = ScaledEdgeDGP(self.dgp, child, parent, weight_factor)
-        # Raises ValueError('...infeasible...') when the variance budget fails.
-        scaled.calibrate(rows)
-        pcols = [self.column_mapping[p] for p in get_parents(self.graph, child)]
-        child_new = (
-            scaled.response(child, rows[:, pcols])
-            + scaled.draw_noise(child, rng, rows.shape[0])
-        )
-        return do(self.dgp, rows, [child], values=[child_new], mode="delta",
-                  rows_original=rows_original)

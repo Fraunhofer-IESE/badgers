@@ -1,0 +1,16 @@
+active: true
+derived: false
+header: ''
+level: 1.8
+links: []
+normative: false
+ref: test_pipeline__unknown_param_keys_are_ignored
+reviewed: null
+text: |
+  REQ-P-008 — Unknown parameter keys (records current behavior; ambiguity):
+  Keys in `params` that match no generator name are currently ignored
+  silently. The docstring does not specify whether this should raise. This
+  item is normative=false until the intended behavior is confirmed with the
+  maintainer.
+
+  Verified by: test_pipeline__unknown_param_keys_are_ignored

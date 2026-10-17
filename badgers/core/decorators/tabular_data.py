@@ -14,7 +14,7 @@ def preprocess_inputs(generate_func):
     """
 
     @functools.wraps(generate_func)
-    def wrapper(self, X, y, **kwargs):
+    def wrapper(self, X, y=None, **kwargs):
         # Validate and preprocess X
         if isinstance(X, list):
             X = np.array(X)

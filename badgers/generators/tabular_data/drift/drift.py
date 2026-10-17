@@ -4,6 +4,7 @@ from typing import Union
 import numpy as np
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.utils import resolve_class_column
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
@@ -76,9 +77,13 @@ class RandomShiftGenerator(DriftGenerator):
 
 class RandomShiftClassesGenerator(DriftGenerator):
     """
-    Randomly shift (geometrical translation) values of each class independently of one another.
-    Data are first standardized (mean = 0, var = 1) and
-    for each class a random number is added to all instances.
+    Randomly shift (geometrical translation) the rows fired by a selector,
+    independently per class.
+
+    Data are first standardized (mean = 0, var = 1); for each class value
+    of the class column a random shift is drawn and added to the FIRED rows
+    of that class. The class data lives in a column of ``X`` (``y`` is not
+    used for selection).
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -92,43 +97,65 @@ class RandomShiftClassesGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, shift_std: Union[float, np.array] = 0.1):
+    def generate(self, X, y=None, *, selector=None, shift_std=0.1):
         """
-        Randomly shift (geometrical translation) values of each class independently of one another.
-        Data are first standardized (mean = 0, var = 1) and for each class a random number is added to all instances.
+        Randomly shift the rows fired by the selector, one independent
+        shift per class value of the class column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param y: Target variable, a 1D array-like object representing the class labels.
-        :param shift_std: Standard deviation of the normal distribution from which the random shifts are drawn.
-                          Can be a single float (applied to all classes) or an array of floats (one per class).
+        :param y: Target variable (optional, passed through unchanged; not used for selection).
+        :param selector: A selector deciding which rows are shifted. A
+                         :class:`badgers.core.selectors.ClassSelector` over
+                         the class column (typical), or any selector whose
+                         masks OR to the fired rows. The per-class lookup
+                         requires ``selector.column_mapping`` to resolve the
+                         class column position. Required (a per-class rule
+                         has no class-free default).
+        :param shift_std: Standard deviation of the normal distribution from
+                          which the shifts are drawn. A single float (same
+                          magnitude for every class, one independent draw
+                          per class) or a dict ``{class_value: float}``.
+                          Fired rows whose class value is absent from the
+                          dict are not shifted.
         :return: A tuple containing the modified feature matrix `X'` and the original target `y`.
         """
-        # extract unique labels
-        classes = np.unique(y)
-        # check that if shift_std is an array, it is either of length == len(classes) or it dimention is (len(classes), X.shape[1])
-        if hasattr(shift_std, '__len__'):
-            shift_std_len = len(shift_std)
-            expected_len = len(classes)
-            expected_shape = (len(classes), X.shape[1])
-
-            assert (
-                shift_std_len == expected_len or (hasattr(shift_std, 'shape') and shift_std.shape == expected_shape)
-            ), f"shift_std length ({shift_std_len}) must equal number of classes ({expected_len}) " \
-               f"or shape must be {expected_shape}, got {getattr(shift_std, 'shape', 'no shape attribute')}"
+        if selector is None:
+            raise ValueError(
+                "RandomShiftClassesGenerator needs a selector deciding "
+                "which rows shift (e.g. ClassSelector over the class "
+                "column): classes are columns of X, y is not used for "
+                "selection."
+            )
+        masks = list(selector(X, y).values())
+        fired = masks[0] if len(masks) == 1 else np.logical_or.reduce(masks)
+        if not fired.any():
+            return X, y
+        # resolve the class column from the selector's column_mapping
+        class_col = resolve_class_column(selector, X)
+        stds = shift_std if isinstance(shift_std, dict) else None
+        if stds is not None and class_col is None:
+            raise ValueError(
+                "a dict shift_std requires selector.column_mapping to "
+                "resolve the class column position"
+            )
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
-        # generate random values for the shift
-        # generate random values for the shift
-        if hasattr(shift_std, 'shape') and shift_std.shape == (len(classes), X.shape[1]):
-            # shift_std is a 2D array: generate separate shifts for each class and feature
-            shifts = self.random_generator.normal(loc=0, scale=shift_std)
+        # one independent shift per class value among the fired rows
+        if class_col is not None:
+            values = np.unique(X[fired, class_col])
         else:
-            # shift_std is 1D or scalar: generate one shift per class, applied to all features
-            shifts = self.random_generator.normal(loc=0, scale=shift_std, size=len(classes))
-        # add shift
-        for c, s in zip(classes, shifts):
-            Xt[y == c] += s
+            values = np.array([None])
+        for value in values:
+            if stds is not None:
+                if value not in stds:
+                    continue
+                std = stds[value]
+            else:
+                std = shift_std
+            rows = fired if class_col is None else (fired & (X[:, class_col] == value))
+            shift = self.random_generator.normal(loc=0, scale=std, size=X.shape[1])
+            Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt), y

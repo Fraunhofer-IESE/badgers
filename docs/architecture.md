@@ -206,13 +206,13 @@ Create a `_<name>.py` file in the appropriate `benchmarks/generators/<category>/
 from benchmarks.models import GeneratorBenchmark
 from benchmarks.registry import register
 from benchmarks.scenarios.tabular import SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS
-from badgers.generators.tabular_data.noise import GaussianNoiseGenerator
+from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator
 
 register(GeneratorBenchmark(
-    generator_cls=GaussianNoiseGenerator,
-    name="GaussianNoise",
+    generator_cls=AdditiveNoiseGenerator,
+    name="AdditiveNoise",
     module_path="tabular_data.noise",
-    default_params={"noise_std": 0.5},
+    default_params={"distribution": scipy.stats.norm(scale=0.5)},
     scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
 ))
 ```
@@ -353,17 +353,34 @@ python -m benchmarks compare --baseline v0.0.13
 2. **Fitted knowledge** (the `DGP` protocol): backends implement exactly one
    operation — `fit_node(node, parents, data)` — and expose two views:
    `response(node, parent_values)` (the fitted deterministic part) and
-   `draw_noise(node, rng, n)` (the node's own shock; parametric or empirical).
-   `fit(X)` is a provided topological loop; `sample(rng, n)` is tier 2,
-   standalone, and no generator depends on it.
-3. **Deficit algebra** (written once, backend-blind): the `do()` intervention
-   primitive (overwrite node columns, walk descendants in topological order,
-   propagate prediction differences in `delta` mode or redraw noise in
-   `recompute` mode) and the scaled-edge view for edge reweighting (no
-   coefficient access needed — `calibrate` rescales the child's noise to the
-   target variance). Indicator derivation from the observation graph lives in
-   the missingness generator (structure-layer helpers + generator-local
-   firing/spread logic).
+   `draw_noise(node, rng, n)` (the node's own shock; parametric or
+   empirical). `fit(X)` is a provided topological loop. The DGP is
+   **immutable and rngless**: every stochastic method takes the caller's
+   `rng`; nothing retains training data (the estimation route
+   `edits.rebuild` refits instead).
+3. **Deficit algebra** (written once, backend-blind): the generic
+   `DGPMixin` cascade — `intervene(rows, nodes, values=None, *, rng=None)`
+   (Pearl surgery on given rows: fix the nodes, recompute ALL descendants
+   in topological order with fresh noise; intervened nodes stay pinned)
+   and `sample(rng, n)` — both start by calling the
+   **`pick_parameters(rng)` hook** (default: `self`; the PyMC backend
+   overrides it to pin one coherent posterior draw per cascade).
+   Structure edits are **free functions** in `badgers.core.dgp.edits`
+   (the DGP itself has NO edit methods): `scale_edge`/`remove_edge`
+   (edge reweighting with variance-budget calibration — no coefficient
+   access needed), `exogenize` (make a node a root; INTERVENTION-ONLY
+   semantics), `set_form` (replace a node's functional form),
+   `add_edge_contribution` (ANM-scoped cheap edge addition),
+   `reversed_graph` + `rebuild` (the estimation route for
+   add/reverse — one refit of the fully modified graph). Edits return
+   read-only views and never mutate the base DGP. Indicator derivation
+   from the observation graph lives in the missingness generator
+   (structure-layer helpers + generator-local firing/spread logic).
 
 Backend selection is **object injection only** (`dgp=...` / `use_dgp`).
 Deficit semantics live in the generators; they never see which backend ran.
+The generator carries NO structure of its own: `CausalGenerator.__init__`
+accepts only `random_generator=` and `dgp=`, derives its `graph`/`
+column_mapping` views from the DGP, and there is no generator-side `fit` or
+implicit OLS default backend. Unfitted DGPs are fitted lazily on first
+`generate(X)`.

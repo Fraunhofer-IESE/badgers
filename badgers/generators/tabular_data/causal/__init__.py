@@ -6,11 +6,12 @@ values. Each generator fits a per-node DGP to the data (the default OLS
 backend is pure NumPy and needs no extra dependencies), applies a structural
 perturbation, then propagates the effect through the descendants.
 
-Custom estimation backends (e.g. PyMC-based) can be provided via the ``dgp``
-argument of ``fit``; the optional ``causal`` extra (PyMC + PyTensor) is only
-needed for writing such backends::
+Custom estimation backends (e.g. PyMC- or DoWhy-GCM-based) can be provided
+via the ``dgp`` argument of ``fit``; the optional ``pymc`` / ``dowhy`` extras
+are only needed for using those backends::
 
-    pip install "badgers[causal]"
+    pip install "badgers[pymc]"    # PyMC-based backend
+    pip install "badgers[dowhy]"   # DoWhy-GCM-based backend
 """
 
 # Generators are re-exported lazily (PEP 562). This avoids a circular import:

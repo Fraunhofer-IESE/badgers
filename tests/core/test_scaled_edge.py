@@ -1,14 +1,16 @@
-"""Tests for the scaled-edge view (edge reweighting without beta access)."""
+"""Tests for the scale_edge edit (edge reweighting without beta access)
+and its remove_edge special case."""
 
 import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP, ScaledEdgeDGP
+from badgers.core.dgp import OlsDGP
+from badgers.core.dgp import edits
 
 
 def _fork_data(n=500, seed=0):
-    """Y = 0.3 * X + 0.5 * W + N(0, 1.0) — multi-parent child."""
+    """Y = 0.3 * X + 0.5 * W + N(0, 1.0) â€” multi-parent child."""
     rng = np.random.default_rng(seed)
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y"), ("W", "Y")])
@@ -22,7 +24,7 @@ def _fork_data(n=500, seed=0):
 def test_scaled_edge_response__multi_parent_closed_form():
     data, graph, column_mapping = _fork_data()
     base = OlsDGP(graph, column_mapping).fit(data)
-    scaled = ScaledEdgeDGP(base, "Y", "X", 2.0)
+    scaled = edits.scale_edge(base, "Y", "X", 2.0)
     parents = np.array([[3.0, -2.0]])  # structural order: predecessors(Y) = [X, W]
     # f'(P) = f(P) + (k-1) * contribution(X), with the contribution derived
     # from the base's OWN fitted response -- exact to machine precision
@@ -45,7 +47,7 @@ def test_scaled_edge_response__multi_parent_closed_form():
 def test_scaled_edge_calibrate__infeasible_raises():
     data, graph, column_mapping = _fork_data()
     base = OlsDGP(graph, column_mapping).fit(data)
-    scaled = ScaledEdgeDGP(base, "Y", "X", 100.0)
+    scaled = edits.scale_edge(base, "Y", "X", 100.0)
     with pytest.raises(ValueError, match="infeasible"):
         scaled.calibrate(data)
 
@@ -53,7 +55,7 @@ def test_scaled_edge_calibrate__infeasible_raises():
 def test_scaled_edge_marginal_variance_preserved():
     data, graph, column_mapping = _fork_data()
     base = OlsDGP(graph, column_mapping).fit(data)
-    scaled = ScaledEdgeDGP(base, "Y", "X", 2.0)
+    scaled = edits.scale_edge(base, "Y", "X", 2.0)
     scaled.calibrate(data)
     # fresh parent draws -> child resampled through the scaled mechanism
     rng = np.random.default_rng(3)
@@ -69,17 +71,42 @@ def test_scaled_edge_marginal_variance_preserved():
 def test_scaled_edge_delegates_graph_mapping_and_sample():
     data, graph, column_mapping = _fork_data()
     base = OlsDGP(graph, column_mapping).fit(data)
-    scaled = ScaledEdgeDGP(base, "Y", "X", 2.0).fit(data)
+    scaled = edits.scale_edge(base, "Y", "X", 2.0).fit(data)
     assert scaled.graph is base.graph
     assert scaled.column_mapping is base.column_mapping
-    np.testing.assert_allclose(
-        scaled.sample(np.random.default_rng(0), 20),
-        base.sample(np.random.default_rng(0), 20),
-    )
+    # Sample walks the VIEW's mechanisms: the unmodified nodes (W, X) draw
+    # identically; the scaled child Y is recomputed through the scaled
+    # response â€” so it DIFFERS from the base sample.
+    s = scaled.sample(np.random.default_rng(0), 20)
+    b = base.sample(np.random.default_rng(0), 20)
+    np.testing.assert_allclose(s[:, [0, 1]], b[:, [0, 1]])
+    assert not np.allclose(s[:, 2], b[:, 2])
+    # ...and Y matches the view's own scaled mechanism (up to noise)
+    det = scaled.response("Y", s[:, [column_mapping["X"], column_mapping["W"]]])
+    base_det = base.response("Y", s[:, [column_mapping["X"], column_mapping["W"]]])
+    assert np.std(s[:, 2] - det) < np.std(s[:, 2] - base_det)
 
 
 def test_scaled_edge_unknown_edge_raises():
     data, graph, column_mapping = _fork_data()
     base = OlsDGP(graph, column_mapping).fit(data)
     with pytest.raises(ValueError, match="not in graph"):
-        ScaledEdgeDGP(base, "X", "Y", 2.0)  # X is a root: Y is not its parent
+        edits.scale_edge(base, "X", "Y", 2.0)  # X is a root: Y is not its parent
+
+
+def test_remove_edge_is_scale_edge_zero():
+    # remove_edge = scale_edge(k=0): the parent's contribution vanishes and
+    # is absorbed into the child's exogenous shock (SCM surgery view, Q3 a).
+    data, graph, column_mapping = _fork_data()
+    base = OlsDGP(graph, column_mapping).fit(data)
+    removed = edits.remove_edge(base, "Y", "X")
+    scaled = edits.scale_edge(base, "Y", "X", 0.0)
+    parents = np.array([[3.0, -2.0]])
+    np.testing.assert_allclose(
+        removed.response("Y", parents), scaled.response("Y", parents)
+    )
+    # The X contribution is gone: response equals the W-only prediction.
+    w_only = base.response("Y", np.array([[0.0, -2.0]]))
+    np.testing.assert_allclose(removed.response("Y", parents), w_only)
+
+

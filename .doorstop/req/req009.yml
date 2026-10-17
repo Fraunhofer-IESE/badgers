@@ -1,0 +1,14 @@
+active: true
+derived: false
+header: ''
+level: 1.9
+links: []
+normative: true
+ref: test_pipeline__empty_generators_preserves_data
+reviewed: null
+text: |
+  REQ-P-009 — Empty pipeline:
+  A Pipeline constructed with an empty generators mapping shall return the
+  inputs `(X, y)` unchanged.
+
+  Verified by: test_pipeline__empty_generators_preserves_data

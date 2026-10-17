@@ -4,7 +4,7 @@ A DGP is a **bundle of per-node mechanisms**: each node's mechanism is
 fitted independently from (data, its parents) — the modularity assumption,
 the same one DoWhy's gcm fitting states explicitly. Everything above this
 protocol (interventions, cascades, joint sampling) is *generic algebra*
-written once in ``badgers.core.dgp.algebra`` / ``badgers.core.dgp.base``;
+written once in ``badgers.core.dgp.base``;
 backends never implement cascades and never learn about deficits.
 """
 
@@ -12,6 +12,7 @@ from typing import Hashable, Iterable, Protocol
 
 import networkx as nx
 import numpy as np
+
 
 
 class DGP(Protocol):
@@ -29,6 +30,16 @@ class DGP(Protocol):
         ``fit_node``; backends that do not inherit it must implement
         ``fit`` themselves. Generators call ``fit`` on any backend passed
         via ``fit(dgp=...)``.
+        """
+        ...
+
+    def is_fitted(self) -> bool:
+        """True iff every structural node has a fitted mechanism.
+
+        Generator-side convenience: lets a generator fit an UNFITTED DGP
+        lazily on the generate-time data while leaving a fitted one
+        untouched. Backend-specific storage means backends implement
+        this; read-only views delegate to the DGP they wrap.
         """
         ...
 
@@ -61,4 +72,39 @@ class DGP(Protocol):
 
     def sample(self, rng: np.random.Generator, n: int) -> np.ndarray:
         """Tier 2: sample ``n`` joint rows from the fitted graph."""
+        ...
+
+    def pick_parameters(self, rng=None) -> "DGP":
+        """Hook called ONCE at the top of ``sample``/``intervene``: return
+        the DGP instance whose mechanisms drive this cascade.
+
+        Generic default (``DGPMixin``): ``self`` — deterministic backends
+        fit exactly one parameter set. Uncertainty-carrying backends
+        override it: they select ONE coherent parameter draw from ``rng``
+        and return a read-only view of themselves evaluating it. The DGP
+        keeps every draw from ``fit``; the choice is made at the top of
+        each cascade from the caller's rng — never inside ``response``
+        and never by mutating the fitted DGP.
+        """
+        ...
+
+    # -- Value-level intervention -------------------------------------------
+
+    def intervene(self, rows: np.ndarray, nodes: Hashable | Iterable,
+                  values=None, *, rng=None) -> np.ndarray:
+        """Pearl surgery applied to GIVEN rows: fix the nodes at ``values``,
+        recompute all their descendants (topological order, fresh noise).
+
+        ``DGPMixin`` provides the generic implementation; backends may
+        override it natively, preserving the same semantics (upstream and
+        non-descendant columns and rows untouched; intervened nodes keep
+        their fixed values even if they are descendants of other
+        intervened nodes).
+
+        NOTE: structure edits are intentionally NOT part of this protocol.
+        The DGP is an immutable, fitted world; structural modifications
+        live in ``badgers.core.dgp.edits`` (free functions returning a new
+        world: ``scale_edge``/``remove_edge``/``add_edge_contribution``/
+        ``exogenize``/``set_form``/``rebuild``).
+        """
         ...

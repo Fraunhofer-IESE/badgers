@@ -1,30 +1,34 @@
 import numpy as np
 import pytest
+import scipy.stats
 
 from numpy.random import default_rng
 from sklearn.datasets import make_blobs
 
 from badgers.core.pipeline import Pipeline
+from badgers.core.selectors import ClassSelector
 from badgers.generators.tabular_data.imbalance.imbalance import RandomSamplingClassesGenerator
-from badgers.generators.tabular_data.noise.noise import GaussianNoiseGenerator
+from badgers.generators.tabular_data.noise.noise import AdditiveNoiseGenerator
 
 
-def test_pipeline__preserves_shape():
-    """Pipeline output should have same number of rows as input."""
+def test_pipeline__subsampling_shrinks_output():
+    """A subsampling selector in the pipeline drops fired rows."""
     random_generator = default_rng(0)
     X, y = make_blobs(centers=3, random_state=0)
     generators = {
         'imbalance': RandomSamplingClassesGenerator(random_generator=random_generator),
-        'noise': GaussianNoiseGenerator(random_generator=random_generator)
+        'noise': AdditiveNoiseGenerator(random_generator=random_generator)
     }
     pipeline = Pipeline(generators=generators)
     params = {
-        'imbalance': {'proportion_classes': {0: 0.5, 1: 0.25, 2: 0.25}},
-        'noise': {'noise_std': 0.5}
+        'imbalance': {'selector': ClassSelector(
+            "cls", {"cls": 2}, {"cls": {0: 0.2, 1: 0.1, 2: 0.1}}, rng=random_generator)},
+        'noise': {'distribution': scipy.stats.norm(scale=0.5)}
     }
-    Xt, yt = pipeline.generate(X=X, y=y, params=params)
-    assert len(Xt) == len(X)
-    assert len(yt) == len(y)
+    Xc = np.column_stack([X, y])
+    Xt, yt = pipeline.generate(X=Xc, y=y, params=params)
+    assert len(Xt) == len(yt)
+    assert 0 < len(Xt) < len(X)
 
 
 def test_pipeline__modifies_data():
@@ -32,10 +36,10 @@ def test_pipeline__modifies_data():
     random_generator = default_rng(0)
     X, y = make_blobs(centers=3, random_state=0)
     generators = {
-        'noise': GaussianNoiseGenerator(random_generator=random_generator)
+        'noise': AdditiveNoiseGenerator(random_generator=random_generator)
     }
     pipeline = Pipeline(generators=generators)
-    params = {'noise': {'noise_std': 1.0}}
+    params = {'noise': {'distribution': scipy.stats.norm(scale=1.0)}}
     Xt, yt = pipeline.generate(X=X.copy(), y=y, params=params)
     assert not np.allclose(Xt, X)
 
@@ -161,11 +165,11 @@ def test_pipeline__unknown_param_keys_are_ignored():
 
 def test_pipeline__y_flows_through_real_generators():
     """REQ-P-007 integration: with a real noise generator, y is documented to
-    remain unchanged while flowing through the pipeline (GaussianNoiseGenerator)."""
+    remain unchanged while flowing through the pipeline (AdditiveNoiseGenerator)."""
     X, y = make_blobs(centers=3, random_state=0)
-    gen = GaussianNoiseGenerator(random_generator=default_rng(0))
+    gen = AdditiveNoiseGenerator(random_generator=default_rng(0))
     Xt, yt = Pipeline(generators={'noise': gen}).generate(
-        X=X.copy(), y=y, params={'noise': {'noise_std': 1.0}}
+        X=X.copy(), y=y, params={'noise': {'distribution': scipy.stats.norm(scale=1.0)}}
     )
     assert np.array_equal(yt, y)          # strengthens the weak `len(yt)` check
     assert np.asarray(Xt).shape == X.shape

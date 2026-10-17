@@ -61,6 +61,13 @@ class OlsDGP(DGPMixin):
     def _is_root(self, node):
         return node not in self._beta
 
+    def is_fitted(self):
+        """True iff every graph node has a fitted mechanism (G9)."""
+        return all(
+            node in self._mu or node in self._beta
+            for node in self.graph.nodes
+        )
+
     def response(self, node, parent_values):
         if self._is_root(node):
             if node not in self._mu:

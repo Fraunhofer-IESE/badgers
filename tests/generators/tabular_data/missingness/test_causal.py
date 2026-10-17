@@ -8,6 +8,12 @@ measurement, not of the world.
 import numpy as np
 import pytest
 
+from badgers.core.dgp import OlsDGP
+from badgers.core.selectors import (
+    AlwaysSelector,
+    BernoulliSelector,
+    TopQuantileSelector,
+)
 from badgers.generators.tabular_data.missingness.causal import (
     CausalMissingnessGenerator,
 )
@@ -16,10 +22,10 @@ from badgers.generators.tabular_data.missingness.causal import (
 def test_generate__always_fires_everywhere(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
-        mechanism="always",
+        selector=AlwaysSelector("X"),
     )
     # in-place: same shape
     assert Xt.shape == X.shape
@@ -36,10 +42,11 @@ def test_generate__mcar_mask_independent_of_values(chain_data):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
-        mechanism="random", mechanism_rate=0.5,
+        selector=BernoulliSelector("X", rate=0.5,
+                                   rng=gen.random_generator),
     )
     mask = np.isnan(Xt[:, 0])
     # ~50% missing
@@ -57,10 +64,10 @@ def test_generate__self_mnar_mask_depends_on_own_value(chain_data):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
-        mechanism="self", mechanism_rate=0.3,
+        selector=TopQuantileSelector("X", column_mapping, quantile=0.7),
     )
     mask = np.isnan(Xt[:, 0])
     # MNAR: high X values are more likely missing.
@@ -77,10 +84,12 @@ def test_generate__observed_mar_depends_on_cause(chain_data):
     X, graph, column_mapping = chain_data
     # cause = X (col 0, an ancestor of Y, fully observed); perturb Y.
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
-        mechanism="observed", mechanism_cause="X", mechanism_rate=0.5,
+        selector=TopQuantileSelector(
+            "Y", column_mapping, quantile=0.5, drivers="X"
+        ),
     )
     mask = np.isnan(Xt[:, 1])
     # Missingness should correlate with X (the cause).
@@ -97,10 +106,12 @@ def test_generate__multi_node_only_fired_cells(chain_data):
     # Perturb TWO nodes: each column gets NaN only where IT fired.
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(3))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, _ = gen.generate(
         X, y=None, perturbation_nodes=["X", "Z"],
-        mechanism="random", mechanism_rate=0.3,
+        selector=BernoulliSelector(
+            ("X", "Z"), rate=0.3, rng=gen.random_generator
+        ),
     )
     mx = np.isnan(Xt[:, 0])
     mz = np.isnan(Xt[:, 2])
@@ -114,40 +125,21 @@ def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator()
     # not fitted yet
-    with pytest.raises(RuntimeError, match="not fitted"):
+    with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
     # unknown perturbation node
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="not found in graph"):
         gen.generate(X, y=None, perturbation_nodes=["NOPE"])
-
-
-def test_generate__mar_requires_cause(chain_data):
-    X, graph, column_mapping = chain_data
-    gen = CausalMissingnessGenerator()
-    gen.fit(X, graph, column_mapping)
-    with pytest.raises(ValueError, match="mechanism_cause"):
-        gen.generate(
-            X, y=None, perturbation_nodes=["X"],
-            mechanism="observed", mechanism_cause=None,
-        )
-
-
-def test_generate__unknown_mechanism_raises(chain_data):
-    X, graph, column_mapping = chain_data
-    gen = CausalMissingnessGenerator()
-    gen.fit(X, graph, column_mapping)
-    with pytest.raises(ValueError, match="mechanism"):
-        gen.generate(X, y=None, perturbation_nodes=["X"], mechanism="nope")
 
 
 def test_generate__labeled_y_passes_through(chain_data):
     X, graph, column_mapping = chain_data
     y = np.array(["a", "b"] * (X.shape[0] // 2))
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
-        X, y=y, perturbation_nodes=["X"], mechanism="always",
+        X, y=y, perturbation_nodes=["X"], selector=AlwaysSelector("X"),
     )
     # y unchanged (defect does not change targets)
     np.testing.assert_array_equal(yt, y)
@@ -160,10 +152,11 @@ def test_generate__reproducible_with_explicit_rng(chain_data):
         gen = CausalMissingnessGenerator(
             random_generator=np.random.default_rng(11)
         )
-        gen.fit(X, graph, column_mapping)
+        gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
         Xt, _ = gen.generate(
             X.copy(), y=None, perturbation_nodes=["X"],
-            mechanism="random", mechanism_rate=0.4,
+            selector=BernoulliSelector("X", rate=0.4,
+                                       rng=gen.random_generator),
         )
         outs.append(Xt)
     np.testing.assert_array_equal(outs[0], outs[1])
@@ -174,11 +167,11 @@ def test_generate__all_nan_input_edge(chain_data):
     # crash, no other column touched.
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(2))
-    gen.fit(X, graph, column_mapping)
+    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
     Xn = X.copy()
     Xn[:, 1] = np.nan
     Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
-                         mechanism="always")
+                         selector=AlwaysSelector("Y"))
     assert np.all(np.isnan(Xt[:, 1]))
     np.testing.assert_array_equal(Xt[:, 0], Xn[:, 0])
     np.testing.assert_array_equal(Xt[:, 2], Xn[:, 2])

@@ -2,32 +2,50 @@
 
 Public surface:
 
-- ``DGP`` — the backend-agnostic protocol (``DGPMixin`` provides the
-  default ``fit``/``sample`` topological walk);
-- ``do`` / ``ordered_descendants`` — the generic deficit algebra;
+- ``DGP`` — the backend-agnostic protocol: per-node mechanisms
+  (``fit_node``/``response``/``draw_noise``), joint ``sample``, and the
+  value-level ``intervene`` (Pearl surgery on given rows). The DGP is
+  an immutable, fitted model — it has NO structure-edit methods;
+- ``DGPMixin`` — the generic reference implementations of everything
+  above except ``fit_node`` (backends may override any method natively,
+  preserving the protocol semantics);
+- ``edits`` — the structure-modification vocabulary as free functions
+  (``scale_edge``/``remove_edge``/``add_edge_contribution``/
+  ``exogenize``/``set_form``/``rebuild``/``reversed_graph``), returning
+  NEW DGPs;
 - ``OlsDGP`` — the default deterministic backend (pure NumPy);
-- ``ScaledEdgeDGP`` — a read-only view of a fitted DGP with one edge's
-  contribution scaled (variance-preserving noise rescaling).
+- ``ordered_descendants`` — topological descendant walk (in
+  ``badgers.core.causal_graph``).
 
 Heavy estimation libraries (PyMC, DoWhy) live in their own backend modules
 under ``badgers.core.dgp.backends`` and are imported lazily **inside those
 modules**; they are never imported by this package.
 """
 
-from badgers.core.dgp.algebra import (
-    ScaledEdgeDGP,
-    do,
-    ordered_descendants,
-)
+from badgers.core.causal_graph import ordered_descendants
 from badgers.core.dgp.backends.ols import OlsDGP
 from badgers.core.dgp.base import DGPMixin
+from badgers.core.dgp.edits import (
+    add_edge_contribution,
+    exogenize,
+    rebuild,
+    remove_edge,
+    reversed_graph,
+    scale_edge,
+    set_form,
+)
 from badgers.core.dgp.protocol import DGP
 
 __all__ = [
     "DGP",
     "DGPMixin",
     "OlsDGP",
-    "ScaledEdgeDGP",
-    "do",
     "ordered_descendants",
+    "scale_edge",
+    "remove_edge",
+    "add_edge_contribution",
+    "exogenize",
+    "set_form",
+    "rebuild",
+    "reversed_graph",
 ]

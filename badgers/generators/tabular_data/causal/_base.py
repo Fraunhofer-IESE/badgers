@@ -1,10 +1,13 @@
 """Shared base class for the causal data quality defect generators.
 
 Owns the shared plumbing: DAG/column_mapping/perturbation validation, DGP
-fitting, mechanism gating (which rows get the defect), and label building.
+configuration (no generator-side ``fit`` — the DGP is fitted by its own
+``fit``, explicitly by the caller or lazily inside ``generate()``),
+mechanism gating (which rows get the defect), and label building.
 Subclasses define the defect injection and propagation.
 """
 
+import inspect
 import numpy as np
 from numpy.random import default_rng
 
@@ -15,8 +18,7 @@ from badgers.core.causal_graph import (
     topological_order,
     validate_dag,
 )
-from badgers.core.dgp import OlsDGP, do
-from badgers.core.selectors import BernoulliSelector, TopQuantileSelector
+from badgers.core.selectors import AlwaysSelector
 
 
 def _column_stds(X):
@@ -42,34 +44,41 @@ class CausalGenerator(GeneratorMixin):
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
     dgp : DGP or None, default=None
-        DGP instance. If None, the default OLS backend (``OlsDGP``) is
-        created on demand and fitted lazily by ``_require_dgp``.
+        DGP instance (fitted or unfitted). This is the ONLY structure
+        the generator accepts — a DGP carries its own graph and
+        column_mapping. There is no graph-only configuration and no
+        implicit default backend: if ``dgp`` is None, ``generate()``
+        raises (build one with e.g. ``OlsDGP(graph, column_mapping)``).
 
     Notes
     -----
-    Fitting in a pipeline
+    No generator-side ``fit``, no graph-only configuration
+        Causal generators have NO public ``fit()`` — the only fitted
+        object is the DGP (``DGP.fit``), consistent with the rest of the
+        library. The DGP is fitted either EXPLICITLY by the caller
+        (preferred) or lazily INSIDE ``generate()`` when the configured
+        DGP is still unfitted (``_require_dgp``).
+
+    Pipelines
         In a pipeline, each causal stage receives the PREVIOUS stage's
-        output as input. Fitting the DGP lazily on that contaminated input
-        would refit the world per stage (and, with NaN-bearing columns,
-        trigger complete-case filtering). Instead, fit the world ONCE on
+        output as input. Fitting the DGP lazily on that contaminated
+        input would refit the world per stage (and, with NaN-bearing
+        columns, trigger complete-case filtering). Fit the DGP ONCE on
         the clean entry data and share the fitted instance::
 
-            world = CausalDriftGenerator(rng=...)
-            world.fit(X, graph, column_mapping,
-                      dgp=OlsDGP(graph, column_mapping))  # fit on clean X
+            dgp = OlsDGP(graph, column_mapping).fit(X)  # fit on clean X
 
-            missingness = CausalMissingnessGenerator(rng=...)
-            missingness.fit(X, graph, column_mapping)
+            missingness = CausalMissingnessGenerator(rng=..., dgp=dgp)
             Xm, _ = missingness.generate(X, None, ...)
 
-            drift = CausalDriftGenerator(rng=...)
-            drift.use_dgp(world.dgp)  # share the fitted world
+            drift = CausalDriftGenerator(rng=..., dgp=dgp)  # share
             Xt, _ = drift.generate(Xm, None, ...)
 
         The OLS backend fits with complete-case filtering and all
         per-stage scale computations are NaN-safe, so even the lazy
-        refit path behaves sensibly; the explicit ``dgp=`` + ``use_dgp``
-        pattern simply guarantees ONE world for the whole pipeline.
+        refit path behaves sensibly; the explicitly-fitted shared
+        ``dgp=`` pattern simply guarantees ONE world for the whole
+        pipeline.
     """
 
     #: Subclasses set this to the deficit name used in labels.
@@ -78,72 +87,76 @@ class CausalGenerator(GeneratorMixin):
     def __init__(self, random_generator=default_rng(seed=0), dgp=None):
         self.random_generator = random_generator
         self.dgp = dgp
-        self.graph = None
-        self.column_mapping = None
+        self.graph = None if dgp is None else dgp.graph
+        self.column_mapping = None if dgp is None else dgp.column_mapping
 
     # -- DGP plumbing -------------------------------------------------------
 
-    def fit(self, X, graph, column_mapping, dgp=None):
-        """Fit phase: store the structure; fit an injected DGP if given.
-
-        Stores ``self.graph`` / ``self.column_mapping`` so ``generate()``
-        does not need them. A DGP backend passed as ``dgp`` is fitted here
-        (explicit fit phase); when ``dgp`` is None, the default ``OlsDGP``
-        is created lazily by ``_require_dgp`` on first use.
-        """
-        self.graph = graph
-        self.column_mapping = column_mapping
-        if dgp is not None:
-            self.dgp = dgp
-            self.dgp.fit(X)
-
     def use_dgp(self, dgp):
-        """Attach an already-fitted DGP (shared across a pipeline)."""
+        """Attach a DGP (fitted or unfitted); the structure comes with it.
+
+        An unfitted DGP is fitted lazily inside ``generate()`` on the
+        generate-time data (``_require_dgp``). Prefer attaching a DGP you
+        fitted explicitly on the clean entry data (shared across a
+        pipeline).
+        """
         self.dgp = dgp
         self.graph = dgp.graph
         self.column_mapping = dgp.column_mapping
 
+    def rebuild_with_graph(self, X, graph):
+        """A3 option (b) refit route: rebuild the world on a MODIFIED graph.
+
+        Delegates to ``badgers.core.dgp.edits.rebuild`` semantics: a fresh
+        DGP of the same backend class is constructed for ``graph`` (same
+        ``column_mapping``) and fitted on the CLEAN entry data ``X``.
+        Use ``use_dgp(rebuilt)`` to adopt it.
+        This is the one-refit-of-the-fully-modified-graph route (A7):
+        apply all structural modifications to ``graph`` FIRST, then call
+        this once — not one refit per edit.
+        """
+        self._require_fitted()
+        from badgers.core.dgp.edits import rebuild
+
+        return rebuild(self.dgp, X, graph)
+
     def _require_fitted(self):
         if self.graph is None:
             raise RuntimeError(
-                "Generator is not fitted: call fit(X, graph, column_mapping) "
-                "or use_dgp(dgp) before generate()."
+                "Generator has no structure: pass a dgp=... to the "
+                "constructor, or use use_dgp(dgp), before generate()."
             )
 
     def _require_dgp(self, X=None):
-        """Require a fitted DGP; create the default OLS backend on demand.
+        """Require a fitted DGP; fit lazily on demand.
 
-        Call ``_require_dgp(X)`` before any column mutation so the default
-        backend is fitted on the ORIGINAL data. Generators that need no
-        structural equation simply never call it (no DGP is created).
+        Call ``_require_dgp(X)`` before any column mutation so the DGP is
+        fitted on the ORIGINAL data. Two routes:
+
+        1. a fitted DGP was configured/attached — nothing to do;
+        2. an UNFITTED DGP was configured/attached — it is fitted here
+           on ``X`` (the generate-time data).
+
+        There is NO implicit default backend: if no DGP was given,
+        ``generate()`` fails. Build the world explicitly, e.g.
+        ``dgp = OlsDGP(graph, column_mapping).fit(X)``.
         """
         if self.dgp is None:
-            if X is None:
-                raise RuntimeError(
-                    "This generator needs a fitted DGP: call fit(X, graph, "
-                    "column_mapping, dgp=<backend>) or use_dgp(dgp) before "
-                    "generate()."
-                )
-            self.dgp = OlsDGP(self.graph, self.column_mapping).fit(X)
-
-    def propagate(self, rows, perturbation_nodes, rng, rows_original=None,
-                  mode="delta"):
-        """Cascade an applied perturbation to the descendants.
-
-        Delegates to the library-level do-operation (backend-blind):
-        ``mode="delta"`` preserves each node's exogenous shock exactly
-        (requires ``rows_original``); ``mode="recompute"`` redraws
-        descendant noise (requires ``rng``).
-        """
-        return do(self.dgp, rows, perturbation_nodes, mode=mode, rng=rng,
-                  rows_original=rows_original)
+            raise RuntimeError(
+                "This generator needs a DGP: pass a dgp=... to the "
+                "constructor, or use use_dgp(dgp), before generate(). "
+                "Build one with e.g. dgp = OlsDGP(graph, "
+                "column_mapping).fit(X)."
+            )
+        elif not self.dgp.is_fitted():
+            self.dgp.fit(X)
 
     def _sample(self, n_samples):
         """Delegate sampling to the fitted DGP."""
-        if self.dgp is None:
+        if self.dgp is None or not self.dgp.is_fitted():
             raise RuntimeError(
-                "_sample requires a fitted DGP: call fit(X, graph, "
-                "column_mapping, dgp=<backend>) first."
+                "_sample requires a fitted DGP: pass a fitted dgp=... to "
+                "the constructor (or use_dgp(dgp)) first."
             )
         return self.dgp.sample(self.random_generator, n_samples)
 
@@ -154,26 +167,14 @@ class CausalGenerator(GeneratorMixin):
         rows,
         perturbation_nodes,
         node_to_col,
-        mechanism,
-        mechanism_cause,
-        mechanism_rate,
+        selector=None,
         stats_rows=None,
     ):
         """Fire masks for ALL rows at once: dict {node: bool row-mask}.
 
-        The vectorized, chooser-based mechanism dispatcher: one dict of
-        bool row-masks per node (quantile thresholds computed ONCE).
-        Every random mechanism is backed by a preset from
-        ``badgers.core.selectors``.
-
-        ``mechanism="random"`` delegates to the ``BernoulliSelector``
-        preset (one vectorized ``(n_rows, n_variables)`` draw, whose
-        row-major fill reproduces the legacy per-row draws exactly).
-        ``mechanism="observed"`` and ``mechanism="self"`` delegate to the
-        ``TopQuantileSelector`` preset (driver mode / self mode; a
-        deterministic threshold rule at the ``1 - mechanism_rate``
-        quantile, so no draw-order concerns). Only
-        ``mechanism="always"`` is computed inline (all-True masks).
+        Delegates to a ``Selector`` from ``badgers.core.selectors``:
+        ``selector(rows, y, stats=stats_rows) -> {node: bool mask}``.
+        ``None`` defaults to ``AlwaysSelector`` (every row fires).
 
         Parameters
         ----------
@@ -181,57 +182,45 @@ class CausalGenerator(GeneratorMixin):
             generator these are the n_copies-EXPANDED rows).
         perturbation_nodes : list of str, non-empty (pre-validated).
         node_to_col : column_mapping dict (node name -> column index).
-        mechanism, mechanism_cause, mechanism_rate : the legacy knobs.
+        selector : Selector or None, default None
+            The row-selection rule. ``None`` = ``AlwaysSelector`` (all
+            rows fire). Presets: ``BernoulliSelector`` (iid rate),
+            ``ExactCountSelector`` (exact count), ``TopQuantileSelector``
+            (value threshold, self or driver mode), ``AlwaysSelector``;
+            any user callable with the same signature works.
         stats_rows : array or None, default None
-            Rows on which quantile thresholds are computed; defaults to
-            ``rows``. The noise generator passes the UN-EXPANDED input so
-            expanded rows are gated against the original columns'
-            statistics (legacy behavior).
+            Passed to the selector as ``stats=`` (the row set on which
+            value thresholds are computed). The noise generator passes the
+            UN-EXPANDED input so expanded rows are gated against the
+            original columns' statistics. Selectors that do not accept a
+            ``stats`` kwarg must be called without expansion gating (the
+            generator only passes ``stats`` when it differs from ``rows``).
 
         Note: masks are computed against ``rows`` BEFORE any mutation
         (callers write NaNs/noise afterwards), which makes the gate
         order-independent -- the "compute ALL masks first" invariant the
         legacy missingness path already documented.
         """
-        n_rows = rows.shape[0]
-        stats = rows if stats_rows is None else stats_rows
-        if mechanism == "random":
-            selector = BernoulliSelector(
-                tuple(perturbation_nodes), rng=self.random_generator,
-            )
-            return selector(rows, None, rate=mechanism_rate)
-        if mechanism == "always":
+        if selector is None:
             return {
-                node: np.ones(n_rows, dtype=bool)
+                node: np.ones(rows.shape[0], dtype=bool)
                 for node in perturbation_nodes
             }
-        if mechanism == "observed":
-            if mechanism_cause is None:
-                raise ValueError(
-                    "mechanism_cause is required for mechanism='observed'"
-                )
-            # legacy semantics: mechanism_rate = TOP FRACTION that fires ->
-            # quantile threshold = 1 - mechanism_rate
-            selector = TopQuantileSelector(
-                tuple(perturbation_nodes), node_to_col,
-                drivers=mechanism_cause,
-            )
-            return selector(rows, None, quantile=1.0 - mechanism_rate,
-                            stats=stats)
-        if mechanism == "self":
-            selector = TopQuantileSelector(
-                tuple(perturbation_nodes), node_to_col,
-            )
-            return selector(rows, None, quantile=1.0 - mechanism_rate,
-                            stats=stats)
-        raise ValueError(f"Unknown mechanism '{mechanism}'")
+        # Pass stats= only to selectors that accept it (e.g. quantile rules
+        # with a threshold row set); stochastic/trivial presets do not.
+        if stats_rows is not None and "stats" in inspect.signature(
+            selector.__call__
+        ).parameters:
+            return selector(rows, None, stats=stats_rows)
+        return selector(rows, None)
 
     # -- Validation ---------------------------------------------------------
 
     def _validate(self, X, perturbation_nodes):
         """Validate inputs and return the working sets.
 
-        Uses ``self.graph`` / ``self.column_mapping`` (set by ``fit()``).
+        Uses ``self.graph`` / ``self.column_mapping`` (derived from the
+        configured DGP).
 
         Returns
         -------
@@ -241,7 +230,9 @@ class CausalGenerator(GeneratorMixin):
         column_mapping = self.column_mapping
         if graph is None:
             raise ValueError(
-                "graph is not set: call fit(X, graph, column_mapping) first"
+                "no DGP configured: pass a dgp=... to the constructor, "
+                "or use use_dgp(dgp) (the DGP carries graph and "
+                "column_mapping)"
             )
         validate_dag(graph)
         if perturbation_nodes is None:
