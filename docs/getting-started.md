@@ -14,15 +14,15 @@ from scipy.stats import norm
 from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator
 
 X, y = make_blobs()
-trf = AdditiveNoiseGenerator()
-Xt, yt = trf.generate(X, y, distribution=norm(scale=0.5))
+gen = AdditiveNoiseGenerator()
+Xt, yt = gen.generate(X, y, distribution=norm(scale=0.5))
 ```
 
 More examples are available in the [tutorials](../tutorials/tabular-data/Imbalance-Tabular-Data/) section.
 
 ## Learn the concepts
 
-New to badgers? The [Understanding badgers](../tutorials/concepts/Badgers-Concepts/) notebook explains the underlying objects and contracts **step by step**: where generators live, how to create one (randomness), how to call `generate()`, what you get back (shape rules), what happens to your input, the `y` deprecation, and then selectors, data-generating processes (DGP), and pipelines.
+New to badgers? The [Understanding badgers](../tutorials/concepts/Badgers-Concepts/) notebook explains the underlying objects and contracts **step by step**: library structure, how to instanciate generators, the `generate()` API, selectors, data-generating processes (DGP), pipelines and more.
 
 ## Build your own
 
