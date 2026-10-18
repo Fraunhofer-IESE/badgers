@@ -167,6 +167,25 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `generate(np.column_stack([X, y]), y,
   selector=ClassSelector("cls", {"cls": n_features},
   {"cls": {c: 1.0 for c in classes}}, rng=rng), shift_std=2.0)`.
+- **Drift generators: signed per-column ``shift_std`` and class-column
+  protection (breaking, ``RandomShiftGenerator``/
+  ``RandomShiftClassesGenerator``).** ``shift_std`` entries are now
+  signed: the magnitude (``|shift_std|``) is the scale of the normal draw
+  and the sign is the shift direction — a negative entry drifts the
+  column downward. For ``RandomShiftClassesGenerator`` the class column
+  is identification metadata and is NEVER shifted by default (shifting
+  it would move rows away from their class values); new parameters
+  ``variables`` (columns to shift) and ``class_column`` (explicit class
+  column position/name) allow shifting an explicit subset and/or a
+  different class column. A dict ``shift_std={class_value: std}`` now
+  requires a resolvable class column (raises otherwise).
+- **Deterministic drift generators (new):** ``FixedShiftGenerator`` and
+  ``FixedShiftClassesGenerator`` — the non-random counterparts of the
+  random shift generators. Each column is translated by exactly
+  ``shift_std`` (in standard-deviation units, data standardized first;
+  sign = direction); no random number is drawn, so repeated calls with
+  the same input return the same output. Both are exported from
+  ``badgers.generators.tabular_data.drift``.
 - **`GaussianNoiseClassesGenerator` takes a `selector` (breaking).** Same
   contract as above: classes are a column of `X` resolved via the
   selector's `column_mapping` (`selector=None` raises; a per-class lookup
@@ -319,6 +338,21 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   any sklearn pipeline-like object with `transform`/`inverse_transform`
   can replace the built-in standardization + decomposition —
   preprocessing is no longer hardcoded inside the generator.
+
+### Removed
+
+- **Seaborn is no longer a dependency of the ``dev`` extra.** All
+  tutorial/dev notebooks use plain matplotlib for visualizations.
+
+### Changed
+
+- Drift tutorials and dev notebooks: extensive fixes — collapsed summary
+  tables rebuilt, garbled prose fixed, one seeded rng per notebook
+  (``gen = Generator()`` naming, ``seed = 0``, no global ``np.random``),
+  verification cells asserting the documented behavior (noise variance,
+  constant drift shift, edge correlation/std preservation, class counts,
+  NaN counts, repeat/drop lengths), and causal-outlier plots using
+  ``get_outliers_labels()``.
 
 ### Documentation
 
