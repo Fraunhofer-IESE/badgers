@@ -11,7 +11,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   new `DGP` protocol (`badgers.core.dgp` is a package). The default backend is
   a deterministic pure-NumPy least-squares DGP (`OlsDGP`) — no extra
   dependency needed. Custom backends are injected as objects (`dgp=...` /
-  `use_dgp`); PyMC-specific knobs (`n_samples_mcmc`, `fit_dgp`) no longer
+  `use_dgp`); PyMC-specific parameters (`n_samples_mcmc`, `fit_dgp`) no longer
   appear in `fit(...)`. PyMC- and DoWhy-GCM-based backends are planned as
   follow-ups (the `causal` extra still installs PyMC + PyTensor for writing
   them).
@@ -70,7 +70,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   bullet below). Signature:
   `generate(X, y, perturbation_nodes=None, selector=None)`.
 - **String `mechanism` flags replaced by `selector` objects (breaking).**
-  The row-gating knobs of the causal defect generators
+  The row-gating parameters of the causal defect generators
   (`CausalDriftGenerator`, `CausalMissingnessGenerator`,
   `CausalNoiseGenerator`, `CausalAdditiveNoiseGenerator`) are now a single
   `selector=` parameter holding a callable from
@@ -254,7 +254,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   contract (G9) as `OlsDGP`.
 - **`PyMCDGP` backend** (`badgers.core.dgp.backends.pymc`, lazy import;
   `causal` extra): per-node Bayesian linear regression (one small
-  `pm.Model` + MCMC per node, `n_draws=200` knob) — port of the removed
+  `pm.Model` + MCMC per node, `n_draws=200` parameter) — port of the removed
   monolithic PyMC backend to the per-node protocol. The FULL posterior is
   kept; NO posterior-mean collapse.
 - **`pick_parameters` hook** (`DGPMixin`): called once at the top of the
@@ -316,7 +316,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   mode (a driver column, optionally broadcast to all gated variables).
   Deterministic (no rng); thresholds computed on the called rows or on a
   separate ``stats`` row set (for generators gating expanded rows against
-  the original columns' statistics). All intensity knobs are now
+  the original columns' statistics). All intensity parameters are now
   CONSTRUCTOR arguments of the presets (``rate=`` for
   ``BernoulliSelector``/``ExactCountSelector``, ``quantile=`` for
   ``TopQuantileSelector``); ``__call__(X, y)`` takes no intensity kwarg,
