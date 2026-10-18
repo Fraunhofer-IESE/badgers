@@ -93,7 +93,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
 
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
-        """
+        r"""
         Randomly generates outliers as data points with a z-score > 3.
 
         The process involves the following steps:
@@ -163,7 +163,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
 
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
-        """
+        r"""
         Randomly generates outliers by sampling points from a hypersphere.
 
         The process involves the following steps:
