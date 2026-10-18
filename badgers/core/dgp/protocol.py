@@ -8,6 +8,8 @@ written once in ``badgers.core.dgp.base``;
 backends never implement cascades and never learn about deficits.
 """
 
+from __future__ import annotations
+
 from typing import Hashable, Iterable, Protocol
 
 import networkx as nx

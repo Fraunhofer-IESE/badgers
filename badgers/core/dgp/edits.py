@@ -34,6 +34,8 @@ All edits compose (the returned object is itself a ``DGP``):
 base DGP.
 """
 
+from __future__ import annotations
+
 import networkx as nx
 import numpy as np
 

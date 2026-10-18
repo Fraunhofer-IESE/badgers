@@ -26,6 +26,8 @@ implementation; overrides must preserve the protocol semantics
 backend against these generic reference implementations.
 """
 
+from __future__ import annotations
+
 import networkx as nx
 import numpy as np
 
