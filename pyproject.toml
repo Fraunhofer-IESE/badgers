@@ -48,7 +48,6 @@ dev = [
     "mkdocs-jupyter>=0.25.1,<0.27.0",
     "jupyterlab>=4.5.2,<4.7.0",
     "matplotlib>=3.10.8,<3.12.0",
-    "seaborn~=0.13.2",
     "pytest>=9.0.2,<9.2.0",
     "pytest-timeout~=2.4.0",
     "pytest-benchmark>=5.2.3,<5.4.0",
