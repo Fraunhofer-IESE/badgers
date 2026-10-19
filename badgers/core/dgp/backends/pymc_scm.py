@@ -134,6 +134,7 @@ class PyMCSCMDGP(DGPMixin):
         self._param_inputs = {}  # node -> fresh inputs per referenced RV
         self._pending = {}    # node -> parent_values (discrete nodes)
         self._free_names = None
+        self._sampled = False
         self._derive_structure()
 
     # -- structure derivation ------------------------------------------------
@@ -202,17 +203,27 @@ class PyMCSCMDGP(DGPMixin):
                     f"(observed=<column>) — the joint posterior is "
                     f"identified through the observed data."
                 )
-        with self._scm:
-            self._idata = pm.sample(
-                draws=self.n_draws,
-                tune=max(self.n_draws // 2, 100),
-                chains=1,
-                cores=1,
-                progressbar=False,
-                compute_convergence_checks=False,
-            )
-        self._free_names = [rv.name for rv in self._scm.free_RVs]
+        # compile + run the unsubstituted-RV safety scan BEFORE sampling:
+        # validation errors must surface regardless of whether pm.sample
+        # would even run (e.g. a model with no free RVs raises PyMC's
+        # SamplingError before the scan could fire)
         self._compile_nodes()
+        if self._scm.free_RVs:
+            with self._scm:
+                self._idata = pm.sample(
+                    draws=self.n_draws,
+                    tune=max(self.n_draws // 2, 100),
+                    chains=1,
+                    cores=1,
+                    progressbar=False,
+                    compute_convergence_checks=False,
+                )
+            self._free_names = [rv.name for rv in self._scm.free_RVs]
+        else:
+            # degenerate SCM: every structural function is a constant —
+            # nothing to sample; the posterior draw index is a no-op
+            self._free_names = []
+        self._sampled = True
         return self
 
     def _compile_nodes(self):
@@ -243,19 +254,27 @@ class PyMCSCMDGP(DGPMixin):
                 )
             memo = {}
             rebuilt = [_rebuild(e, subst, memo) for e in params]
-            # safety scan: any RV still unsubstituted in the rebuilt
-            # graph would be freshly DRAWN at evaluation (silent
-            # corruption — verified failure mode). References to
-            # non-parent structural RVs land here.
+            # safety scan on the REBUILT graph: a correct rebuild
+            # substitutes EVERY RV with a plain vector/scalar input, so
+            # no RV op may remain — any leftover is a freshly DRAWN RV
+            # at evaluation (silent corruption — verified failure
+            # mode). Map rebuilt RV copies back to the originals (via
+            # the memo) to name the offender; references to non-parent
+            # structural RVs land here.
+            original_of = {
+                new: orig for orig, new in memo.items()
+                if new.owner and isinstance(new.owner.op, RandomVariable)
+            }
             for expr in rebuilt:
                 for anc in variable_ancestors([expr]):
                     if anc.owner and isinstance(
                         anc.owner.op, RandomVariable
                     ):
+                        offender = original_of.get(anc, anc)
                         raise ValueError(
                             f"Node '{node}': its structural function "
-                            f"references RV '{anc.name}' which is not one "
-                            f"of its parents "
+                            f"references RV '{offender.name}' which is "
+                            f"not one of its parents "
                             f"{[p for p in self.graph.predecessors(node)]} "
                             f"— unsubstituted RVs would be freshly drawn "
                             f"at evaluation (silent corruption)."
@@ -272,7 +291,7 @@ class PyMCSCMDGP(DGPMixin):
     def is_fitted(self):
         """True iff the posterior is sampled and every node is compiled."""
         return (
-            self._idata is not None
+            self._sampled
             and all(node in self._fns for node in self.graph.nodes)
         )
 
