@@ -28,6 +28,11 @@ parent. For non-additive (future) backends, the general tool is
 All edits compose (the returned object is itself a ``DGP``):
 ``set_form(scale_edge(dgp, ...), ...)`` etc. Views never mutate the
 base DGP.
+
+Re-estimation after a structural change is out of scope here: build
+the modified SCM with the library's own API (dowhy mechanism
+assignment or a new PyMC model) and wrap it again with ``GcmSCMDGP``
+or ``PyMCSCMDGP``.
 """
 
 from __future__ import annotations
@@ -87,7 +92,9 @@ def add_edge_contribution(dgp, child, parent, contribution=None,
         raise ValueError(
             "add_edge_contribution requires a contribution closure or a "
             "coefficient (an ESTIMATED new parent is not supported by "
-            "this view edit)."
+            "this view edit; for re-estimation after a structural change, "
+            "build the modified SCM with the library's own API and wrap "
+            "it again with GcmSCMDGP or PyMCSCMDGP)."
         )
     if contribution is not None and coefficient is not None:
         raise ValueError(
