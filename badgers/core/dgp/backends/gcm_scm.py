@@ -76,6 +76,8 @@ class GcmSCMDGP(DGPMixin):
         self._mech = {}
         self._residuals = {}  # node -> empirical residuals (non-root ANM)
         self._data = {}       # node -> observed values (empirical root)
+        self._clf = {}        # node -> ClassifierFCM mechanism
+        self._pending = {}    # node -> parent_values captured by last response call
 
     def is_fitted(self):
         """True iff every graph node has a translated mechanism."""
@@ -85,7 +87,7 @@ class GcmSCMDGP(DGPMixin):
         """Translate one node's mechanism (the bulk of the work happens in
         :meth:`fit`, which delegates to ``gcm.fit``; ``fit_node`` validates
         and caches the per-node translation)."""
-        from dowhy.gcm import AdditiveNoiseModel, EmpiricalDistribution
+        from dowhy.gcm import AdditiveNoiseModel, ClassifierFCM, EmpiricalDistribution
 
         mech = self.graph.nodes[node].get("causal_mechanism")
         if mech is None:
@@ -111,16 +113,31 @@ class GcmSCMDGP(DGPMixin):
                 )
             self._mech[node] = mech
             return
+        if isinstance(mech, ClassifierFCM):
+            if not parents:
+                raise ValueError(
+                    f"Node '{node}' is a root but its mechanism is a "
+                    f"ClassifierFCM; use EmpiricalDistribution for roots."
+                )
+            self._mech[node] = mech
+            self._clf[node] = mech
+            return
         raise NotImplementedError(
             f"GcmSCMDGP does not support mechanism "
             f"{type(mech).__name__} for node '{node}' yet. Supported: "
-            f"AdditiveNoiseModel (non-root), EmpiricalDistribution (root)."
+            f"AdditiveNoiseModel (non-root), ClassifierFCM (non-root, "
+            f"discrete), EmpiricalDistribution (root)."
         )
 
     def fit(self, X):
         """Validate and translate all mechanisms BEFORE delegating to
         ``gcm.fit`` on a DataFrame, then cache the empirical noise sources
         (residuals / root observations).
+
+        A pandas DataFrame is accepted directly and its dtypes are
+        preserved (gcm classifiers need string categorical targets while
+        the remaining columns stay numeric); numpy input is converted to a
+        DataFrame in ``column_mapping`` order.
 
         Pre-validating every node first avoids wasted compute and
         confusing dowhy-gcm errors when a mechanism is missing or of an
@@ -137,23 +154,44 @@ class GcmSCMDGP(DGPMixin):
         columns = [None] * len(self.graph.nodes)
         for node, col in self.column_mapping.items():
             columns[col] = node
-        df = pd.DataFrame(data, columns=columns)
+        if isinstance(X, pd.DataFrame):
+            # keep the caller's dtypes (mixed continuous/categorical data is
+            # required by gcm classifiers — an object-dtype numpy array
+            # would coerce every column to strings)
+            df = X.loc[:, columns]
+        else:
+            df = pd.DataFrame(np.asarray(X), columns=columns)
         gcm.fit(self._cm, df)
         # cache the empirical noise sources per node
+        from dowhy.gcm import AdditiveNoiseModel, ClassifierFCM
+
         for node in self.graph.nodes:
             mech = self._mech[node]
-            if hasattr(mech, "prediction_model"):  # AdditiveNoiseModel
+            if isinstance(mech, AdditiveNoiseModel):
                 parents = get_parents(self.graph, node)
                 residuals = mech.estimate_noise(
                     df[[node]].to_numpy(), df[parents].to_numpy()
                 )
                 self._residuals[node] = np.asarray(residuals).ravel()
+            elif isinstance(mech, ClassifierFCM):
+                # gcm.fit already fitted the classifier; nothing extra to cache
+                pass
             else:  # EmpiricalDistribution root
                 self._data[node] = np.asarray(mech.data).ravel()
         return self
 
     def response(self, node, parent_values):
+        from dowhy.gcm import ClassifierFCM
+
         mech = self._mech[node]
+        if isinstance(mech, ClassifierFCM):
+            # the deterministic part of a classifier FCM contributes nothing:
+            # the CLASS comes from draw_noise (inverse-CDF sampled from the
+            # classifier's class probabilities over the PENDING parent
+            # values — draw_noise receives no parents, so they are captured
+            # here at the last response call).
+            self._pending[node] = parent_values
+            return np.zeros(parent_values.shape[0])
         if hasattr(mech, "prediction_model"):
             return np.asarray(mech.prediction_model.predict(parent_values), dtype=float).ravel()
         # EmpiricalDistribution root: the marginal comes entirely from
@@ -163,6 +201,19 @@ class GcmSCMDGP(DGPMixin):
         return np.zeros(parent_values.shape[0])
 
     def draw_noise(self, node, rng, n):
+        if node in self._clf:
+            # classifier FCM: the noise draw IS the class — inverse-CDF
+            # sampling of the class probabilities over the pending parent
+            # values (gcm's own evaluate is unseeded, never call it here).
+            P = np.asarray(
+                self._clf[node].estimate_probabilities(self._pending.pop(node)),
+                dtype=float,
+            )
+            u = rng.random(n)
+            cum = np.cumsum(P, axis=1)
+            idx = (u[:, None] > cum).sum(axis=1)
+            idx = np.clip(idx, 0, P.shape[1] - 1)
+            return np.asarray(self._clf[node].get_class_names(idx), dtype=float)
         if node in self._residuals:
             # empirical noise: resample fitted residuals with the caller's rng
             return rng.choice(self._residuals[node], size=n)

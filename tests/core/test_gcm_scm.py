@@ -213,3 +213,57 @@ def test_sample_reproducible_with_same_seed():
     s1 = dgp.sample(np.random.default_rng(7), 100)
     s2 = dgp.sample(np.random.default_rng(7), 100)
     np.testing.assert_array_equal(s1, s2)
+
+
+# ---- discrete-node tests (plan Task 4) ---------------------------------
+
+
+def _build_discrete_scm():
+    """A (continuous root) -> D (binary, logistic on sin(A))."""
+    graph = nx.DiGraph([("A", "D")])
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.EmpiricalDistribution())
+    cm.set_causal_mechanism(
+        "D",
+        gcm.ClassifierFCM(gcm.ml.create_logistic_regression_classifier()),
+    )
+    return cm
+
+
+def _discrete_data(n=500, seed=0):
+    rng = np.random.default_rng(seed)
+    A = rng.normal(size=n)
+    p = 1.0 / (1.0 + np.exp(-(3.0 * np.sin(A))))
+    # dowhy-gcm classifiers require STRING categorical targets; keep A
+    # float via a DataFrame (a numpy object array would coerce A too)
+    D = np.where(rng.random(n) < p, "1", "0")
+    return pd.DataFrame({"A": A, "D": D})
+
+
+def test_classifier_fcm_discrete_node():
+    data = _discrete_data()
+    dgp = GcmSCMDGP(_build_discrete_scm()).fit(data)
+    Xs = dgp.sample(np.random.default_rng(1), 5000)
+    assert set(np.unique(Xs[:, 1])) <= {0.0, 1.0}
+    # marginal rate close to training rate
+    train_rate = np.mean(np.asarray(data["D"], dtype=float))
+    assert np.mean(Xs[:, 1]) == pytest.approx(train_rate, abs=0.08)
+    # conditional sanity: response returns zeros (class comes from noise)
+    np.testing.assert_allclose(dgp.response("D", data[["A"]]), 0.0)
+    # sampling reproducible with the caller's rng
+    s1 = dgp.sample(np.random.default_rng(3), 100)
+    s2 = dgp.sample(np.random.default_rng(3), 100)
+    np.testing.assert_array_equal(s1, s2)
+
+
+def test_intervene_discrete_node():
+    # do(D = 1.0): D pinned regardless of the logistic mechanism
+    data = _discrete_data()
+    dgp = GcmSCMDGP(_build_discrete_scm()).fit(data)
+    # the mixin's intervene mutates numpy rows (not DataFrames)
+    rows_np = np.column_stack([data["A"].to_numpy(), data["D"].astype(float)])[:50]
+    rows = dgp.intervene(
+        rows_np, ["D"], [np.full(50, 1.0)], rng=np.random.default_rng(0)
+    )
+    np.testing.assert_allclose(rows[:, 1], 1.0)
+    assert np.all(np.isfinite(rows))
