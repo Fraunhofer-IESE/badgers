@@ -8,21 +8,17 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 - **`PyMCDGP` and the old `badgers.core.dgp` module are removed.** The causal
   defect generators now fit a **per-node data generation process** behind the
-  new `DGP` protocol (`badgers.core.dgp` is a package). The default backend is
-  a deterministic pure-NumPy least-squares DGP (`OlsDGP`) — no extra
-  dependency needed. Custom backends are injected as objects (`dgp=...` /
-  `use_dgp`); PyMC-specific parameters (`n_samples_mcmc`, `fit_dgp`) no longer
-  appear in `fit(...)`. PyMC- and DoWhy-GCM-based backends are planned as
-  follow-ups (the `causal` extra still installs PyMC + PyTensor for writing
-  them).
+  new `DGP` protocol (`badgers.core.dgp` is a package). Backends are
+  injected as objects (`dgp=...` / `use_dgp`); PyMC-specific parameters
+  (`n_samples_mcmc`, `fit_dgp`) no longer appear in `fit(...)`.
 - **`CausalGenerator.fit` removed AND the `graph=`/`column_mapping=`
   generator-side structure is gone (breaking).** The DGP is the ONLY structure
   a causal generator accepts: the constructor is `CausalGenerator(random_generator=..., dgp=None)`
   and the only structure param anywhere on the generator is `dgp=` (or
-  `use_dgp(dgp)`). The DGP carries `graph` and `column_mapping` itself — pass
-  `dgp = OlsDGP(graph, column_mapping).fit(X)` and pass it via the constructor;
-  there is no implicit OLS default backend inside the generator. Unfitted DGPs
-  are fitted lazily on first `generate(X)` (`DGP.is_fitted` is respected).
+  `use_dgp(dgp)`). The DGP carries `graph` and `column_mapping` itself —
+  build one with e.g. `dgp = GcmSCMDGP(scm).fit(X)` (see
+  `docs/dev/Using-DGPs.ipynb`). Unfitted DGPs are fitted lazily on first
+  `generate(X)` (`DGP.is_fitted` is respected).
 - **`fit` signature change** for the causal defect family:
   `fit(X, graph, column_mapping, dgp=None)` — `n_samples_mcmc` and
   `fit_dgp` are gone.
@@ -216,13 +212,10 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `edits.remove_edge(dgp, child, parent)`,
   `edits.add_edge_contribution(dgp, child, parent, contribution=... or
   coefficient=..., draw_noise=...)` (the A5 cheap edit, ANM-scoped; cycle
-  and existing-edge checks; an estimated new parent routes to
-  `edits.rebuild`), `edits.exogenize(dgp, node)` (INTERVENTION-ONLY
-  semantics — see below), `edits.set_form(dgp, node, response_fn,
-  draw_noise=None)` (Q2: an optional noise-law closure),
-  `edits.reversed_graph(graph, child, parent)` + `edits.rebuild(dgp, X,
-  graph=None)` (the A3 estimation route: one refit of the fully modified
-  graph, same backend class). Edits return read-only views and never
+  and existing-edge checks), `edits.exogenize(dgp, node)`
+  (INTERVENTION-ONLY semantics — see below), `edits.set_form(dgp, node,
+  response_fn, draw_noise=None)` (Q2: an optional noise-law closure).
+  Edits return read-only views and never
   mutate the base DGP; they compose by delegation.
 
 ### Added
@@ -259,23 +252,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   one operation, `fit_node(node, parents, data)`, and expose
   `response(node, parent_values)` and `draw_noise(node, rng, n)`;
   `sample(rng, n)` is tier 2 and no generator depends on it.
-- **`DowhyGcmDGP` backend** (`badgers.core.dgp.backends.dowhy_gcm`, lazy
-  import; new `dowhy` optional extra — `pip install badgers[dowhy]`):
-  per-node `dowhy.gcm.AdditiveNoiseModel` mechanisms with GCM's linear
-  regressor as the prediction model and EMPIRICAL noise (resampled
-  residuals/shocks through the caller's rng — GCM's own sampling paths use
-  global `np.random` with no seed parameter). Same complete-case fit
-  contract (G9) as `OlsDGP`.
-- **`PyMCDGP` backend** (`badgers.core.dgp.backends.pymc`, lazy import;
-  `causal` extra): per-node Bayesian linear regression (one small
-  `pm.Model` + MCMC per node, `n_draws=200` parameter) — port of the removed
-  monolithic PyMC backend to the per-node protocol. The FULL posterior is
-  kept; NO posterior-mean collapse.
 - **`pick_parameters` hook** (`DGPMixin`): called once at the top of the
   generic `sample`/`intervene` cascades; returns the DGP instance whose
   mechanisms drive the batch (ONE coherent parameter set per call).
   Default: `self` (deterministic backends fit exactly one parameter set).
-  `PyMCDGP` overrides it to pin ONE posterior draw from the caller's rng
+  `PyMCSCMDGP` overrides it to pin ONE coherent posterior draw from the
+  caller's rng
   (a `_ParameterDrawView`): each cascade evaluates one coherent
   parameterization; the carrier itself evaluates draw 0. Posterior draws
   compose through the structure edits (an edited view rebinds the pinned
@@ -305,7 +287,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   retention).
 - **`CausalOutlierPropagationGenerator` now propagates through the shared
   DGP machinery** (internal change): the hand-rolled per-call lstsq
-  forward pass is replaced by `OlsDGP(...).fit(X)` +
+  forward pass is replaced by a fitted DGP (`GcmSCMDGP` from a dowhy-gcm
+  SCM) +
   `dgp.intervene(outliers, perturbation_nodes, rng=...)` — uniform Pearl
   surgery semantics with the other causal generators. Behavior note: a
   degenerate zero-residual fitted mechanism now contributes no noise (the
@@ -322,8 +305,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   perturbation; child recomputed with the new coefficient, descendants
   recomputed from the perturbed values).
 - **`pymc` optional extra** (renamed from `causal`; `pip install
-  "badgers[pymc]"`) — only needed for writing custom PyMC-based backends;
-  the default OLS path is pure NumPy.
+  "badgers[pymc]"`) — only needed for building the PyMC SCM passed to
+  `PyMCSCMDGP`.
 
 - **`TopQuantileSelector`** preset (`badgers.core.selectors`): fires rows at
   or above the ``quantile`` of a column — self mode (own column) or driver
@@ -357,9 +340,25 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 - **Seaborn is no longer a dependency of the ``dev`` extra.** All
   tutorial/dev notebooks use plain matplotlib for visualizations.
+- **`OlsDGP`, `DowhyGcmDGP` and `PyMCDGP` DGP backends are removed.**
+  The only DGP backends are now the two SCM adapters
+  (`badgers.core.dgp.backends.GcmSCMDGP` and `PyMCSCMDGP`): build the
+  structural causal model with the wrapped library (dowhy-gcm or PyMC),
+  then wrap it — `GcmSCMDGP(scm)` / `PyMCSCMDGP(pymc_model)`. See
+  `docs/dev/Using-DGPs.ipynb`.
+- **`edits.rebuild` and `edits.reversed_graph` are removed** (and with
+  them `CausalGenerator.rebuild_with_graph`). Re-estimation after a
+  structural modification is out of scope: build the modified SCM with
+  the wrapped library's own API, fit it, and wrap it again with the
+  appropriate adapter.
 
 ### Changed
 
+- **Causal generators require an explicit DGP (hard error when
+  missing).** There is no implicit default backend: every causal defect
+  generator raises when no `dgp=` is supplied to the
+  `CausalGenerator` constructor. Build a DGP from the library of choice
+  (dowhy-gcm or PyMC) and wrap it with `GcmSCMDGP`/`PyMCSCMDGP`.
 - Drift tutorials and dev notebooks: extensive fixes — collapsed summary
   tables rebuilt, garbled prose fixed, one seeded rng per notebook
   (``gen = Generator()`` naming, ``seed = 0``, no global ``np.random``),
