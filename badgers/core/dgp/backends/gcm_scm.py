@@ -1,0 +1,137 @@
+"""Adapter for externally built ``dowhy.gcm.StructuralCausalModel`` objects.
+
+Users familiar with dowhy-gcm build their own causal model — custom
+``PredictionModel`` subclasses, ``EmpiricalDistribution`` roots, any
+mechanism the library offers — and hand the finished object to badgers.
+Badgers does NOT replace dowhy-gcm: this adapter translates the badgers
+DGP protocol onto the mechanisms the user configured, so ``sample`` and
+Pearl-surgery ``intervene`` run on the generic ``DGPMixin`` path.
+
+Mapping (dowhy 0.13):
+
+- ``fit`` delegates mechanism fitting wholesale to ``gcm.fit`` on a
+  DataFrame in ``column_mapping`` order — whatever the user configured
+  per node is fitted by gcm exactly as gcm would fit it;
+- non-root ``AdditiveNoiseModel`` nodes: ``response`` is
+  ``prediction_model.predict(parent_values)``; noise is the EMPIRICAL
+  residual distribution (``mechanism.estimate_noise`` residuals cached at
+  fit time and resampled with the caller's rng — gcm's own draw paths use
+  global ``np.random`` with no seed, which would break the library-wide
+  reproducibility contract);
+- root ``EmpiricalDistribution`` nodes: ``response`` returns zeros and
+  ``draw_noise`` resamples the stored observations ``mechanism.data``
+  (response + noise reconstructs the marginal);
+- any other mechanism type raises a clear ``NotImplementedError`` at fit
+  time naming the node and mechanism class.
+"""
+
+import numpy as np
+import pandas as pd
+
+from badgers.core.causal_graph import get_parents
+from badgers.core.dgp.base import DGPMixin
+
+
+class GcmSCMDGP(DGPMixin):
+    """Plug an externally built ``dowhy.gcm`` causal model into badgers.
+
+    Args:
+        causal_model: a user-built ``dowhy.gcm.StructuralCausalModel``
+            (or any object with ``.graph`` and per-node
+            ``'causal_mechanism'`` attributes on the graph).
+        column_mapping: optional dict node name -> column index of the
+            numpy data; defaults to graph node insertion order.
+
+    Requires the optional ``dowhy`` extra (``pip install badgers[dowhy]``).
+    """
+
+    def __init__(self, causal_model, column_mapping=None):
+        self._cm = causal_model
+        self.graph = causal_model.graph
+        if column_mapping is None:
+            column_mapping = {node: i for i, node in enumerate(self.graph.nodes)}
+        self.column_mapping = column_mapping
+        self._mech = {}
+        self._residuals = {}  # node -> empirical residuals (non-root ANM)
+        self._data = {}       # node -> observed values (empirical root)
+
+    def is_fitted(self):
+        """True iff every graph node has a translated mechanism."""
+        return all(node in self._mech for node in self.graph.nodes)
+
+    def fit_node(self, node, parents, data):
+        """Translate one node's mechanism (the bulk of the work happens in
+        :meth:`fit`, which delegates to ``gcm.fit``; ``fit_node`` validates
+        and caches the per-node translation)."""
+        from dowhy.gcm import AdditiveNoiseModel, EmpiricalDistribution
+
+        mech = self.graph.nodes[node].get("causal_mechanism")
+        if mech is None:
+            raise ValueError(
+                f"Node '{node}' has no causal mechanism: set one with "
+                f"causal_model.set_causal_mechanism(...) before fitting."
+            )
+        if isinstance(mech, AdditiveNoiseModel):
+            if not parents:
+                raise ValueError(
+                    f"Node '{node}' is a root but its mechanism is an "
+                    f"AdditiveNoiseModel; use EmpiricalDistribution (or a "
+                    f"ScipyDistribution) for root nodes."
+                )
+            self._mech[node] = mech
+            return
+        if isinstance(mech, EmpiricalDistribution):
+            if parents:
+                raise ValueError(
+                    f"Node '{node}' has parents {list(parents)} but its "
+                    f"mechanism is an EmpiricalDistribution, which is only "
+                    f"valid for root nodes."
+                )
+            self._mech[node] = mech
+            return
+        raise NotImplementedError(
+            f"GcmSCMDGP does not support mechanism "
+            f"{type(mech).__name__} for node '{node}' yet. Supported: "
+            f"AdditiveNoiseModel (non-root), EmpiricalDistribution (root)."
+        )
+
+    def fit(self, X):
+        """Fit all mechanisms with ``gcm.fit`` on a DataFrame, then cache
+        the empirical noise sources (residuals / root observations)."""
+        import dowhy.gcm as gcm
+
+        columns = [None] * len(self.graph.nodes)
+        for node, col in self.column_mapping.items():
+            columns[col] = node
+        df = pd.DataFrame(np.asarray(X), columns=columns)
+        gcm.fit(self._cm, df)
+        # per-node validation + caching
+        for node in self.graph.nodes:
+            parents = get_parents(self.graph, node)
+            self.fit_node(node, parents, np.asarray(X))
+            mech = self._mech[node]
+            if hasattr(mech, "prediction_model"):  # AdditiveNoiseModel
+                residuals = mech.estimate_noise(
+                    df[[node]].to_numpy(), df[parents].to_numpy()
+                )
+                self._residuals[node] = np.asarray(residuals).ravel()
+            else:  # EmpiricalDistribution root
+                self._data[node] = np.asarray(mech.data).ravel()
+        return self
+
+    def response(self, node, parent_values):
+        mech = self._mech[node]
+        if hasattr(mech, "prediction_model"):
+            return np.asarray(mech.prediction_model.predict(parent_values), dtype=float).ravel()
+        # EmpiricalDistribution root: the marginal comes entirely from
+        # draw_noise; the deterministic part contributes zeros (the mixin's
+        # sample/intervene always call response, even for roots, with
+        # parent_values of shape (n, 0)).
+        return np.zeros(parent_values.shape[0])
+
+    def draw_noise(self, node, rng, n):
+        if node in self._residuals:
+            # empirical noise: resample fitted residuals with the caller's rng
+            return rng.choice(self._residuals[node], size=n)
+        # root: resample the observed marginal (response contributes zeros)
+        return rng.choice(self._data[node], size=n)
