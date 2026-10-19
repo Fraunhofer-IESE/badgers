@@ -104,22 +104,6 @@ class CausalGenerator(GeneratorMixin):
         self.graph = dgp.graph
         self.column_mapping = dgp.column_mapping
 
-    def rebuild_with_graph(self, X, graph):
-        """A3 option (b) refit route: rebuild the world on a MODIFIED graph.
-
-        Delegates to ``badgers.core.dgp.edits.rebuild`` semantics: a fresh
-        DGP of the same backend class is constructed for ``graph`` (same
-        ``column_mapping``) and fitted on the CLEAN entry data ``X``.
-        Use ``use_dgp(rebuilt)`` to adopt it.
-        This is the one-refit-of-the-fully-modified-graph route (A7):
-        apply all structural modifications to ``graph`` FIRST, then call
-        this once — not one refit per edit.
-        """
-        self._require_fitted()
-        from badgers.core.dgp.edits import rebuild
-
-        return rebuild(self.dgp, X, graph)
-
     def _require_fitted(self):
         if self.graph is None:
             raise RuntimeError(

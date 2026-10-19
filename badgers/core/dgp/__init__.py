@@ -11,7 +11,7 @@ Public surface:
   preserving the protocol semantics);
 - ``edits`` — the structure-modification vocabulary as free functions
   (``scale_edge``/``remove_edge``/``add_edge_contribution``/
-  ``exogenize``/``set_form``/``rebuild``/``reversed_graph``), returning
+  ``exogenize``/``set_form``), returning
   NEW DGPs;
 - ``OlsDGP`` — the default deterministic backend (pure NumPy);
 - ``ordered_descendants`` — topological descendant walk (in
@@ -28,9 +28,7 @@ from badgers.core.dgp.base import DGPMixin
 from badgers.core.dgp.edits import (
     add_edge_contribution,
     exogenize,
-    rebuild,
     remove_edge,
-    reversed_graph,
     scale_edge,
     set_form,
 )
@@ -46,6 +44,4 @@ __all__ = [
     "add_edge_contribution",
     "exogenize",
     "set_form",
-    "rebuild",
-    "reversed_graph",
 ]

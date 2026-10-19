@@ -157,20 +157,6 @@ def test_add_edge_contribution__missing_term_raises():
                                     contribution=lambda x: x)
 
 
-def test_reversed_graph__surgery_and_rebuild():
-    data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
-    g2 = edits.reversed_graph(graph, "Y", "X")  # edge (X -> Y) reversed
-    assert g2.has_edge("Y", "X") and not g2.has_edge("X", "Y")
-    world2 = edits.rebuild(base, data, g2)
-    assert type(world2) is OlsDGP
-    assert world2.graph is g2
-    # fitted on the reversed graph: Y's mechanism now regresses on nothing
-    # (Y is a root), X's mechanism regresses on Y
-    assert list(g2.predecessors("Y")) == []
-    assert list(g2.predecessors("X")) == ["Y"]
-
-
 def test_set_form__custom_draw_noise_used_for_the_node():
     # Q2 option (b): a user-supplied draw_noise(rng, n) closure replaces
     # the inherited noise law for the edited node ONLY.

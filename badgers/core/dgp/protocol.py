@@ -107,6 +107,6 @@ class DGP(Protocol):
         The DGP is an immutable, fitted world; structural modifications
         live in ``badgers.core.dgp.edits`` (free functions returning a new
         world: ``scale_edge``/``remove_edge``/``add_edge_contribution``/
-        ``exogenize``/``set_form``/``rebuild``).
+        ``exogenize``/``set_form``).
         """
         ...

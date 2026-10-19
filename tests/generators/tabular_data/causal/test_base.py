@@ -4,8 +4,7 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import DGPMixin, OlsDGP
-from badgers.core.dgp import edits
+from badgers.core.dgp import DGPMixin
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -206,45 +205,4 @@ def test_use_dgp__attaches_fitted_dgp(chain_data):
     np.testing.assert_allclose(out[:, 1], 2.0 * (X[:, 0] + 3.0))
 
 
-def test_rebuild_with_graph__ols_rebuilds_on_modified_graph(chain_data):
-    # A3 option (b) refit route: a fresh OlsDGP is built for the modified
-    # graph and fitted on the clean entry data (no training-data retention).
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=OlsDGP(graph, column_mapping))
-    g2 = graph.copy()
-    g2.add_edge("X", "Z")  # 2 parents for Z
-    rebuilt = gen.rebuild_with_graph(X, g2)
-    assert type(rebuilt).__name__ == "OlsDGP"
-    assert rebuilt.graph is g2
-    assert rebuilt.column_mapping is column_mapping
-    # fitted: response() works for Z with both parents
-    vals = rebuilt.response("Z", np.array([[1.0, 1.0]]))
-    assert vals.shape == (1,)
-    # adopting the rebuilt world keeps the generator consistent
-    gen.use_dgp(rebuilt)
-    assert gen.graph is g2
 
-
-def test_rebuild_with_graph__preserves_backend_class(chain_data):
-    # The rebuilt world uses the SAME backend class as the current DGP
-    # (object-injection contract: dowhy stays dowhy).
-    pytest.importorskip("dowhy.gcm")
-    from badgers.core.dgp.backends import DowhyGcmDGP
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=DowhyGcmDGP(graph, column_mapping))
-    g2 = graph.copy()
-    g2.add_edge("X", "Z")
-    rebuilt = gen.rebuild_with_graph(X, g2)
-    assert type(rebuilt) is DowhyGcmDGP
-    assert rebuilt.graph is g2
-
-
-def test_add_edge_contribution__guides_to_rebuild_for_estimation(chain_data):
-    # A3 decision (b): an ESTIMATED new parent needs a refit, which is not
-    # possible without training data — the error points at the rebuild
-    # route (edits.rebuild / rebuild_with_graph).
-    X, graph, column_mapping = chain_data
-    fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
-    fake.fit(X)
-    with pytest.raises(ValueError, match="(?i)rebuild"):
-        edits.add_edge_contribution(fake, "Z", "X")

@@ -19,15 +19,11 @@ Edit semantics
       (optionally its noise law too);
     - :func:`add_edge_contribution` — add a NEW parent's additive term to
       a child (ANM-scoped; see below).
-- **Estimation edit**: :func:`rebuild` — the canonical add/reverse route
-  (A3 option (b): the DGP never retains training data). Apply ALL graph
-  modifications first, then refit ONCE (A7).
 
 ``add_edge_contribution`` is the only ANM-scoped edit: it augments an
 additive-noise child's response with a user-authored term for the new
 parent. For non-additive (future) backends, the general tool is
-:func:`set_form` (rewrite the child's full response) or :func:`rebuild`
-(fit that backend's own mechanism class for the extended parent set).
+:func:`set_form` (rewrite the child's full response).
 
 All edits compose (the returned object is itself a ``DGP``):
 ``set_form(scale_edge(dgp, ...), ...)`` etc. Views never mutate the
@@ -39,7 +35,6 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 
-from badgers.core.dgp.backends.ols import OlsDGP
 from badgers.core.dgp.views import (
     _AddedEdgeContributionView,
     _ExogenizedView,
@@ -53,8 +48,6 @@ __all__ = [
     "add_edge_contribution",
     "exogenize",
     "set_form",
-    "rebuild",
-    "reversed_graph",
 ]
 
 
@@ -89,16 +82,12 @@ def add_edge_contribution(dgp, child, parent, contribution=None,
 
     Raises ``ValueError`` if the edge would create a cycle (A6) or if the
     parent is already a parent of ``child``.
-
-    For an ESTIMATED new parent (no authored term), use :func:`rebuild`
-    with the modified graph — the child's mechanism is then fitted by the
-    backend from data, which works for any backend class.
     """
     if contribution is None and coefficient is None:
         raise ValueError(
             "add_edge_contribution requires a contribution closure or a "
-            "coefficient; for an ESTIMATED new parent use rebuild(dgp, "
-            "X, modified_graph) instead."
+            "coefficient (an ESTIMATED new parent is not supported by "
+            "this view edit)."
         )
     if contribution is not None and coefficient is not None:
         raise ValueError(
@@ -143,40 +132,3 @@ def set_form(dgp, node, response_fn, draw_noise=None):
     default; pass a ``draw_noise(rng, n)`` closure to supply your own
     noise law (Q2 option (b)). Returns a ``_FormView``."""
     return _FormView(dgp, node, response_fn, draw_noise)
-
-
-def reversed_graph(graph, child, parent):
-    """Return a copy of ``graph`` with edge (parent -> child) reversed to
-    (child -> parent). Pure graph surgery — pair with :func:`rebuild` to
-    refit the reversed DGP.
-
-    The reversal is only graph-visible; verifying that the reversed DAG is
-    (close to) the true causal structure is the caller's modeling choice.
-    """
-    g = graph.copy()
-    if (parent, child) not in g.edges:
-        raise ValueError(f"edge ({parent}, {child}) not in graph")
-    g.remove_edge(parent, child)
-    g.add_edge(child, parent)
-    if not nx.is_directed_acyclic_graph(g):
-        raise ValueError(
-            f"reversing edge ({parent}, {child}) would create a cycle"
-        )
-    return g
-
-
-def rebuild(dgp, X, graph=None):
-    """Estimation edit (A3 option (b)): refit the DGP on a MODIFIED
-    graph.
-
-    No training-data retention: a fresh DGP of the SAME backend class as
-    ``dgp`` is constructed for ``graph`` (default: ``dgp.graph``
-    unchanged — a plain refit) with ``dgp``'s column_mapping, and fitted
-    on the CLEAN entry data ``X``. This is the one-refit-of-the-fully-
-    modified-graph route (A7): apply all structural modifications to the
-    graph FIRST, then call :func:`rebuild` ONCE.
-    """
-    backend_cls = type(dgp) if type(dgp) is not OlsDGP else OlsDGP
-    if graph is None:
-        graph = dgp.graph
-    return backend_cls(graph, dgp.column_mapping).fit(X)

@@ -17,8 +17,7 @@ one coherent draw from the caller's rng).
 The DGP is immutable and rngless: all randomness enters through the
 ``rng`` argument the CALLER provides. Structure edits are NOT methods on
 the DGP: modifications live in ``badgers.core.dgp.edits`` as free
-functions returning a new DGP (exact view edits + the estimation route
-``rebuild``).
+functions returning a new DGP (exact view edits only).
 
 Backends may override any of the evaluation verbs with a native
 implementation; overrides must preserve the protocol semantics
