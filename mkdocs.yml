@@ -33,7 +33,7 @@ nav:
             -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
             -   Creating Selectors: dev/Create-New-Selectors.ipynb
             -   Creating DGP Backends: dev/Create-New-DGP-Backends.ipynb
-            -   Using DowhyGCM and PyMC: dev/Using-DowhyGCM-And-PyMC.ipynb
+            -   Using DGPs: dev/Using-DGPs.ipynb
     -   About: about.md
     -   Changes: changelog.md
     - Architecture: architecture.md
