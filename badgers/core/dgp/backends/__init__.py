@@ -16,12 +16,16 @@ never pulls their dependencies — the import-hygiene test
   included); needs the ``dowhy`` extra.
 - ``PyMCDGP`` (lazy, in ``pymc.py``): per-node Bayesian linear regression;
   needs the ``causal`` extra.
+- ``PyMCSCMDGP`` (lazy, in ``pymc_scm.py``): adapter for user-built
+  PyMC causal models (one ``pm.Model``, full posterior); needs the
+  ``pymc`` extra.
 """
 
 _LAZY = {
     "DowhyGcmDGP": "badgers.core.dgp.backends.dowhy_gcm",
     "GcmSCMDGP": "badgers.core.dgp.backends.gcm_scm",
     "PyMCDGP": "badgers.core.dgp.backends.pymc",
+    "PyMCSCMDGP": "badgers.core.dgp.backends.pymc_scm",
 }
 
 
