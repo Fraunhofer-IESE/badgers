@@ -40,7 +40,14 @@ class GcmSCMDGP(DGPMixin):
             (or any object with ``.graph`` and per-node
             ``'causal_mechanism'`` attributes on the graph).
         column_mapping: optional dict node name -> column index of the
-            numpy data; defaults to graph node insertion order.
+            numpy data; defaults to graph node insertion order. When
+            supplied explicitly it must cover every graph node exactly
+            once (keys and column indices both form complete sets).
+
+    Raises:
+        ValueError: if an explicit ``column_mapping`` does not cover the
+            graph nodes exactly (missing/extra node names, or missing/
+            duplicate column indices).
 
     Requires the optional ``dowhy`` extra (``pip install badgers[dowhy]``).
     """
@@ -50,6 +57,21 @@ class GcmSCMDGP(DGPMixin):
         self.graph = causal_model.graph
         if column_mapping is None:
             column_mapping = {node: i for i, node in enumerate(self.graph.nodes)}
+        else:
+            nodes = set(self.graph.nodes)
+            keys = set(column_mapping)
+            if keys != nodes:
+                raise ValueError(
+                    f"column_mapping must cover every graph node exactly "
+                    f"once: missing nodes {sorted(nodes - keys)}, unknown "
+                    f"nodes {sorted(keys - nodes)}."
+                )
+            if len(column_mapping) != len(nodes) or len(set(column_mapping.values())) != len(nodes):
+                raise ValueError(
+                    "column_mapping values must form a complete, "
+                    "duplicate-free column index set matching the number "
+                    "of graph nodes."
+                )
         self.column_mapping = column_mapping
         self._mech = {}
         self._residuals = {}  # node -> empirical residuals (non-root ANM)
@@ -96,21 +118,32 @@ class GcmSCMDGP(DGPMixin):
         )
 
     def fit(self, X):
-        """Fit all mechanisms with ``gcm.fit`` on a DataFrame, then cache
-        the empirical noise sources (residuals / root observations)."""
+        """Validate and translate all mechanisms BEFORE delegating to
+        ``gcm.fit`` on a DataFrame, then cache the empirical noise sources
+        (residuals / root observations).
+
+        Pre-validating every node first avoids wasted compute and
+        confusing dowhy-gcm errors when a mechanism is missing or of an
+        unsupported type.
+        """
         import dowhy.gcm as gcm
+
+        data = np.asarray(X)
+        # validate all nodes up front (this also caches the mechanism
+        # translation into self._mech)
+        for node in self.graph.nodes:
+            self.fit_node(node, get_parents(self.graph, node), data)
 
         columns = [None] * len(self.graph.nodes)
         for node, col in self.column_mapping.items():
             columns[col] = node
-        df = pd.DataFrame(np.asarray(X), columns=columns)
+        df = pd.DataFrame(data, columns=columns)
         gcm.fit(self._cm, df)
-        # per-node validation + caching
+        # cache the empirical noise sources per node
         for node in self.graph.nodes:
-            parents = get_parents(self.graph, node)
-            self.fit_node(node, parents, np.asarray(X))
             mech = self._mech[node]
             if hasattr(mech, "prediction_model"):  # AdditiveNoiseModel
+                parents = get_parents(self.graph, node)
                 residuals = mech.estimate_noise(
                     df[[node]].to_numpy(), df[parents].to_numpy()
                 )

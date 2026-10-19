@@ -100,3 +100,80 @@ def test_default_column_mapping_follows_graph_order():
     data = _chain_data()
     dgp = GcmSCMDGP(_build_scm()).fit(data)
     assert dgp.column_mapping == {"A": 0, "B": 1, "C": 2}
+
+
+# ---- error-path tests --------------------------------------------------
+
+
+def test_unsupported_mechanism_raises_not_implemented():
+    graph = nx.DiGraph([("A", "B")])
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.EmpiricalDistribution())
+    cm.set_causal_mechanism("B", object())  # dummy: unsupported mechanism type
+    data = _chain_data()[:, :2]
+    with pytest.raises(NotImplementedError, match="'B'"):
+        GcmSCMDGP(cm).fit(data)
+
+
+def test_missing_mechanism_raises():
+    graph = nx.DiGraph([("A", "B")])
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.EmpiricalDistribution())
+    # node B deliberately left without a mechanism
+    data = _chain_data()[:, :2]
+    with pytest.raises(ValueError, match="'B'"):
+        GcmSCMDGP(cm).fit(data)
+
+
+def test_root_anm_raises():
+    graph = nx.DiGraph()
+    graph.add_node("A")
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.AdditiveNoiseModel(prediction_model=create_linear_regressor()))
+    data = _chain_data()[:, [0]]
+    with pytest.raises(ValueError, match="root"):
+        GcmSCMDGP(cm).fit(data)
+
+
+def test_empirical_root_with_parents_raises():
+    graph = nx.DiGraph([("A", "B")])
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.EmpiricalDistribution())
+    cm.set_causal_mechanism("B", gcm.EmpiricalDistribution())
+    data = _chain_data()[:, :2]
+    with pytest.raises(ValueError, match="'B'"):
+        GcmSCMDGP(cm).fit(data)
+
+
+def test_explicit_column_mapping_reorder():
+    # 2-node chain A -> B with data columns SWAPPED: col 1 = A, col 0 = B
+    graph = nx.DiGraph([("A", "B")])
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.EmpiricalDistribution())
+    cm.set_causal_mechanism("B", gcm.AdditiveNoiseModel(prediction_model=SinModel()))
+    rng = np.random.default_rng(0)
+    n = 500
+    a = rng.normal(size=n)
+    b = np.sin(a) + rng.normal(0, 0.1, size=n)
+    data = np.zeros((n, 2))
+    data[:, 1] = a
+    data[:, 0] = b
+    dgp = GcmSCMDGP(cm, column_mapping={"A": 1, "B": 0}).fit(data)
+    assert dgp.column_mapping == {"A": 1, "B": 0}
+    sample = dgp.sample(np.random.default_rng(1), 2000)
+    # col 1 is the root A, col 0 is the sin-of-A child B
+    assert np.std(sample[:, 1]) == pytest.approx(np.std(a), rel=0.1)
+    coef = np.polyfit(np.sin(sample[:, 1]), sample[:, 0], 1)
+    assert coef[0] == pytest.approx(1.0, abs=0.1)
+    # response for B consumes the parent column per the explicit mapping
+    parents = np.array([[2.0], [-1.0]])
+    np.testing.assert_allclose(dgp.response("B", parents), np.sin(parents).ravel(), atol=1e-6)
+
+
+def test_explicit_column_mapping_incomplete_raises():
+    cm = _build_scm()
+    data = _chain_data()
+    with pytest.raises(ValueError, match="column_mapping"):
+        GcmSCMDGP(cm, column_mapping={"A": 0, "B": 1})
+    with pytest.raises(ValueError, match="column_mapping"):
+        GcmSCMDGP(cm, column_mapping={"A": 0, "B": 1, "C": 1})
