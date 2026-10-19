@@ -57,7 +57,7 @@ def test_fire_masks__delegates_to_selector(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
 
-    def selector(X, y=None, stats=None):
+    def selector(X, y=None):
         return {"X": np.zeros(X.shape[0], dtype=bool)}
 
     fires = gen._fire_masks(X, ["X"], column_mapping, selector=selector)

@@ -297,16 +297,6 @@ class TestTopQuantileSelector:
         np.testing.assert_array_equal(masks["b"], X[:, 0] >= np.quantile(X[:, 0], 0.8))
         np.testing.assert_array_equal(masks["c"], X[:, 1] >= np.quantile(X[:, 1], 0.8))
 
-    def test_stats_kwarg_thresholds_on_other_rows(self):
-        # Legacy noise-expansion case: thresholds computed on the original
-        # (stats) rows, comparisons against the expanded rows.
-        selector = TopQuantileSelector("a", self.MAPPING, quantile=0.8)
-        stats = _X(10, 3)
-        rows = np.repeat(stats, 3, axis=0)  # 30 expanded rows
-        masks = selector(rows, y=None, stats=stats)
-        thr = np.quantile(stats[:, 0], 0.8)
-        np.testing.assert_array_equal(masks["a"], rows[:, 0] >= thr)
-
     def test_deterministic_no_rng(self):
         # Quantile rules involve no randomness: two calls agree, and the
         # constructor needs no rng.

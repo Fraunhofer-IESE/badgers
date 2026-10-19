@@ -31,6 +31,7 @@ Those interested in developing their own generators and/or contribute to badgers
 * [Creating Tabular Generators](../dev/Create-New-Tabular-Generators/)
 * [Creating Selectors](../dev/Create-New-Selectors/)
 * [Creating DGP Backends](../dev/Create-New-DGP-Backends/)
+* [Using DowhyGCM and PyMC](../dev/Using-DowhyGCM-And-PyMC/) — how the two bundled causal backends behave on fit / sample / intervene
 
 For the big picture, see the [architecture](architecture.md) overview and [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md).
 

@@ -232,7 +232,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   delegated to `gcm.fit`, sampling and interventions run on the generic
   protocol with caller-provided rngs. Supports `AdditiveNoiseModel`
   (non-root), `EmpiricalDistribution` (root) and `ClassifierFCM`
-  (discrete non-root).
+  (non-root discrete nodes with numeric-encoded classes).
 - **`ClassSelector` preset** (`badgers.core.selectors`): per-class
   fixed-count sampling on a discrete column — `ClassSelector(variables,
   column_mapping, proportions, rng=...)` with `proportions` mapping each

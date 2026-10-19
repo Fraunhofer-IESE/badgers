@@ -50,6 +50,11 @@ class GcmSCMDGP(DGPMixin):
             duplicate column indices).
 
     Requires the optional ``dowhy`` extra (``pip install badgers[dowhy]``).
+
+    Classifier nodes couple ``response`` to ``draw_noise``: ``response``
+    captures the pending parent values that ``draw_noise`` then consumes
+    (it receives no parents itself). Discrete classes are numeric-encoded
+    (``get_class_names`` coerced to float).
     """
 
     def __init__(self, causal_model, column_mapping=None):
@@ -142,6 +147,9 @@ class GcmSCMDGP(DGPMixin):
         Pre-validating every node first avoids wasted compute and
         confusing dowhy-gcm errors when a mechanism is missing or of an
         unsupported type.
+
+        NaN handling is delegated to gcm's per-mechanism estimators
+        (unlike ``DowhyGcmDGP``'s complete-case policy).
         """
         import dowhy.gcm as gcm
 
@@ -205,6 +213,11 @@ class GcmSCMDGP(DGPMixin):
             # classifier FCM: the noise draw IS the class — inverse-CDF
             # sampling of the class probabilities over the pending parent
             # values (gcm's own evaluate is unseeded, never call it here).
+            if node not in self._pending:
+                raise RuntimeError(
+                    f"GcmSCMDGP.draw_noise for classifier node '{node}' requires a "
+                    f"preceding response(node, parent_values) call in the same cascade"
+                )
             P = np.asarray(
                 self._clf[node].estimate_probabilities(self._pending.pop(node)),
                 dtype=float,

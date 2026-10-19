@@ -168,12 +168,11 @@ class CausalGenerator(GeneratorMixin):
         perturbation_nodes,
         node_to_col,
         selector=None,
-        stats_rows=None,
     ):
         """Fire masks for ALL rows at once: dict {node: bool row-mask}.
 
         Delegates to a ``Selector`` from ``badgers.core.selectors``:
-        ``selector(rows, y, stats=stats_rows) -> {node: bool mask}``.
+        ``selector(rows, y) -> {node: bool mask}``.
         ``None`` defaults to ``AlwaysSelector`` (every row fires).
 
         Parameters
@@ -188,13 +187,6 @@ class CausalGenerator(GeneratorMixin):
             ``ExactCountSelector`` (exact count), ``TopQuantileSelector``
             (value threshold, self or driver mode), ``AlwaysSelector``;
             any user callable with the same signature works.
-        stats_rows : array or None, default None
-            Passed to the selector as ``stats=`` (the row set on which
-            value thresholds are computed). The noise generator passes the
-            UN-EXPANDED input so expanded rows are gated against the
-            original columns' statistics. Selectors that do not accept a
-            ``stats`` kwarg must be called without expansion gating (the
-            generator only passes ``stats`` when it differs from ``rows``).
 
         Note: masks are computed against ``rows`` BEFORE any mutation
         (callers write NaNs/noise afterwards), which makes the gate
@@ -206,12 +198,6 @@ class CausalGenerator(GeneratorMixin):
                 node: np.ones(rows.shape[0], dtype=bool)
                 for node in perturbation_nodes
             }
-        # Pass stats= only to selectors that accept it (e.g. quantile rules
-        # with a threshold row set); stochastic/trivial presets do not.
-        if stats_rows is not None and "stats" in inspect.signature(
-            selector.__call__
-        ).parameters:
-            return selector(rows, None, stats=stats_rows)
         return selector(rows, None)
 
     # -- Validation ---------------------------------------------------------

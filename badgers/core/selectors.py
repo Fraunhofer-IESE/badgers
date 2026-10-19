@@ -380,13 +380,9 @@ class TopQuantileSelector:
 
     Calling
     -------
-    ``__call__(X, y=None, stats=None)``:
-
-    - ``stats`` (optional): the row set on which the QUANTILE THRESHOLDS
-      are computed; comparisons are always against ``X``. Defaults to
-      ``X`` itself. This supports generators that gate expanded rows
-      against the original columns' statistics (e.g. a row-duplication
-      noise generator): pass ``stats=original_rows``.
+    ``__call__(X, y=None)``: one mask per gated variable; a row fires
+    when the (driver) column's value is ``>=`` the column's quantile
+    threshold computed on the passed rows.
     """
 
     def __init__(
@@ -426,14 +422,11 @@ class TopQuantileSelector:
         self,
         X: np.ndarray,
         y: np.ndarray | None = None,
-        *,
-        stats: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
-        stats = X if stats is None else stats
         masks = {}
         for name, driver in zip(self.variables, self.drivers or self.variables):
             dcol = self.column_mapping[driver]
-            threshold = np.quantile(stats[:, dcol], self.quantile)
+            threshold = np.quantile(X[:, dcol], self.quantile)
             masks[name] = X[:, dcol] >= threshold
         return masks
 

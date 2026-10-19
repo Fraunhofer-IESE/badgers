@@ -256,6 +256,20 @@ def test_classifier_fcm_discrete_node():
     np.testing.assert_array_equal(s1, s2)
 
 
+def test_classifier_draw_noise_without_response_raises():
+    data = _discrete_data()
+    dgp = GcmSCMDGP(_build_discrete_scm()).fit(data)
+    # no preceding response(...) call: draw_noise must fail clearly
+    with pytest.raises(RuntimeError, match="response"):
+        dgp.draw_noise("D", np.random.default_rng(0), 5)
+    # the failed attempt does not poison state: a valid
+    # response -> draw_noise cycle still works afterwards
+    dgp.response("D", data[["A"]].head(10))
+    classes = dgp.draw_noise("D", np.random.default_rng(0), 10)
+    assert classes.shape == (10,)
+    assert set(np.unique(classes)) <= {0.0, 1.0}
+
+
 def test_intervene_discrete_node():
     # do(D = 1.0): D pinned regardless of the logistic mechanism
     data = _discrete_data()
