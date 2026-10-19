@@ -11,12 +11,16 @@ never pulls their dependencies — the import-hygiene test
 - ``DowhyGcmDGP`` (lazy, in ``dowhy_gcm.py``): ``dowhy.gcm``
   AdditiveNoiseModel mechanisms with EMPIRICAL residual noise; needs the
   ``dowhy`` extra.
+- ``GcmSCMDGP`` (lazy, in ``gcm_scm.py``): adapter for externally built
+  ``dowhy.gcm.StructuralCausalModel`` objects (custom mechanisms
+  included); needs the ``dowhy`` extra.
 - ``PyMCDGP`` (lazy, in ``pymc.py``): per-node Bayesian linear regression;
   needs the ``causal`` extra.
 """
 
 _LAZY = {
     "DowhyGcmDGP": "badgers.core.dgp.backends.dowhy_gcm",
+    "GcmSCMDGP": "badgers.core.dgp.backends.gcm_scm",
     "PyMCDGP": "badgers.core.dgp.backends.pymc",
 }
 
