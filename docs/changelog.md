@@ -227,6 +227,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ### Added
 
+- **New DGP backend `GcmSCMDGP` (dowhy extra)**: plug an externally built
+  `dowhy.gcm.StructuralCausalModel` into badgers — mechanism fitting is
+  delegated to `gcm.fit`, sampling and interventions run on the generic
+  protocol with caller-provided rngs. Supports `AdditiveNoiseModel`
+  (non-root), `EmpiricalDistribution` (root) and `ClassifierFCM`
+  (discrete non-root).
 - **`ClassSelector` preset** (`badgers.core.selectors`): per-class
   fixed-count sampling on a discrete column — `ClassSelector(variables,
   column_mapping, proportions, rng=...)` with `proportions` mapping each
