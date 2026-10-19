@@ -12,7 +12,6 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.dgp import edits
 
 pytest.importorskip("dowhy.gcm")
@@ -32,19 +31,19 @@ def _chain_data(n=300, seed=0, noise=0.1):
     return np.column_stack([X, Y, Z]), graph, column_mapping
 
 
-def test_fit_node_response_matches_ols_reference():
-    # Both backends fit least squares on the same data: the deterministic
-    # part must agree within intercept tolerance.
+def test_fit_node_response_recovers_true_slope():
+    # The fitted linear mechanism recovers the TRUE structural slopes
+    # (Y = 2X, Z = 0.5Y) within intercept/regularization tolerance.
     data, graph, column_mapping = _chain_data()
     ours = DowhyGcmDGP(graph, column_mapping).fit(data)
-    ref = OlsDGP(graph, column_mapping).fit(data)
     parents = np.array([[1.0], [-2.0], [3.0]])
-    # tolerance: GCM's default linear regressor is slightly regularized
+    # tolerance: the default regressor is slightly regularized (RidgeCV),
+    # so the slope recovery drifts a little at larger |parent| values
     np.testing.assert_allclose(
-        ours.response("Y", parents), ref.response("Y", parents), atol=1e-2
+        ours.response("Y", parents), 2.0 * parents[:, 0], atol=2e-2
     )
     np.testing.assert_allclose(
-        ours.response("Z", parents), ref.response("Z", parents), atol=1e-2
+        ours.response("Z", parents), 0.5 * parents[:, 0], atol=2e-2
     )
 
 

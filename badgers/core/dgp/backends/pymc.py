@@ -101,7 +101,8 @@ class PyMCDGP(DGPMixin):
     draw from the caller's rng and returns a ``_ParameterDrawView``.
 
     Requires the optional ``pymc`` extra (``pip install badgers[pymc]``).
-    MCMC latency is a different cost class than ``OlsDGP`` — use it for
+    MCMC latency is a different cost class than the deterministic
+    adapters — use it for
     posterior-faithful fits, not for the dependency-light default path.
     """
 
@@ -124,7 +125,7 @@ class PyMCDGP(DGPMixin):
         import pymc as pm
 
         col = self.column_mapping[node]
-        # Complete-case fit (G9): same contract as OlsDGP — NaN-contaminated
+        # Complete-case fit (G9): NaN-contaminated
         # rows are dropped for the ESTIMATION only; too few rows cannot
         # identify the mechanism.
         mask = np.isfinite(data[:, col])

@@ -32,7 +32,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         DGP instance (fitted or unfitted) carrying the graph and
         column_mapping. No other structure is accepted: if None,
         ``generate()`` raises (build one with e.g.
-        ``OlsDGP(graph, column_mapping).fit(X)``).
+        ``GcmSCMDGP(scm).fit(X)``).
 
     generate() parameters (passed via **params)
     ----------

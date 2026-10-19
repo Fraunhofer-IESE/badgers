@@ -48,7 +48,8 @@ class CausalGenerator(GeneratorMixin):
         the generator accepts — a DGP carries its own graph and
         column_mapping. There is no graph-only configuration and no
         implicit default backend: if ``dgp`` is None, ``generate()``
-        raises (build one with e.g. ``OlsDGP(graph, column_mapping)``).
+        raises (build one with e.g.
+        ``GcmSCMDGP(make_gcm_scm(graph, column_mapping))``).
 
     Notes
     -----
@@ -66,7 +67,7 @@ class CausalGenerator(GeneratorMixin):
         columns, trigger complete-case filtering). Fit the DGP ONCE on
         the clean entry data and share the fitted instance::
 
-            dgp = OlsDGP(graph, column_mapping).fit(X)  # fit on clean X
+            dgp = GcmSCMDGP(make_gcm_scm(graph, column_mapping)).fit(X)  # fit on clean X
 
             missingness = CausalMissingnessGenerator(rng=..., dgp=dgp)
             Xm, _ = missingness.generate(X, None, ...)
@@ -74,11 +75,11 @@ class CausalGenerator(GeneratorMixin):
             drift = CausalDriftGenerator(rng=..., dgp=dgp)  # share
             Xt, _ = drift.generate(Xm, None, ...)
 
-        The OLS backend fits with complete-case filtering and all
-        per-stage scale computations are NaN-safe, so even the lazy
+        All per-stage scale computations are NaN-safe, so even the lazy
         refit path behaves sensibly; the explicitly-fitted shared
         ``dgp=`` pattern simply guarantees ONE world for the whole
-        pipeline.
+        pipeline. Fit the DGP once on clean data — the backends do not
+        impute or filter NaN rows at fit time.
     """
 
     #: Subclasses set this to the deficit name used in labels.
@@ -123,14 +124,14 @@ class CausalGenerator(GeneratorMixin):
 
         There is NO implicit default backend: if no DGP was given,
         ``generate()`` fails. Build the world explicitly, e.g.
-        ``dgp = OlsDGP(graph, column_mapping).fit(X)``.
+        ``dgp = GcmSCMDGP(make_gcm_scm(graph, column_mapping)).fit(X)``.
         """
         if self.dgp is None:
             raise RuntimeError(
                 "This generator needs a DGP: pass a dgp=... to the "
                 "constructor, or use use_dgp(dgp), before generate(). "
-                "Build one with e.g. dgp = OlsDGP(graph, "
-                "column_mapping).fit(X)."
+                "Build one with e.g. dgp = GcmSCMDGP(make_gcm_scm("
+                "graph, column_mapping)).fit(X)."
             )
         elif not self.dgp.is_fitted():
             self.dgp.fit(X)

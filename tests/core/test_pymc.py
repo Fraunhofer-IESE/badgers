@@ -18,7 +18,6 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.dgp import edits
 
 pytest.importorskip("pymc")
@@ -59,20 +58,17 @@ def test_carrier_response_is_canonical_draw(fitted_chain):
     )
 
 
-def test_response_agrees_with_ols_reference(fitted_chain):
+def test_response_mean_agrees_with_true_slope(fitted_chain):
     # Averaging over MANY pinned parameter draws recovers the posterior
-    # mean, which approximates the OLS fit (loose rtol: short MCMC +
-    # prior shrinkage).
+    # mean, which approximates the TRUE structural slope (2.0; loose rtol:
+    # short MCMC + prior shrinkage).
     data, graph, column_mapping, dgp = fitted_chain
-    ref = OlsDGP(graph, column_mapping).fit(data)
     parents = np.array([[1.0]])
     preds = np.array([
         dgp.pick_parameters(np.random.default_rng(s)).response("Y", parents)
         for s in range(40)
     ])
-    np.testing.assert_allclose(
-        np.mean(preds), ref.response("Y", parents)[0], rtol=0.2
-    )
+    np.testing.assert_allclose(np.mean(preds), 2.0, rtol=0.2)
 
 
 def test_draw_noise_shapes_and_reproducibility(fitted_chain):

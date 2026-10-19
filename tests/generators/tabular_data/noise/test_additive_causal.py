@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 import scipy.stats
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.selectors import (
     AlwaysSelector,
     BernoulliSelector,
@@ -14,7 +13,11 @@ from badgers.generators.tabular_data.noise.causal import CausalAdditiveNoiseGene
 
 
 def _world(X, graph, column_mapping):
-    return OlsDGP(graph, column_mapping).fit(X)
+    """Fitted ``GcmSCMDGP`` world (linear ANM SCM via the conftest helper)."""
+    pytest.importorskip("dowhy.gcm")
+    from tests.conftest import make_gcm_scm
+    from badgers.core.dgp.backends.gcm_scm import GcmSCMDGP
+    return GcmSCMDGP(make_gcm_scm(graph), column_mapping).fit(X)
 
 
 def test_generate__shape_and_labels(chain_data):
@@ -169,9 +172,9 @@ def test_generate__invalid_perturbation_node_raises(chain_data):
         )
 
 
-def test_generate__lazy_fit(chain_data):
+def test_generate__lazy_fit(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
-    dgp = OlsDGP(graph, column_mapping)
+    dgp = make_gcm_dgp(graph, column_mapping)
     gen = CausalAdditiveNoiseGenerator(
         random_generator=np.random.default_rng(0),
         dgp=dgp,

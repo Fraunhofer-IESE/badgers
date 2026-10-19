@@ -4,7 +4,6 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.dgp import edits
 
 
@@ -20,9 +19,9 @@ def _chain_data(n=300, seed=0):
     return np.column_stack([X, Y, Z]), graph, column_mapping
 
 
-def test_exogenize_removes_incoming_edges():
+def test_exogenize_removes_incoming_edges(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     exo = edits.exogenize(base, "Y")
     # Y is a root in the view's graph (its own copy); the base is untouched
     assert list(exo.graph.predecessors("Y")) == []
@@ -40,19 +39,19 @@ def test_exogenize_removes_incoming_edges():
     )
 
 
-def test_exogenize_unknown_node_raises():
+def test_exogenize_unknown_node_raises(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     with pytest.raises(ValueError, match="not in graph"):
         edits.exogenize(base, "NOPE")
 
 
-def test_exogenize_cascade_never_touches_the_root():
+def test_exogenize_cascade_never_touches_the_root(make_gcm_dgp):
     # intervene() recomputes only descendants; an exogenized node is a root
     # and cannot be a descendant, so a downstream intervention leaves the
     # node's column exactly as the caller wrote it.
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     exo = edits.exogenize(base, "Y")
     rows = data.copy()
     fixed = rows[:, 1] + 7.0
@@ -65,16 +64,15 @@ def test_exogenize_cascade_never_touches_the_root():
     np.testing.assert_allclose(np.mean(out[:, 2] - det_z), 0.0, atol=0.3)
 
 
-def test_set_form_replaces_response():
+def test_set_form_replaces_response(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
-    view = edits.set_form(base, "Y", lambda p: 3.0 * p[:, 0])
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     parents = np.array([[1.0], [2.0]])
+    base_ref = base.response("Y", parents).copy()
+    view = edits.set_form(base, "Y", lambda p: 3.0 * p[:, 0])
     np.testing.assert_allclose(view.response("Y", parents), [3.0, 6.0])
-    # the base is untouched
-    np.testing.assert_allclose(
-        base.response("Y", parents), parents[:, [0]] @ base._beta["Y"]
-    )
+    # the base is untouched: its response is the pre-view fitted mechanism
+    np.testing.assert_allclose(base.response("Y", parents), base_ref)
     # non-overridden nodes delegate
     np.testing.assert_allclose(
         view.response("Z", parents),
@@ -82,25 +80,25 @@ def test_set_form_replaces_response():
     )
 
 
-def test_set_form_broadcasts_scalar_responses():
+def test_set_form_broadcasts_scalar_responses(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.set_form(base, "Y", lambda p: 1.5)  # constant form
     np.testing.assert_allclose(
         view.response("Y", np.zeros((5, 1))), np.full(5, 1.5)
     )
 
 
-def test_set_form_non_callable_raises():
+def test_set_form_non_callable_raises(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     with pytest.raises(ValueError, match="callable"):
         edits.set_form(base, "Y", 3.0)
 
 
-def test_add_edge_contribution__coefficient_honored():
+def test_add_edge_contribution__coefficient_honored(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.add_edge_contribution(base, "Z", "X", coefficient=0.25)
     # graph gained the edge; base untouched
     assert view.graph.has_edge("X", "Z")
@@ -112,9 +110,9 @@ def test_add_edge_contribution__coefficient_honored():
     )
 
 
-def test_add_edge_contribution__closure_contribution():
+def test_add_edge_contribution__closure_contribution(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.add_edge_contribution(
         base, "Z", "X", contribution=lambda x: np.exp(x)
     )
@@ -125,9 +123,9 @@ def test_add_edge_contribution__closure_contribution():
     )
 
 
-def test_add_edge_contribution__descendants_and_intervene():
+def test_add_edge_contribution__descendants_and_intervene(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.add_edge_contribution(base, "Z", "X", coefficient=0.5)
     rows = data.copy()
     out = view.intervene(rows, ["Y"], values=[data[:, 1] + 1.0],
@@ -139,17 +137,17 @@ def test_add_edge_contribution__descendants_and_intervene():
     assert abs(np.mean(out[:, 2] - det)) < 0.3
 
 
-def test_add_edge_contribution__cycle_raises():
+def test_add_edge_contribution__cycle_raises(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     # adding X->Z is fine, but adding Z->X would create a cycle
     with pytest.raises(ValueError, match="cycle"):
         edits.add_edge_contribution(base, "X", "Z", coefficient=0.5)
 
 
-def test_add_edge_contribution__missing_term_raises():
+def test_add_edge_contribution__missing_term_raises(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     with pytest.raises(ValueError, match="contribution|coefficient"):
         edits.add_edge_contribution(base, "Z", "X")
     with pytest.raises(ValueError, match="not both"):
@@ -157,11 +155,11 @@ def test_add_edge_contribution__missing_term_raises():
                                     contribution=lambda x: x)
 
 
-def test_set_form__custom_draw_noise_used_for_the_node():
+def test_set_form__custom_draw_noise_used_for_the_node(make_gcm_dgp):
     # Q2 option (b): a user-supplied draw_noise(rng, n) closure replaces
     # the inherited noise law for the edited node ONLY.
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.set_form(base,         "Y",
         lambda p: 3.0 * p[:, 0],
         draw_noise=lambda rng, n: rng.normal(0.0, 5.0, size=n),
@@ -172,10 +170,10 @@ def test_set_form__custom_draw_noise_used_for_the_node():
     assert np.std(view.draw_noise("X", np.random.default_rng(0), 500)) < 1.5
 
 
-def test_set_form__custom_noise_flows_into_intervene():
+def test_set_form__custom_noise_flows_into_intervene(make_gcm_dgp):
     # The custom noise law is used by the mixin's intervene recompute.
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.set_form(base,         "Y",
         lambda p: 2.0 * p[:, 0],
         draw_noise=lambda rng, n: rng.normal(0.0, 0.0, size=n),
@@ -193,18 +191,18 @@ def test_set_form__custom_noise_flows_into_intervene():
     assert abs(np.mean(diff)) < 0.3
 
 
-def test_set_form__draw_noise_must_be_callable_or_none():
+def test_set_form__draw_noise_must_be_callable_or_none(make_gcm_dgp):
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     with pytest.raises(ValueError, match="draw_noise must be callable"):
         edits.set_form(base, "Y", lambda p: p[:, 0], draw_noise=42)
 
 
-def test_edits_compose():
+def test_edits_compose(make_gcm_dgp):
     # Views compose by delegation: form edit inside scale edit (order
     # irrelevant here — different nodes).
     data, graph, column_mapping = _chain_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     view = edits.scale_edge(
         edits.set_form(base, "Y", lambda p: 3.0 * p[:, 0]), "Z", "Y", 2.0
     )

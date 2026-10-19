@@ -4,7 +4,6 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.generators.tabular_data.relationship.causal import (
     CausalEdgePerturbationGenerator,
 )
@@ -28,12 +27,12 @@ def _weak_edge_data(n=100, rng=None):
     return np.column_stack([X, Y, Z]), graph, column_mapping
 
 
-def test_generate__edge_relationship_strengthened():
+def test_generate__edge_relationship_strengthened(make_gcm_dgp):
     X, graph, column_mapping = _weak_edge_data(rng=np.random.default_rng(0))
     # Distinct seed from the data rng: the residual drawn during propagate
     # must not be a scaled copy of X (a shared seed would inflate the result).
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     base_corr = abs(np.corrcoef(X[:, 0], X[:, 1])[0, 1])
     base_var_y = np.var(X[:, 1])
     Xt, yt = gen.generate(
@@ -51,12 +50,12 @@ def test_generate__edge_relationship_strengthened():
     assert abs(np.var(Xt[:, 1]) - base_var_y) < 0.5 * base_var_y
 
 
-def test_generate__marginal_preserved():
+def test_generate__marginal_preserved(make_gcm_dgp):
     X, graph, column_mapping = _weak_edge_data(rng=np.random.default_rng(0))
     # Distinct seed from the data rng: the residual drawn during propagate
     # must not be a scaled copy of X (a shared seed would inflate the result).
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     base_var_y = np.var(X[:, 1])
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
@@ -66,14 +65,14 @@ def test_generate__marginal_preserved():
     assert abs(np.var(Xt[:, 1]) - base_var_y) < 0.5 * base_var_y
 
 
-def test_generate__descendants_recomputed():
+def test_generate__descendants_recomputed(make_gcm_dgp):
     # Chain X -> Y -> Z. The X->Y edge is perturbed (child Y recomputed);
     # Z is RECOMPUTED from the new Y with fresh noise (Pearl surgery), so
     # the deterministic component comes through exactly in expectation,
     # not row-wise. The oracle goes through the fitted mechanism itself.
     X, graph, column_mapping = _weak_edge_data(rng=np.random.default_rng(0))
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(42))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Y_orig = X[:, 1].copy()
     Z_orig = X[:, 2].copy()
     Xt, yt = gen.generate(
@@ -95,10 +94,10 @@ def test_generate__descendants_recomputed():
     assert np.std(dZ - dZ_det) < 1.0
 
 
-def test_generate__infeasible_raises(chain_data):
+def test_generate__infeasible_raises(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     # weight_factor huge -> beta'^2 * var(X) > var(Y) -> infeasible
     with pytest.raises(ValueError, match="infeasible"):
         gen.generate(
@@ -107,10 +106,10 @@ def test_generate__infeasible_raises(chain_data):
         )
 
 
-def test_generate__perturbation_nodes_must_be_child(chain_data):
+def test_generate__perturbation_nodes_must_be_child(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalEdgePerturbationGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="perturbation_nodes"):
         gen.generate(
             X, y=None, perturbation_nodes=["X"],
@@ -118,14 +117,14 @@ def test_generate__perturbation_nodes_must_be_child(chain_data):
         )
 
 
-def test_generate__validation_errors(chain_data):
+def test_generate__validation_errors(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalEdgePerturbationGenerator()
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(
             X, y=None, perturbation_nodes=["Y"], edge=("X", "Y"),
         )
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="edge"):
         gen.generate(
             X, y=None, perturbation_nodes=["Y"], edge=None,

@@ -5,7 +5,6 @@ import networkx as nx
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.dgp import edits
 
 
@@ -21,9 +20,9 @@ def _fork_data(n=500, seed=0):
     return np.column_stack([W, X, Y]), graph, column_mapping
 
 
-def test_scaled_edge_response__multi_parent_closed_form():
+def test_scaled_edge_response__multi_parent_closed_form(make_gcm_dgp):
     data, graph, column_mapping = _fork_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     scaled = edits.scale_edge(base, "Y", "X", 2.0)
     parents = np.array([[3.0, -2.0]])  # structural order: predecessors(Y) = [X, W]
     # f'(P) = f(P) + (k-1) * contribution(X), with the contribution derived
@@ -44,17 +43,17 @@ def test_scaled_edge_response__multi_parent_closed_form():
     )
 
 
-def test_scaled_edge_calibrate__infeasible_raises():
+def test_scaled_edge_calibrate__infeasible_raises(make_gcm_dgp):
     data, graph, column_mapping = _fork_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     scaled = edits.scale_edge(base, "Y", "X", 100.0)
     with pytest.raises(ValueError, match="infeasible"):
         scaled.calibrate(data)
 
 
-def test_scaled_edge_marginal_variance_preserved():
+def test_scaled_edge_marginal_variance_preserved(make_gcm_dgp):
     data, graph, column_mapping = _fork_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     scaled = edits.scale_edge(base, "Y", "X", 2.0)
     scaled.calibrate(data)
     # fresh parent draws -> child resampled through the scaled mechanism
@@ -68,9 +67,9 @@ def test_scaled_edge_marginal_variance_preserved():
     assert abs(np.var(child) - var_orig) < 0.1 * var_orig
 
 
-def test_scaled_edge_delegates_graph_mapping_and_sample():
+def test_scaled_edge_delegates_graph_mapping_and_sample(make_gcm_dgp):
     data, graph, column_mapping = _fork_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     scaled = edits.scale_edge(base, "Y", "X", 2.0).fit(data)
     assert scaled.graph is base.graph
     assert scaled.column_mapping is base.column_mapping
@@ -87,18 +86,18 @@ def test_scaled_edge_delegates_graph_mapping_and_sample():
     assert np.std(s[:, 2] - det) < np.std(s[:, 2] - base_det)
 
 
-def test_scaled_edge_unknown_edge_raises():
+def test_scaled_edge_unknown_edge_raises(make_gcm_dgp):
     data, graph, column_mapping = _fork_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     with pytest.raises(ValueError, match="not in graph"):
         edits.scale_edge(base, "X", "Y", 2.0)  # X is a root: Y is not its parent
 
 
-def test_remove_edge_is_scale_edge_zero():
+def test_remove_edge_is_scale_edge_zero(make_gcm_dgp):
     # remove_edge = scale_edge(k=0): the parent's contribution vanishes and
     # is absorbed into the child's exogenous shock (SCM surgery view, Q3 a).
     data, graph, column_mapping = _fork_data()
-    base = OlsDGP(graph, column_mapping).fit(data)
+    base = make_gcm_dgp(graph, column_mapping).fit(data)
     removed = edits.remove_edge(base, "Y", "X")
     scaled = edits.scale_edge(base, "Y", "X", 0.0)
     parents = np.array([[3.0, -2.0]])

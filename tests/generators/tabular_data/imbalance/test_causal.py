@@ -3,17 +3,16 @@
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.selectors import BernoulliSelector, TopQuantileSelector
 from badgers.generators.tabular_data.imbalance.causal import (
     CausalImbalanceGenerator,
 )
 
 
-def test_generate__quantile_range_respected(chain_data):
+def test_generate__quantile_range_respected(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         quantile_range=(0.5, 1.0),
@@ -26,10 +25,10 @@ def test_generate__quantile_range_respected(chain_data):
     assert list(yt) == ["imbalance"] * Xt.shape[0]
 
 
-def test_generate__descendants_skewed(chain_data):
+def test_generate__descendants_skewed(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         quantile_range=(0.5, 1.0),
@@ -38,13 +37,13 @@ def test_generate__descendants_skewed(chain_data):
     assert np.mean(Xt[:, 1]) > np.mean(X[:, 1])
 
 
-def test_generate__descendants_are_pure_subset(chain_data):
+def test_generate__descendants_are_pure_subset(chain_data, make_gcm_dgp):
     # Imbalance only filters rows; since the kept rows' parents are
     # unchanged, the propagated delta is 0 and every value (including the
     # descendants') must be bit-identical to the filtered original.
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         quantile_range=(0.5, 1.0),
@@ -54,10 +53,10 @@ def test_generate__descendants_are_pure_subset(chain_data):
     np.testing.assert_array_equal(Xt, X[keep])
 
 
-def test_generate__multi_node_intersection(chain_data):
+def test_generate__multi_node_intersection(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X", "Y"],
         quantile_range=(0.5, 1.0),
@@ -67,24 +66,24 @@ def test_generate__multi_node_intersection(chain_data):
     assert np.mean(Xt[:, 1]) > np.mean(X[:, 1])
 
 
-def test_generate__validation_errors(chain_data):
+def test_generate__validation_errors(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator()
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="quantile_range"):
         gen.generate(
             X, y=None, perturbation_nodes=["X"], quantile_range=(0.9, 0.1),
         )
 
 
-def test_generate__explicit_selector_drops_fired_rows(chain_data):
+def test_generate__explicit_selector_drops_fired_rows(chain_data, make_gcm_dgp):
     # With an explicit selector, the FIRED rows are dropped (subsampling
     # polarity) and perturbation_nodes/quantile_range are ignored.
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
 
     sel = TopQuantileSelector(
         variables="X", column_mapping=column_mapping, quantile=0.8
@@ -97,10 +96,10 @@ def test_generate__explicit_selector_drops_fired_rows(chain_data):
     assert list(yt) == ["imbalance"] * Xt.shape[0]
 
 
-def test_generate__explicit_selector_ignores_quantile_params(chain_data):
+def test_generate__explicit_selector_ignores_quantile_params(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
 
     sel = TopQuantileSelector(
         variables="Y", column_mapping=column_mapping, quantile=0.7

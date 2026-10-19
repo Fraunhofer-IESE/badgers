@@ -9,14 +9,13 @@ own exogenous noise is preserved exactly.
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.generators.tabular_data.drift.causal import CausalDriftGenerator
 
 
-def test_generate__drift_systematic_shift(chain_data):
+def test_generate__drift_systematic_shift(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         drift_std=1.0,
@@ -27,11 +26,11 @@ def test_generate__drift_systematic_shift(chain_data):
     assert list(yt) == ["drift"] * X.shape[0]
 
 
-def test_generate__drift_shift_is_constant_across_rows(chain_data):
+def test_generate__drift_shift_is_constant_across_rows(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         drift_std=1.0,
@@ -43,11 +42,11 @@ def test_generate__drift_shift_is_constant_across_rows(chain_data):
     assert np.allclose(shift, shift[0], atol=1e-8)
 
 
-def test_generate__drift_zero_shift_recompute(chain_data):
+def test_generate__drift_zero_shift_recompute(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         drift_std=0.0,
@@ -65,7 +64,7 @@ def test_generate__drift_zero_shift_recompute(chain_data):
     assert np.std(dY) < 0.5  # residual scale, not a structural shift
 
 
-def test_generate__drift_propagates_recompute(chain_data):
+def test_generate__drift_propagates_recompute(chain_data, make_gcm_dgp):
     # Known-coefficients chain: Y = 2 X + eps_Y, Z = 0.5 Y + eps_Z.
     # Shifting X by a constant c must shift Y by beta_XY * c in expectation
     # and Z by beta_YZ * beta_XY * c: the descendants are RECOMPUTED with
@@ -75,7 +74,7 @@ def test_generate__drift_propagates_recompute(chain_data):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         drift_std=1.0,
@@ -104,11 +103,11 @@ def test_generate__drift_propagates_recompute(chain_data):
     np.testing.assert_allclose(np.mean(dC), 0.5 * np.mean(dB), rtol=0.1)
 
 
-def test_generate__drift_magnitude(chain_data):
+def test_generate__drift_magnitude(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         drift_std=2.0,
@@ -120,7 +119,7 @@ def test_generate__drift_magnitude(chain_data):
     assert shift > 0.05 * (2.0 * np.std(X_orig[:, 0]))
 
 
-def test_generate__drift_closed_form_exact():
+def test_generate__drift_closed_form_exact(make_gcm_dgp):
     # Noise-free structural equations: least squares recovers beta exactly,
     # so the closed-form oracle holds to machine precision.
     import networkx as nx
@@ -132,7 +131,7 @@ def test_generate__drift_closed_form_exact():
     column_mapping = {"X": 0, "Y": 1, "Z": 2}
     data_orig = data.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(data))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(data))
     Xt, _ = gen.generate(
         data, y=None, perturbation_nodes=["X"],
         drift_std=1.0,
@@ -153,7 +152,7 @@ def test_generate__validation_errors(chain_data):
         gen.generate(X, y=None, perturbation_nodes=["X"])
 
 
-def test_generate__nan_input_does_not_poison(chain_data):
+def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):
     # G9b: the drift scale is computed from the stage input. A NaN-bearing
     # perturbation column must not turn the WHOLE column NaN (NaN scale ->
     # NaN shift). NaN semantics: NaN rows stay NaN; the delta propagates to
@@ -161,7 +160,7 @@ def test_generate__nan_input_does_not_poison(chain_data):
     # NaN-cascade semantics as the missingness generator.
     X, graph, column_mapping = chain_data
     world_src = CausalDriftGenerator(random_generator=np.random.default_rng(2))
-    world_src.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    world_src.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(1))
     gen.use_dgp(world_src.dgp)
     Xn = X.copy()
@@ -184,13 +183,13 @@ def test_generate__nan_input_does_not_poison(chain_data):
     np.testing.assert_array_equal(np.isnan(Xt[:, 2]), expected_z_nan)
 
 
-def test_generate__all_nan_column_does_not_crash(chain_data):
+def test_generate__all_nan_column_does_not_crash(chain_data, make_gcm_dgp):
     # G9b edge: a fully NaN column has no finite scale; the generator must
     # fall back to a finite scale (1.0) instead of producing a NaN shift
     # (which would silently poison the column).
     X, graph, column_mapping = chain_data
     world_src = CausalDriftGenerator(random_generator=np.random.default_rng(2))
-    world_src.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    world_src.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(world_src.dgp)
     Xn = X.copy()

@@ -60,7 +60,7 @@ class DowhyGcmDGP(DGPMixin):
         from dowhy.gcm.ml import create_linear_regressor
 
         col = self.column_mapping[node]
-        # Complete-case fit (G9): same contract as OlsDGP — NaN-contaminated
+        # Complete-case fit (G9): NaN-contaminated
         # rows are dropped for the ESTIMATION only; too few rows cannot
         # identify the mechanism.
         mask = np.isfinite(data[:, col])

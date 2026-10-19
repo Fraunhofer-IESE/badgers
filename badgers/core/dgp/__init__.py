@@ -13,7 +13,8 @@ Public surface:
   (``scale_edge``/``remove_edge``/``add_edge_contribution``/
   ``exogenize``/``set_form``), returning
   NEW DGPs;
-- ``OlsDGP`` — the default deterministic backend (pure NumPy);
+- ``backends`` — the concrete backend modules
+  (``badgers.core.dgp.backends``);
 - ``ordered_descendants`` — topological descendant walk (in
   ``badgers.core.causal_graph``).
 
@@ -23,7 +24,6 @@ modules**; they are never imported by this package.
 """
 
 from badgers.core.causal_graph import ordered_descendants
-from badgers.core.dgp.backends.ols import OlsDGP
 from badgers.core.dgp.base import DGPMixin
 from badgers.core.dgp.edits import (
     add_edge_contribution,
@@ -37,7 +37,6 @@ from badgers.core.dgp.protocol import DGP
 __all__ = [
     "DGP",
     "DGPMixin",
-    "OlsDGP",
     "ordered_descendants",
     "scale_edge",
     "remove_edge",

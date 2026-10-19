@@ -326,10 +326,9 @@ def test_outliers__labels_reflect_last_generation():
     assert labels2[50:].all()
 
 
-def test_causal_outlier_propagation__labels_and_y_passthrough():
+def test_causal_outlier_propagation__labels_and_y_passthrough(make_gcm_dgp):
     """CausalOutlierPropagationGenerator also exposes internal outlier labels."""
     import networkx as nx
-    from badgers.core.dgp import OlsDGP
     from badgers.generators.tabular_data.outliers.causal import (
         CausalOutlierPropagationGenerator,
     )
@@ -342,7 +341,7 @@ def test_causal_outlier_propagation__labels_and_y_passthrough():
     X = rng.normal(size=(n_samples, 3))
     y = rng.integers(0, 2, size=n_samples)
 
-    dgp = OlsDGP(graph, column_mapping).fit(X)
+    dgp = make_gcm_dgp(graph, column_mapping).fit(X)
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=dgp)
     with pytest.raises(RuntimeError):
         generator.get_outliers_labels()

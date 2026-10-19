@@ -201,7 +201,20 @@ class GcmSCMDGP(DGPMixin):
             self._pending[node] = parent_values
             return np.zeros(parent_values.shape[0])
         if hasattr(mech, "prediction_model"):
-            return np.asarray(mech.prediction_model.predict(parent_values), dtype=float).ravel()
+            # NaN-cascade semantics (G9): sklearn estimators REJECT NaN
+            # input, so evaluate finite rows only and let NaN parents
+            # propagate to a NaN response (the mixin's sample/intervene
+            # then cascade NaNs to the descendants exactly like the pure
+            # NumPy backends did).
+            parent_values = np.asarray(parent_values, dtype=float)
+            finite = np.isfinite(parent_values).all(axis=1)
+            out = np.full(parent_values.shape[0], np.nan)
+            if finite.any():
+                out[finite] = np.asarray(
+                    mech.prediction_model.predict(parent_values[finite]),
+                    dtype=float,
+                ).ravel()
+            return out
         # EmpiricalDistribution root: the marginal comes entirely from
         # draw_noise; the deterministic part contributes zeros (the mixin's
         # sample/intervene always call response, even for roots, with
@@ -218,15 +231,26 @@ class GcmSCMDGP(DGPMixin):
                     f"GcmSCMDGP.draw_noise for classifier node '{node}' requires a "
                     f"preceding response(node, parent_values) call in the same cascade"
                 )
-            P = np.asarray(
-                self._clf[node].estimate_probabilities(self._pending.pop(node)),
-                dtype=float,
+            pending = np.asarray(self._pending.pop(node), dtype=float)
+            # NaN-cascade semantics: NaN parent rows get NaN classes
+            # (no probabilities can be estimated for them).
+            finite = np.isfinite(pending).all(axis=1)
+            idx = np.full(n, -1)
+            if finite.any():
+                P = np.asarray(
+                    self._clf[node].estimate_probabilities(pending[finite]),
+                    dtype=float,
+                )
+                u = rng.random(int(finite.sum()))
+                cum = np.cumsum(P, axis=1)
+                idx[finite] = (u[:, None] > cum).sum(axis=1)
+                idx[finite] = np.clip(idx[finite], 0, P.shape[1] - 1)
+            out = np.full(n, np.nan)
+            finite_idx = idx >= 0
+            out[finite_idx] = np.asarray(
+                self._clf[node].get_class_names(idx[finite_idx]), dtype=float
             )
-            u = rng.random(n)
-            cum = np.cumsum(P, axis=1)
-            idx = (u[:, None] > cum).sum(axis=1)
-            idx = np.clip(idx, 0, P.shape[1] - 1)
-            return np.asarray(self._clf[node].get_class_names(idx), dtype=float)
+            return out
         if node in self._residuals:
             # empirical noise: resample fitted residuals with the caller's rng
             return rng.choice(self._residuals[node], size=n)

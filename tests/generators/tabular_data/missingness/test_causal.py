@@ -8,7 +8,6 @@ measurement, not of the world.
 import numpy as np
 import pytest
 
-from badgers.core.dgp import OlsDGP
 from badgers.core.selectors import (
     AlwaysSelector,
     BernoulliSelector,
@@ -19,10 +18,10 @@ from badgers.generators.tabular_data.missingness.causal import (
 )
 
 
-def test_generate__always_fires_everywhere(chain_data):
+def test_generate__always_fires_everywhere(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         selector=AlwaysSelector("X"),
@@ -38,11 +37,11 @@ def test_generate__always_fires_everywhere(chain_data):
     assert list(yt) == ["missingness"] * X.shape[0]
 
 
-def test_generate__mcar_mask_independent_of_values(chain_data):
+def test_generate__mcar_mask_independent_of_values(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         selector=BernoulliSelector("X", rate=0.5,
@@ -60,11 +59,11 @@ def test_generate__mcar_mask_independent_of_values(chain_data):
     np.testing.assert_array_equal(np.isnan(Xt[:, 2]), np.zeros(X.shape[0], bool))
 
 
-def test_generate__self_mnar_mask_depends_on_own_value(chain_data):
+def test_generate__self_mnar_mask_depends_on_own_value(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["X"],
         selector=TopQuantileSelector("X", column_mapping, quantile=0.7),
@@ -80,11 +79,11 @@ def test_generate__self_mnar_mask_depends_on_own_value(chain_data):
     assert np.all(np.isfinite(Xt[:, 2]))
 
 
-def test_generate__observed_mar_depends_on_cause(chain_data):
+def test_generate__observed_mar_depends_on_cause(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     # cause = X (col 0, an ancestor of Y, fully observed); perturb Y.
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=None, perturbation_nodes=["Y"],
         selector=TopQuantileSelector(
@@ -102,11 +101,11 @@ def test_generate__observed_mar_depends_on_cause(chain_data):
     assert np.all(np.isfinite(Xt[:, 2]))
 
 
-def test_generate__multi_node_only_fired_cells(chain_data):
+def test_generate__multi_node_only_fired_cells(chain_data, make_gcm_dgp):
     # Perturb TWO nodes: each column gets NaN only where IT fired.
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(3))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, _ = gen.generate(
         X, y=None, perturbation_nodes=["X", "Z"],
         selector=BernoulliSelector(
@@ -121,23 +120,23 @@ def test_generate__multi_node_only_fired_cells(chain_data):
     assert np.all(np.isfinite(Xt[:, 1]))
 
 
-def test_generate__validation_errors(chain_data):
+def test_generate__validation_errors(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator()
     # not fitted yet
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, y=None, perturbation_nodes=["X"])
     # unknown perturbation node
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="not found in graph"):
         gen.generate(X, y=None, perturbation_nodes=["NOPE"])
 
 
-def test_generate__labeled_y_passes_through(chain_data):
+def test_generate__labeled_y_passes_through(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     y = np.array(["a", "b"] * (X.shape[0] // 2))
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt, yt = gen.generate(
         X, y=y, perturbation_nodes=["X"], selector=AlwaysSelector("X"),
     )
@@ -145,14 +144,14 @@ def test_generate__labeled_y_passes_through(chain_data):
     np.testing.assert_array_equal(yt, y)
 
 
-def test_generate__reproducible_with_explicit_rng(chain_data):
+def test_generate__reproducible_with_explicit_rng(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     outs = []
     for _ in range(2):
         gen = CausalMissingnessGenerator(
             random_generator=np.random.default_rng(11)
         )
-        gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+        gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
         Xt, _ = gen.generate(
             X.copy(), y=None, perturbation_nodes=["X"],
             selector=BernoulliSelector("X", rate=0.4,
@@ -162,12 +161,12 @@ def test_generate__reproducible_with_explicit_rng(chain_data):
     np.testing.assert_array_equal(outs[0], outs[1])
 
 
-def test_generate__all_nan_input_edge(chain_data):
+def test_generate__all_nan_input_edge(chain_data, make_gcm_dgp):
     # A fully NaN input column: firing writes NaN again (idempotent), no
     # crash, no other column touched.
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(2))
-    gen.use_dgp(OlsDGP(graph, column_mapping).fit(X))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xn = X.copy()
     Xn[:, 1] = np.nan
     Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
