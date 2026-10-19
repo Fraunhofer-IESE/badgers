@@ -177,3 +177,39 @@ def test_explicit_column_mapping_incomplete_raises():
         GcmSCMDGP(cm, column_mapping={"A": 0, "B": 1})
     with pytest.raises(ValueError, match="column_mapping"):
         GcmSCMDGP(cm, column_mapping={"A": 0, "B": 1, "C": 1})
+
+
+# ---- intervene-conformance tests (plan Task 3) -------------------------
+
+
+def test_inherited_intervene_semantics():
+    # do(B = 10): B pinned, A untouched, C recomputed toward 0.5 * 10
+    data = _chain_data()
+    dgp = GcmSCMDGP(_build_scm()).fit(data)
+    rows = data[:50].copy()
+    before = rows.copy()
+    rows = dgp.intervene(
+        rows, ["B"], [np.full(50, 10.0)], rng=np.random.default_rng(0)
+    )
+    np.testing.assert_allclose(rows[:, 0], before[:, 0])   # A untouched
+    np.testing.assert_allclose(rows[:, 1], 10.0)           # B pinned
+    assert np.allclose(np.mean(rows[:, 2]), 5.0, atol=0.5)  # C ~ 0.5 * B
+
+
+def test_intervene_without_values_pins_current_column():
+    data = _chain_data()
+    dgp = GcmSCMDGP(_build_scm()).fit(data)
+    rows = data[:50].copy()
+    before_b = rows[:, 1].copy()
+    rows = dgp.intervene(rows, ["B"], None, rng=np.random.default_rng(0))
+    np.testing.assert_allclose(rows[:, 1], before_b)       # B stays as-is
+    assert np.all(np.isfinite(rows[:, 2]))                 # C recomputed, finite
+    assert np.count_nonzero(np.abs(rows[:, 2] - data[:50, 2]) > 1e-9) > 0  # C differs somewhere
+
+
+def test_sample_reproducible_with_same_seed():
+    data = _chain_data()
+    dgp = GcmSCMDGP(_build_scm()).fit(data)
+    s1 = dgp.sample(np.random.default_rng(7), 100)
+    s2 = dgp.sample(np.random.default_rng(7), 100)
+    np.testing.assert_array_equal(s1, s2)
