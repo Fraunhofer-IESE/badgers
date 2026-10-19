@@ -233,6 +233,14 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   protocol with caller-provided rngs. Supports `AdditiveNoiseModel`
   (non-root), `EmpiricalDistribution` (root) and `ClassifierFCM`
   (non-root discrete nodes with numeric-encoded classes).
+- **New DGP backend `PyMCSCMDGP` (pymc extra)**: plug a user-built PyMC
+  causal model into badgers — structural nodes are observed RVs whose
+  distribution parameters carry the structural functions; mechanism
+  fitting is one joint `pm.sample` (full posterior kept), sampling and
+  interventions run on the generic protocol with caller-provided rngs
+  and ONE coherent posterior draw per cascade. Supported families:
+  `Normal`, `StudentT`, `Laplace` (additive) and `Bernoulli`, `Poisson`,
+  `Binomial`, `Categorical` (numeric-encoded discrete).
 - **`ClassSelector` preset** (`badgers.core.selectors`): per-class
   fixed-count sampling on a discrete column — `ClassSelector(variables,
   column_mapping, proportions, rng=...)` with `proportions` mapping each
