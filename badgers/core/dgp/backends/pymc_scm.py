@@ -365,14 +365,22 @@ class PyMCSCMDGP(DGPMixin):
         raise NotImplementedError(f"No centered-noise rule for {family}")
 
     def _draw_discrete(self, node, family, params, rng, n):
+        # per-row parameters must have shape (n,): a root node's scalar
+        # (or (1,)-shaped) parameter would otherwise produce a single
+        # draw broadcast to every row
         if family == "BernoulliRV":
-            p = np.asarray(params[0]).ravel()
+            p = np.broadcast_to(np.asarray(params[0], dtype=float).ravel(), (n,))
             return (rng.random(n) < p).astype(float)
         if family == "PoissonRV":
-            return rng.poisson(np.maximum(np.asarray(params[0]).ravel(), 1e-9)).astype(float)
+            mu = np.broadcast_to(
+                np.asarray(params[0], dtype=float).ravel(), (n,)
+            )
+            return rng.poisson(np.maximum(mu, 1e-9)).astype(float)
         if family == "BinomialRV":
-            n_trials = np.asarray(params[0]).ravel()
-            p = np.asarray(params[1]).ravel()
+            n_trials = np.broadcast_to(
+                np.asarray(params[0]).ravel(), (n,)
+            )
+            p = np.broadcast_to(np.asarray(params[1], dtype=float).ravel(), (n,))
             return rng.binomial(n_trials.astype(int), p).astype(float)
         if family == "CategoricalRV":
             probs = np.asarray(params[0])

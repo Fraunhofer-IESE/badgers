@@ -90,3 +90,52 @@ def test_root_location_and_scale_are_inferred():
     # root marginal reconstructed from pinned mu_A + Normal(0, sigma_A)
     assert np.mean(Xs[:, 0]) == pytest.approx(np.mean(data[:, 0]), abs=0.2)
     assert np.std(Xs[:, 0]) == pytest.approx(np.std(data[:, 0]), rel=0.25)
+
+
+def _mixed_model(n=400, seed=0):
+    """A -> B (continuous) -> D (Bernoulli on logit w*B) in one pm.Model."""
+    rng = np.random.default_rng(seed)
+    data = np.zeros((n, 3))
+    data[:, 0] = rng.normal(size=n)
+    data[:, 1] = np.sin(data[:, 0]) + rng.normal(0, 0.2, size=n)
+    p = 1.0 / (1.0 + np.exp(-(2.0 * data[:, 1])))
+    data[:, 2] = (rng.random(n) < p).astype(float)
+    with pm.Model() as scm:
+        A = pm.Normal("A", mu=0.0, sigma=1.0, observed=data[:, 0])
+        sigma_B = pm.HalfNormal("sigma_B", 1.0)
+        B = pm.Normal("B", mu=pt.sin(A), sigma=sigma_B, observed=data[:, 1])
+        w = pm.Normal("w", 0.0, 5.0)
+        D = pm.Bernoulli("D", logit_p=w * B, observed=data[:, 2])
+    return scm, data, {"A": 0, "B": 1, "D": 2}
+
+
+def test_discrete_node_marginal_and_samples():
+    scm, data, mapping = _mixed_model()
+    dgp = PyMCSCMDGP(scm, mapping, n_draws=30).fit(data)
+    Xs = dgp.sample(np.random.default_rng(0), 5000)
+    assert set(np.unique(Xs[:, 2])) <= {0.0, 1.0}
+    # marginal rate close to training rate
+    assert np.mean(Xs[:, 2]) == pytest.approx(np.mean(data[:, 2]), abs=0.08)
+    # discrete node response contributes zeros; class comes from noise
+    np.testing.assert_allclose(dgp.response("D", data[:5, [1]]), 0.0)
+
+
+def test_poisson_and_binomial_families():
+    rng = np.random.default_rng(3)
+    n = 400
+    Xobs = rng.normal(size=n)
+    Y = rng.poisson(np.exp(Xobs))
+    Z = rng.binomial(4, 0.3, size=n)
+    with pm.Model() as scm:
+        X = pm.Normal("X", mu=0.0, sigma=1.0, observed=Xobs)
+        lam = pm.HalfNormal("lam", 1.0)
+        P = pm.Poisson("P", mu=pt.exp(X) * 0.5, observed=Y)
+        Nt = pm.Binomial("Nt", n=4, p=0.3, observed=Z)
+    dgp = PyMCSCMDGP(scm, {"X": 0, "P": 1, "Nt": 2}, n_draws=30).fit(
+        np.column_stack([Xobs, Y, Z])
+    )
+    Xs = dgp.sample(np.random.default_rng(1), 3000)
+    assert np.all(Xs[:, 1] >= 0)
+    assert np.all(Xs[:, 1] == np.floor(Xs[:, 1]))
+    assert set(np.unique(Xs[:, 2])) <= {0.0, 1.0, 2.0, 3.0, 4.0}
+    assert np.mean(Xs[:, 2]) == pytest.approx(1.2, abs=0.3)
