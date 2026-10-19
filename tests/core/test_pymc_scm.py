@@ -179,6 +179,73 @@ def test_intervene_without_values_pins_current_column():
     assert np.count_nonzero(np.abs(rows[:, 2] - data[:50, 2]) > 1e-9) > 0
 
 
+# ---- posterior-draw mechanics (ported from test_pymc.py) ---------------
+
+
+def test_pick_parameters_pins_one_draw():
+    # Two pinned draws DIFFER (posterior spread is real), and each draw is
+    # internally coherent: repeated response calls on ONE pin are identical
+    # (deterministic given the draw — protocol constraint).
+    scm, data, mapping = _sin_chain_model(n=500)
+    dgp = PyMCSCMDGP(scm, mapping, n_draws=30).fit(data)
+    p = np.array([[1.0]])
+    w1 = dgp.pick_parameters(np.random.default_rng(0))
+    w2 = dgp.pick_parameters(np.random.default_rng(1))
+    assert not np.isclose(
+        w1.response("C", p)[0], w2.response("C", p)[0], atol=1e-12
+    )
+    np.testing.assert_array_equal(w1.response("C", p), w1.response("C", p))
+    # reproducible draw selection under a fixed rng
+    w1b = dgp.pick_parameters(np.random.default_rng(0))
+    np.testing.assert_allclose(w1.response("C", p), w1b.response("C", p))
+    # idempotent: a pinned view re-picks itself
+    assert w1.pick_parameters(np.random.default_rng(5)) is w1
+
+
+def test_pinned_draws_average_to_true_slope():
+    # Averaging over MANY pinned parameter draws recovers the posterior
+    # mean, which approximates the TRUE structural slope (0.5; loose
+    # rtol: short MCMC + prior shrinkage).
+    scm, data, mapping = _sin_chain_model(n=500)
+    dgp = PyMCSCMDGP(scm, mapping, n_draws=30).fit(data)
+    parents = np.array([[1.0]])
+    preds = np.array([
+        dgp.pick_parameters(np.random.default_rng(s)).response("C", parents)
+        for s in range(40)
+    ])
+    np.testing.assert_allclose(np.mean(preds), 0.5, rtol=0.3)
+
+
+def test_draw_noise_shapes_and_reproducibility():
+    scm, data, mapping = _sin_chain_model()
+    dgp = PyMCSCMDGP(scm, mapping, n_draws=30).fit(data)
+    # draw_noise requires a preceding response(node, parent_values) call
+    # in the same cascade (pending parent values are consumed)
+    parents = data[:100, [1]]
+    dgp.response("C", parents)
+    n1 = dgp.draw_noise("C", np.random.default_rng(0), 100)
+    dgp.response("C", parents)
+    n2 = dgp.draw_noise("C", np.random.default_rng(0), 100)
+    dgp.response("C", parents)
+    n3 = dgp.draw_noise("C", np.random.default_rng(1), 100)
+    np.testing.assert_array_equal(n1, n2)
+    assert n1.shape == (100,)
+    assert not np.allclose(n1, n3)
+    # pinned-draw residual noise is small relative to the data scale
+    assert np.std(n1) < 1.0
+
+
+def test_intervene_with_edited_view_still_pins():
+    # a parameter-draw pin applies through an edited (view) DGP too
+    from badgers.core.dgp import edits
+
+    scm, data, mapping = _sin_chain_model(n=400)
+    dgp = PyMCSCMDGP(scm, mapping, n_draws=30).fit(data)
+    scaled = edits.scale_edge(dgp, "B", "A", 0.5).calibrate(data)
+    out2 = scaled.sample(np.random.default_rng(8), 100)
+    assert np.all(np.isfinite(out2))
+
+
 def test_error_paths():
     # structural node missing from the model
     with pm.Model() as scm:

@@ -148,8 +148,10 @@ class GcmSCMDGP(DGPMixin):
         confusing dowhy-gcm errors when a mechanism is missing or of an
         unsupported type.
 
-        NaN handling is delegated to gcm's per-mechanism estimators
-        (unlike ``DowhyGcmDGP``'s complete-case policy).
+        NaN handling is delegated to gcm's per-mechanism estimators: no
+        complete-case filtering is applied by this adapter, so the input
+        DataFrame must already be free of NaNs wherever a mechanism
+        estimator would reject them (fit the DGP once on clean data).
         """
         import dowhy.gcm as gcm
 

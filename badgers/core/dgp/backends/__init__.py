@@ -16,9 +16,7 @@ their dependencies — the import-hygiene test
 """
 
 _LAZY = {
-    "DowhyGcmDGP": "badgers.core.dgp.backends.dowhy_gcm",
     "GcmSCMDGP": "badgers.core.dgp.backends.gcm_scm",
-    "PyMCDGP": "badgers.core.dgp.backends.pymc",
     "PyMCSCMDGP": "badgers.core.dgp.backends.pymc_scm",
 }
 

@@ -10,7 +10,7 @@ DGP honors the edit. Views never mutate the base DGP.
 Parameter-uncertainty hook: all views override ``pick_parameters`` to
 first let the base pick (default: the base itself → the view works as-is
 for deterministic backends); when the base returns a PINNED draw (e.g.
-``PyMCDGP``'s posterior), the view returns a shallow copy of itself with
+``PyMCSCMDGP``'s posterior), the view returns a shallow copy of itself with
 the pinned base rebound, so the edit's overridden mechanisms evaluate on
 that parameter draw.
 """

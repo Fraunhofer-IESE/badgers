@@ -11,7 +11,7 @@ every backend by construction:
 Every cascade (``sample``/``intervene``) starts by asking the backend for
 its parameter set via :meth:`pick_parameters` — a hook with the default
 "THIS DGP" (deterministic backends have exactly one fitted parameter
-set; uncertainty-carrying backends like ``PyMCDGP`` override it to pin
+set; uncertainty-carrying backends like ``PyMCSCMDGP`` override it to pin
 one coherent draw from the caller's rng).
 
 The DGP is immutable and rngless: all randomness enters through the

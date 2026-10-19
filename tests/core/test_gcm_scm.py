@@ -179,6 +179,36 @@ def test_explicit_column_mapping_incomplete_raises():
         GcmSCMDGP(cm, column_mapping={"A": 0, "B": 1, "C": 1})
 
 
+# ---- linear slope recovery ---------------------------------------------
+
+
+def _linear_chain_data(n=300, seed=0, noise=0.1):
+    """X -> Y -> Z; Y = 2X + e, Z = 0.5Y + e."""
+    rng = np.random.default_rng(seed)
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y"), ("Y", "Z")])
+    X = rng.normal(size=n)
+    Y = 2.0 * X + rng.normal(0, noise, size=n)
+    Z = 0.5 * Y + rng.normal(0, noise, size=n)
+    return np.column_stack([X, Y, Z]), graph
+
+
+def test_fit_node_response_recovers_true_slope(make_gcm_dgp):
+    # The fitted linear mechanism recovers the TRUE structural slopes
+    # (Y = 2X, Z = 0.5Y) within tolerance: the default regressor is
+    # slightly regularized (RidgeCV), so slopes drift a little at larger
+    # |parent| values.
+    data, graph = _linear_chain_data()
+    ours = make_gcm_dgp(graph).fit(data)
+    parents = np.array([[1.0], [-2.0], [3.0]])
+    np.testing.assert_allclose(
+        ours.response("Y", parents), 2.0 * parents[:, 0], atol=2e-2
+    )
+    np.testing.assert_allclose(
+        ours.response("Z", parents), 0.5 * parents[:, 0], atol=2e-2
+    )
+
+
 # ---- intervene-conformance tests (plan Task 3) -------------------------
 
 
