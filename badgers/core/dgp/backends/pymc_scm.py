@@ -88,7 +88,10 @@ class _ParameterDrawView(DGPMixin):
         self.column_mapping = carrier.column_mapping
 
     def fit_node(self, node, parents, data):
-        self._carrier.fit_node(node, parents, data)
+        raise NotImplementedError(
+            "PyMCSCMDGP fits the whole model in fit() — per-node "
+            "mechanism fitting is not applicable"
+        )
 
     def is_fitted(self):
         return self._carrier.is_fitted()
@@ -132,7 +135,8 @@ class PyMCSCMDGP(DGPMixin):
         self._fns = {}        # node -> compiled param functions
         self._families = {}   # node -> (family name, param exprs)
         self._param_inputs = {}  # node -> fresh inputs per referenced RV
-        self._pending = {}    # node -> parent_values (discrete nodes)
+        self._pending = {}    # node -> params evaluated by the last
+        # response call (draw_noise reuses them)
         self._free_names = None
         self._sampled = False
         self._derive_structure()
@@ -316,7 +320,6 @@ class PyMCSCMDGP(DGPMixin):
     # -- evaluation ----------------------------------------------------------
 
     def _eval(self, node, parent_values, pinned, which):
-        family, roles = self._families[node]
         fns = self._fns[node]
         inputs = self._param_inputs[node]
         args = []
@@ -378,7 +381,7 @@ class PyMCSCMDGP(DGPMixin):
                     f"Node '{node}': StudentT nu must be scalar or "
                     f"per-row (size {n}); got size {nu.size}"
                 )
-            return rng.standard_t(nu if nu.size == 1 else nu[0], size=n) * scale
+            return rng.standard_t(nu, size=n) * scale
         if family == "LaplaceRV":
             return rng.laplace(0.0, scale, size=n)
         raise NotImplementedError(f"No centered-noise rule for {family}")
