@@ -32,7 +32,6 @@ nav:
     -   Implementing Novel Generators:
             -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
             -   Creating Selectors: dev/Create-New-Selectors.ipynb
-            -   Creating DGP Backends: dev/Create-New-DGP-Backends.ipynb
             -   Using DGPs: dev/Using-DGPs.ipynb
     -   About: about.md
     -   Changes: changelog.md

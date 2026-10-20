@@ -80,8 +80,8 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
             raise ValueError(
                 "GaussianNoiseClassesGenerator needs a selector deciding "
                 "which rows receive noise (e.g. ClassSelector over the "
-                "class column): classes are columns of X, y is not used "
-                "for selection."
+                "class column): classes are columns of X with discrete values,"
+                "y is not used for selection."
             )
         masks = list(selector(X, y).values())
         fired = masks[0] if len(masks) == 1 else np.logical_or.reduce(masks)
