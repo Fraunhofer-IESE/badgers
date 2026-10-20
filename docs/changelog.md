@@ -8,16 +8,15 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 - **Causal generators: labels are internal generator state (breaking).**
   The causal defect generators
-  (`CausalDriftGenerator`, `CausalMissingnessGenerator`,
-  `CausalImbalanceGenerator`, `CausalNoiseGenerator`,
-  `CausalAdditiveNoiseGenerator`, `CausalEdgePerturbationGenerator`) no
+  (``CausalDriftGenerator``, ``CausalMissingnessGenerator``,
+  ``CausalImbalanceGenerator``, ``CausalNoiseGenerator``,
+  ``CausalAdditiveNoiseGenerator``) no
   longer return deficit labels in ``yt``: ``generate()`` returns
   ``(Xt, None)`` and each generator exposes its own boolean label getter
   aligned with the rows of the last generated output —
-  ``get_drift_labels()``, ``get_missing_labels()``,
+  (``get_drift_labels()``, ``get_missing_labels()``,
   ``get_imbalance_labels()``, ``get_noise_labels()`` (both noise
-  generators), ``get_relationship_labels()``,
-  ``get_outliers_labels()``. Calling a getter before ``generate()``
+  generators), ``get_outliers_labels()``. Calling a getter before ``generate()``
   raises ``RuntimeError``. The base class owns the storage slot
   (``deficit_labels_``); each generator owns its getter.
 - **`CausalGenerator._validate` replaced by two raise-only helpers.**
@@ -68,11 +67,14 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `GaussianNoiseClassesGenerator` (per-class noise) remains; the
   time-series `Local/GlobalGaussianNoiseGenerator` are unrelated and
   unchanged.
-- **`CausalEdgePerturbationGenerator.generate` drops the dead
-  `mechanism`/`mechanism_cause`/`mechanism_rate` parameters** — they were
-  accepted but ignored (the edge generator's gate is always "all rows").
-  The signature is now
-  `generate(X, y, perturbation_nodes=None, edge=None, weight_factor=2.0)`.
+- **`CausalEdgePerturbationGenerator` is removed for this release
+  (deferred to future work).** The relationship-level (edge weight)
+  defect — scaling one edge coefficient and recomputing the child
+  marginal-preserving — was developed behind the family API but is not
+  part of the 0.0.15 surface: the generator, its tests and the
+  "Perturbing Edge Strength" tutorial are removed. The underlying
+  `edits.scale_edge` DGP edit remains in `badgers.core.dgp.edits` (and
+  is tested), so re-introducing the generator is a small follow-up.
 - **`CausalImbalanceGenerator` no longer requires a DGP** (breaking): the
   generator is a pure row-subset (quantile-range truncation); the kept
   rows' parents are unchanged, so no structural equation is re-evaluated.
@@ -318,17 +320,14 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   surgery semantics with the other causal generators. Behavior note: a
   degenerate zero-residual fitted mechanism now contributes no noise (the
   old `0.1*col_std` fallback is gone).
-- **Causal defect family** (five generators sharing `CausalGenerator`, an
+- **Causal defect family** (four generators sharing `CausalGenerator`, an
   explicit `fit(X, graph, column_mapping)` phase followed by `generate(...)`
   with `selector=` row gating):
   `CausalDriftGenerator` (single systematic shift, recomputed downstream),
   `CausalNoiseGenerator` (per-edge noise injection, `noise_std`),
   `CausalImbalanceGenerator` (quantile-range truncation (pure subset,
   descendants untouched) or explicit `selector=` — fired rows dropped), `CausalMissingnessGenerator` (m-graph missingness
-  with `any`/`all` propagation, optional observation-graph derivation),
-  `CausalEdgePerturbationGenerator` (marginal-preserving edge-weight
-  perturbation; child recomputed with the new coefficient, descendants
-  recomputed from the perturbed values).
+  with `any`/`all` propagation, optional observation-graph derivation).
 - **`pymc` optional extra** (renamed from `causal`; `pip install
   "badgers[pymc]"`) — only needed for building the PyMC SCM passed to
   `PyMCSCMDGP`.
@@ -402,8 +401,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   selectors, DGP backends and pipelines.
 - **Tabular tutorials merged per deficit** (one notebook per deficit
   instead of causal/non-causal pairs): `Outliers.ipynb`, `Noise.ipynb`,
-  `Missingness.ipynb`, `Imbalance.ipynb`, `Drift.ipynb`,
-  `Edge-Perturbation.ipynb`. Each has **Part A** (acting on the
+  `Missingness.ipynb`, `Imbalance.ipynb`, `Drift.ipynb`.
+  Each has **Part A** (acting on the
   observation process — no DGP) and **Part B** (acting on the DGP).
   Visualizations use explicit `cls` class vectors and `labels` deficit
   vectors (no `y`/`yt` placeholders); the outlier tutorial was

@@ -31,9 +31,6 @@ _LAZY_ATTRS = {
         "badgers.generators.tabular_data.missingness.causal"
     ),
     "CausalNoiseGenerator": "badgers.generators.tabular_data.noise.causal",
-    "CausalEdgePerturbationGenerator": (
-        "badgers.generators.tabular_data.relationship.causal"
-    ),
 }
 
 __all__ = list(_LAZY_ATTRS)

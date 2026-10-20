@@ -15,7 +15,6 @@ nav:
                     -   Generating Missing Data: tutorials/tabular-data/Missingness.ipynb
                     -   Generating Imbalanced Data: tutorials/tabular-data/Imbalance.ipynb
                     -   Generating Drift: tutorials/tabular-data/Drift.ipynb
-                    -   Perturbing Edge Strength: tutorials/tabular-data/Edge-Perturbation.ipynb
             -   Text Data:
                     -   Generating Typos: tutorials/text/Typos-Text.ipynb
             -   Time Series Data:
