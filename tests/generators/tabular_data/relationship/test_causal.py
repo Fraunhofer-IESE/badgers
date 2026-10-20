@@ -42,7 +42,9 @@ def test_generate__edge_relationship_strengthened(make_gcm_dgp):
     # in-place: same shape, all finite
     assert Xt.shape == X.shape
     assert np.all(np.isfinite(Xt))
-    assert list(yt) == ["relationship"] * X.shape[0]
+    labels = gen.get_relationship_labels()
+    assert labels.dtype == bool
+    assert labels.all()
     # The X->Y relationship is doubled: Y's dependence on X strengthens,
     # while Y's own marginal variance is preserved.
     new_corr = abs(np.corrcoef(Xt[:, 0], Xt[:, 1])[0, 1])

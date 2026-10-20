@@ -350,8 +350,9 @@ def test_causal_outlier_propagation__labels_and_y_passthrough(make_gcm_dgp):
         X, y=y, perturbation_nodes=["a"], n_outliers=7
     )
 
-    # y is a pure pass-through
-    np.testing.assert_array_equal(returned_y, y)
+    # y is ignored (deprecated): nothing is returned; labels live in the
+    # generator (getter)
+    assert returned_y is None
 
     labels = generator.get_outliers_labels()
     assert labels.dtype == bool

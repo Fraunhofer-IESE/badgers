@@ -18,7 +18,9 @@ def test_generate__noise_expands(chain_data, make_gcm_dgp):
     assert Xt.shape == (X.shape[0] * 3, 3)
     # All columns finite (noise, not missingness)
     assert np.all(np.isfinite(Xt))
-    assert list(yt) == ["noise"] * (X.shape[0] * 3)
+    labels = gen.get_noise_labels()
+    assert labels.dtype == bool
+    assert labels.all()
 
 
 def test_generate__n_copies_one_keeps_shape(chain_data, make_gcm_dgp):
@@ -193,7 +195,7 @@ def test_generate__selector_gates_expanded_rows(chain_data, make_gcm_dgp):
         selector=BernoulliSelector("X", rate=0.5, rng=gen.random_generator),
     )
     assert Xt.shape == (X.shape[0] * 3, 3)
-    fired = np.asarray(yt) == "noise"
+    fired = gen.get_noise_labels()
     # groups of n_copies share the same state
     groups = fired.reshape(X.shape[0], 3)
     assert np.all(groups[:, 0] == groups[:, 1]) and np.all(groups[:, 1] == groups[:, 2])

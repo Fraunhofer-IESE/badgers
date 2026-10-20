@@ -1,24 +1,19 @@
 """Shared base class for the causal data quality defect generators.
 
-Owns the shared plumbing: DAG/column_mapping/perturbation validation, DGP
-configuration (no generator-side ``fit`` — the DGP is fitted by its own
-``fit``, explicitly by the caller or lazily inside ``generate()``),
-mechanism gating (which rows get the defect), and label building.
-Subclasses define the defect injection and propagation.
+Owns the shared plumbing: DGP configuration (no generator-side ``fit`` —
+the DGP is fitted by its own ``fit``, explicitly by the caller or lazily
+inside ``generate()``), input/structure validation, and mechanism gating
+(which rows get the defect). Subclasses define the defect injection and
+propagation, and manage their OWN labels: each generator stores the
+per-row defect labels of its last generated output and exposes them
+through a public getter (e.g. ``get_outliers_labels()``).
 """
 
-import inspect
 import numpy as np
 from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
-from badgers.core.causal_graph import (
-    get_ancestors,
-    get_descendants,
-    topological_order,
-    validate_dag,
-)
-from badgers.core.selectors import AlwaysSelector
+from badgers.core.causal_graph import validate_dag
 
 
 def _column_stds(X):
@@ -90,6 +85,11 @@ class CausalGenerator(GeneratorMixin):
         self.dgp = dgp
         self.graph = None if dgp is None else dgp.graph
         self.column_mapping = None if dgp is None else dgp.column_mapping
+        # Per-row deficit labels of the last generated output. Subclasses
+        # fill this in ``generate()`` and expose it through their own
+        # public getter (e.g. ``get_outliers_labels()``) which raises
+        # RuntimeError when no output has been generated yet.
+        self.deficit_labels_ = None
 
     # -- DGP plumbing -------------------------------------------------------
 
@@ -147,13 +147,7 @@ class CausalGenerator(GeneratorMixin):
 
     # -- Mechanism gating (Distinction 3) -----------------------------------
 
-    def _fire_masks(
-        self,
-        rows,
-        perturbation_nodes,
-        node_to_col,
-        selector=None,
-    ):
+    def _fire_masks(self, rows, perturbation_nodes, selector=None):
         """Fire masks for ALL rows at once: dict {node: bool row-mask}.
 
         Delegates to a ``Selector`` from ``badgers.core.selectors``:
@@ -165,7 +159,6 @@ class CausalGenerator(GeneratorMixin):
         rows : array to gate (the generator's working rows -- for the noise
             generator these are the n_copies-EXPANDED rows).
         perturbation_nodes : list of str, non-empty (pre-validated).
-        node_to_col : column_mapping dict (node name -> column index).
         selector : Selector or None, default None
             The row-selection rule. ``None`` = ``AlwaysSelector`` (all
             rows fire). Presets: ``BernoulliSelector`` (iid rate),
@@ -187,15 +180,19 @@ class CausalGenerator(GeneratorMixin):
 
     # -- Validation ---------------------------------------------------------
 
-    def _validate(self, X, perturbation_nodes):
-        """Validate inputs and return the working sets.
+    def _validate_structure(self, X):
+        """Validate the configured structure against the input data.
 
-        Uses ``self.graph`` / ``self.column_mapping`` (derived from the
-        configured DGP).
+        Raises ``ValueError`` when:
 
-        Returns
-        -------
-        (order, node_to_col, descendants, exogenous, perturb_cols)
+        - no DGP is configured (no graph / column_mapping available);
+        - the graph is not a valid DAG;
+        - ``X`` has as many columns as the graph has nodes;
+        - the column_mapping is a dict covering exactly the graph nodes
+          with unique, in-range integer column indices.
+
+        Returns nothing: all state needed downstream lives on ``self``
+        (``self.graph``, ``self.column_mapping``).
         """
         graph = self.graph
         column_mapping = self.column_mapping
@@ -206,21 +203,7 @@ class CausalGenerator(GeneratorMixin):
                 "column_mapping)"
             )
         validate_dag(graph)
-        if perturbation_nodes is None:
-            raise ValueError("perturbation_nodes parameter is required")
-        if not isinstance(perturbation_nodes, list):
-            raise ValueError(
-                "perturbation_nodes must be a list, "
-                f"got {type(perturbation_nodes).__name__}"
-            )
-        if len(perturbation_nodes) == 0:
-            raise ValueError("perturbation_nodes must not be empty")
-        for node in perturbation_nodes:
-            if node not in graph.nodes:
-                raise ValueError(
-                    f"perturbation node '{node}' not found in graph"
-                )
-        n_samples, n_features = X.shape
+        n_features = X.shape[1]
         if n_features != len(graph.nodes):
             raise ValueError(
                 f"X has {n_features} columns but graph has "
@@ -249,6 +232,7 @@ class CausalGenerator(GeneratorMixin):
             raise ValueError(
                 f"column_mapping has unknown node(s): {sorted(extra)}"
             )
+        seen = {}
         for node, idx in column_mapping.items():
             if not isinstance(idx, int):
                 raise ValueError(
@@ -260,8 +244,6 @@ class CausalGenerator(GeneratorMixin):
                     f"column index {idx} for node '{node}' "
                     f"is out of range [0, {n_features - 1}]"
                 )
-        seen = {}
-        for node, idx in column_mapping.items():
             if idx in seen:
                 raise ValueError(
                     f"duplicate column index {idx} "
@@ -269,37 +251,30 @@ class CausalGenerator(GeneratorMixin):
                 )
             seen[idx] = node
 
-        order = topological_order(graph)
-        node_to_col = column_mapping
-        descendants = set()
-        for pn in perturbation_nodes:
-            descendants |= get_descendants(graph, pn)
-        ancestors = set()
-        for pn in perturbation_nodes:
-            ancestors |= get_ancestors(graph, pn)
-        perturb_set = set(perturbation_nodes)
-        exogenous = ancestors - perturb_set - descendants
-        perturb_cols = [node_to_col[n] for n in perturbation_nodes]
-        return order, node_to_col, descendants, exogenous, perturb_cols
+    def _validate_perturbation_nodes(self, perturbation_nodes):
+        """Validate the perturbation nodes against the configured graph.
 
-    # -- Sampler + labels ---------------------------------------------------
-
-    def _labels_inplace(self, y, affected_mask, deficit_name):
-        """Labels for an in-place defect (same length as the output rows).
-
-        If ``y`` is None, returns a label array ("original"/deficit name).
-        Otherwise returns ``y`` unchanged (the defect does not change targets).
+        Requires a non-empty list of nodes that exist in the graph.
+        Raises ``ValueError`` otherwise; returns nothing.
         """
-        if y is None:
-            return np.where(affected_mask, deficit_name, "original")
-        return y
-
-    def _labels_expanded(self, y, affected_mask, deficit_name):
-        """Labels for an expanded defect (one per output row).
-
-        If ``y`` is None, returns a label array ("original"/deficit name).
-        Otherwise returns ``y`` unchanged (already expanded by the caller).
-        """
-        if y is None:
-            return np.where(affected_mask, deficit_name, "original")
-        return y
+        graph = self.graph
+        if graph is None:
+            raise ValueError(
+                "no DGP configured: pass a dgp=... to the constructor, "
+                "or use use_dgp(dgp) (the DGP carries graph and "
+                "column_mapping)"
+            )
+        if perturbation_nodes is None:
+            raise ValueError("perturbation_nodes parameter is required")
+        if not isinstance(perturbation_nodes, list):
+            raise ValueError(
+                "perturbation_nodes must be a list, "
+                f"got {type(perturbation_nodes).__name__}"
+            )
+        if len(perturbation_nodes) == 0:
+            raise ValueError("perturbation_nodes must not be empty")
+        for node in perturbation_nodes:
+            if node not in graph.nodes:
+                raise ValueError(
+                    f"perturbation node '{node}' not found in graph"
+                )

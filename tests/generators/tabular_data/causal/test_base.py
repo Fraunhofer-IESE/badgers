@@ -17,37 +17,60 @@ class _Probe(CausalGenerator):
         raise NotImplementedError
 
 
-def test_validate__returns_sets(chain_data):
+def test_validate_structure__ok(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-    order, node_to_col, descendants, exogenous, perturb_cols = gen._validate(
-        X, ["X"]
-    )
-    assert set(order) == {"X", "Y", "Z"}
-    assert descendants == {"Y", "Z"}
-    assert exogenous == set()  # X has no ancestors
-    assert perturb_cols == [0]
+    assert gen._validate_structure(X) is None
+    assert gen._validate_perturbation_nodes(["X"]) is None
 
 
-def test_validate__missing_dgp_raises(chain_data):
+def test_validate_structure__missing_dgp_raises(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator()
     # no DGP configured -> the generator has no structure at all
     with pytest.raises(ValueError, match="DGP"):
-        gen._validate(X, ["X"])
+        gen._validate_structure(X)
 
 
-def test_validate__unknown_perturbation_node_raises(chain_data):
+def test_validate_structure__bad_column_count_raises(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    with pytest.raises(ValueError, match="columns but graph"):
+        gen._validate_structure(X[:, :2])
+
+
+def test_validate_perturbation_nodes__missing_dgp_raises(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalGenerator()
+    with pytest.raises(ValueError, match="DGP"):
+        gen._validate_perturbation_nodes(["X"])
+
+
+def test_validate_perturbation_nodes__unknown_node_raises(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
     with pytest.raises(ValueError, match="not found in graph"):
-        gen._validate(X, ["NOPE"])
+        gen._validate_perturbation_nodes(["NOPE"])
+
+
+def test_validate_perturbation_nodes__not_a_list_raises(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    with pytest.raises(ValueError, match="must be a list"):
+        gen._validate_perturbation_nodes("X")
+
+
+def test_validate_perturbation_nodes__empty_raises(chain_data):
+    X, graph, column_mapping = chain_data
+    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    with pytest.raises(ValueError, match="not be empty"):
+        gen._validate_perturbation_nodes([])
 
 
 def test_fire_masks__none_selector_fires_all_rows(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-    fires = gen._fire_masks(X, ["X"], column_mapping, selector=None)
+    fires = gen._fire_masks(X, ["X"], selector=None)
     assert set(fires) == {"X"}
     assert fires["X"].all()
 
@@ -59,32 +82,14 @@ def test_fire_masks__delegates_to_selector(chain_data):
     def selector(X, y=None):
         return {"X": np.zeros(X.shape[0], dtype=bool)}
 
-    fires = gen._fire_masks(X, ["X"], column_mapping, selector=selector)
+    fires = gen._fire_masks(X, ["X"], selector=selector)
     assert not fires["X"].any()
 
 
-def test_labels_inplace__y_none(chain_data):
+def test_deficit_labels__start_as_none(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator()
-    affected = np.array([True, False, True])
-    yt = gen._labels_inplace(None, affected, "missingness")
-    assert list(yt) == ["missingness", "original", "missingness"]
-
-
-def test_labels_inplace__y_passthrough(chain_data):
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
-    y = np.array([0, 1, 0])
-    yt = gen._labels_inplace(y, np.array([True, True, True]), "noise")
-    assert list(yt) == [0, 1, 0]
-
-
-def test_labels_expanded__y_none(chain_data):
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
-    affected = np.array([True, True, False, False])
-    yt = gen._labels_expanded(None, affected, "noise")
-    assert list(yt) == ["noise", "noise", "original", "original"]
+    assert gen.deficit_labels_ is None
 
 
 class _FakeDGP(DGPMixin):

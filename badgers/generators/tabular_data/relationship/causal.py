@@ -40,6 +40,20 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
 
     deficit_name = "relationship"
 
+    def get_relationship_labels(self) -> np.ndarray:
+        """Return the relationship labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that carry the relationship deficit (every
+        row is recomputed through the scaled edge), False for none.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                "Relationship labels are only available after calling "
+                "generate()."
+            )
+        return self.deficit_labels_
+
     @preprocess_inputs
     def generate(
         self,
@@ -62,9 +76,8 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
                 f"perturbation_nodes must be [{child!r}] (the child of the "
                 f"perturbed edge), got {perturbation_nodes!r}"
             )
-        order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-            X, perturbation_nodes
-        )
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
         n_samples = X.shape[0]
 
         # Recompute the child through the SCALED edge (raises ValueError if
@@ -82,5 +95,6 @@ class CausalEdgePerturbationGenerator(CausalGenerator):
                            rng=self.random_generator)
 
         affected = np.ones(n_samples, dtype=bool)
-        yt = self._labels_inplace(y, affected, self.deficit_name)
-        return X, yt
+
+        self.deficit_labels_ = affected.copy()
+        return X, None

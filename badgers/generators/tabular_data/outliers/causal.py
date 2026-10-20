@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from badgers.core.causal_graph import get_ancestors, get_descendants
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.sampling import (
     WithinDistributionSampler,
@@ -86,9 +87,9 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         X : np.ndarray of shape (n_samples, n_features)
             Input data.
         y : np.ndarray or None
-            Target values. If None, a label array is created with
-            "original" for input rows and "outliers" for generated rows.
-            If provided, "outliers" labels are appended.
+            Ignored (deprecated). The target is not modified; use
+            ``get_outliers_labels()`` for the per-row outlier labels of
+            the generated output.
         perturbation_nodes : list of int or str
             Nodes where the intervention is applied.
         n_outliers : int, default=10
@@ -107,19 +108,26 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         Xt : np.ndarray of shape (n_samples + n_outliers, n_features)
             Original data with outlier rows appended.
         y : np.ndarray or None
-            The unchanged target passed in (use ``get_outliers_labels()``
-            for the per-row outlier labels of the generated output).
+            Ignored (deprecated). The target is not modified; use
+            ``get_outliers_labels()`` for the per-row outlier labels of
+            the generated output.
         """
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
+        node_to_col = self.column_mapping
         graph = self.graph
-        if graph is None:
-            raise ValueError(
-                "no DGP configured: pass a dgp=... to the constructor, "
-                "or use use_dgp(dgp) (the DGP carries graph and "
-                "column_mapping)"
-            )
 
-        order, node_to_col, descendants, exogenous, perturb_cols = \
-            self._validate(X, perturbation_nodes)
+        # Graph algebra for the propagation: descendants of the perturbation
+        # nodes, and their exogenous (ancestor) nodes -- sampled from their
+        # distributions rather than intervened on.
+        descendants = set()
+        for pn in perturbation_nodes:
+            descendants |= get_descendants(graph, pn)
+        ancestors = set()
+        for pn in perturbation_nodes:
+            ancestors |= get_ancestors(graph, pn)
+        exogenous = ancestors - set(perturbation_nodes) - descendants
+        perturb_cols = [node_to_col[n] for n in perturbation_nodes]
 
         if n_outliers <= 0:
             raise ValueError(
@@ -192,4 +200,4 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(n_samples, n_outliers)
-        return Xt, y
+        return Xt, None

@@ -23,7 +23,9 @@ def test_generate__drift_systematic_shift(chain_data, make_gcm_dgp):
     # in-place: same shape
     assert Xt.shape == X.shape
     assert np.all(np.isfinite(Xt))
-    assert list(yt) == ["drift"] * X.shape[0]
+    labels = gen.get_drift_labels()
+    assert labels.dtype == bool
+    assert labels.all()
 
 
 def test_generate__drift_shift_is_constant_across_rows(chain_data, make_gcm_dgp):

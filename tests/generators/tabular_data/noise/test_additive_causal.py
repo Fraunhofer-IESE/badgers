@@ -34,7 +34,9 @@ def test_generate__shape_and_labels(chain_data):
     assert Xt.shape == X.shape
     assert np.all(np.isfinite(Xt))
     # every row fires
-    assert list(yt) == ["noise"] * X.shape[0]
+    labels = gen.get_noise_labels()
+    assert labels.dtype == bool
+    assert labels.all()
 
 
 def test_generate__inplace_with_y(chain_data):
@@ -48,7 +50,9 @@ def test_generate__inplace_with_y(chain_data):
         X, y=y, perturbation_nodes=["X"],
         distribution=scipy.stats.norm(scale=0.1),
     )
-    assert np.array_equal(yt, y)
+    # y is ignored (deprecated): nothing is returned, labels live in the
+    # generator (getter)
+    assert yt is None
     assert Xt.shape == X.shape
 
 
@@ -201,7 +205,7 @@ def test_generate__selector_gates_rows(chain_data):
         selector=BernoulliSelector("X", rate=0.5, rng=gen.random_generator),
     )
     assert Xt.shape == X.shape
-    fired = np.asarray(yt) == "noise"
+    fired = gen.get_noise_labels()
     assert fired.any() and not fired.all()
     # unfired rows are untouched
     assert np.array_equal(Xt[~fired], X[~fired])

@@ -43,6 +43,19 @@ class CausalDriftGenerator(CausalGenerator):
 
     deficit_name = "drift"
 
+    def get_drift_labels(self) -> np.ndarray:
+        """Return the drift labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that carry the drift deficit, False for
+        original rows.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                "Drift labels are only available after calling generate()."
+            )
+        return self.deficit_labels_
+
     @preprocess_inputs
     def generate(
         self,
@@ -55,9 +68,9 @@ class CausalDriftGenerator(CausalGenerator):
         """Inject causally-propagated systematic drift in place."""
         self._require_fitted()
         self._require_dgp(X)
-        order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-            X, perturbation_nodes
-        )
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
+        node_to_col = self.column_mapping
         n_samples = X.shape[0]
         col_stds = _column_stds(X)
 
@@ -81,7 +94,7 @@ class CausalDriftGenerator(CausalGenerator):
         # Apply the shift to the perturbation nodes (gated by the selector:
         # fire masks for ALL rows at once, thresholds on the un-mutated data).
         fires = self._fire_masks(
-            X, perturbation_nodes, node_to_col, selector=selector,
+            X, perturbation_nodes, selector=selector,
         )
         affected = np.zeros(n_samples, dtype=bool)
         for node in perturbation_nodes:
@@ -103,5 +116,5 @@ class CausalDriftGenerator(CausalGenerator):
             )
             X[affected_rows] = sub
 
-        yt = self._labels_inplace(y, affected, self.deficit_name)
-        return X, yt
+        self.deficit_labels_ = affected.copy()
+        return X, None

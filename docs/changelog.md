@@ -6,6 +6,30 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ### Breaking changes
 
+- **Causal generators: labels are internal generator state (breaking).**
+  The causal defect generators
+  (`CausalDriftGenerator`, `CausalMissingnessGenerator`,
+  `CausalImbalanceGenerator`, `CausalNoiseGenerator`,
+  `CausalAdditiveNoiseGenerator`, `CausalEdgePerturbationGenerator`) no
+  longer return deficit labels in ``yt``: ``generate()`` returns
+  ``(Xt, None)`` and each generator exposes its own boolean label getter
+  aligned with the rows of the last generated output —
+  ``get_drift_labels()``, ``get_missing_labels()``,
+  ``get_imbalance_labels()``, ``get_noise_labels()`` (both noise
+  generators), ``get_relationship_labels()``,
+  ``get_outliers_labels()``. Calling a getter before ``generate()``
+  raises ``RuntimeError``. The base class owns the storage slot
+  (``deficit_labels_``); each generator owns its getter.
+- **`CausalGenerator._validate` replaced by two raise-only helpers.**
+  ``_validate(X, perturbation_nodes)`` (which mixed validation with
+  graph-derivative computation and returned a 5-tuple) is split into
+  ``_validate_structure(X)`` (graph/DAG, column count, column_mapping
+  coverage and indices) and ``_validate_perturbation_nodes(nodes)``
+  (non-empty list of known nodes). Neither returns anything — the
+  mapping is ``self.column_mapping``. The dead ``order`` member and the
+  graph algebra (descendants/exogenous/perturb_cols) moved into the only
+  generator that used them (`CausalOutlierPropagationGenerator`).
+
 - **`PyMCDGP` and the old `badgers.core.dgp` module are removed.** The causal
   defect generators now fit a **per-node data generation process** behind the
   new `DGP` protocol (`badgers.core.dgp` is a package). Backends are

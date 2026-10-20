@@ -44,6 +44,19 @@ class CausalNoiseGenerator(CausalGenerator):
 
     deficit_name = "noise"
 
+    def get_noise_labels(self) -> np.ndarray:
+        """Return the noise labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that carry the noise deficit, False for
+        original rows.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                "Noise labels are only available after calling generate()."
+            )
+        return self.deficit_labels_
+
     @preprocess_inputs
     def generate(
         self,
@@ -59,9 +72,9 @@ class CausalNoiseGenerator(CausalGenerator):
             raise ValueError(f"n_copies must be >= 1, got {n_copies}")
         self._require_fitted()
         self._require_dgp(X)
-        order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-            X, perturbation_nodes
-        )
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
+        node_to_col = self.column_mapping
         n_features = X.shape[1]
         col_stds = _column_stds(X)
 
@@ -82,7 +95,7 @@ class CausalNoiseGenerator(CausalGenerator):
         # either all fire or all stay clean). Quantile thresholds are
         # computed on the un-expanded input by construction.
         fires = self._fire_masks(
-            X, perturbation_nodes, node_to_col, selector=selector,
+            X, perturbation_nodes, selector=selector,
         )
         fires = {
             node: np.repeat(mask, n_copies) for node, mask in fires.items()
@@ -108,10 +121,8 @@ class CausalNoiseGenerator(CausalGenerator):
             )
             rows[affected_rows] = sub
 
-        if y is not None:
-            y = np.repeat(y, n_copies)
-        yt = self._labels_expanded(y, affected, self.deficit_name)
-        return rows, yt
+        self.deficit_labels_ = affected.copy()
+        return rows, None
 
 
 class CausalAdditiveNoiseGenerator(CausalGenerator):
@@ -150,6 +161,19 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
 
     deficit_name = "noise"
 
+    def get_noise_labels(self) -> np.ndarray:
+        """Return the noise labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that carry the noise deficit, False for
+        original rows.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                "Noise labels are only available after calling generate()."
+            )
+        return self.deficit_labels_
+
     @preprocess_inputs
     def generate(
         self,
@@ -172,12 +196,12 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
             raise ValueError(f"noise_std must be >= 0, got {noise_std}")
         self._require_fitted()
         self._require_dgp(X)
-        order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-            X, perturbation_nodes
-        )
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
+        node_to_col = self.column_mapping
 
         fires = self._fire_masks(
-            X, perturbation_nodes, node_to_col, selector=selector,
+            X, perturbation_nodes, selector=selector,
         )
         affected = np.zeros(X.shape[0], dtype=bool)
         for mask in fires.values():
@@ -205,5 +229,5 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
             )
             rows[affected_rows] = sub
 
-        yt = self._labels_inplace(y, affected, self.deficit_name)
-        return rows, yt
+        self.deficit_labels_ = affected.copy()
+        return rows, None

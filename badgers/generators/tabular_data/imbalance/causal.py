@@ -45,6 +45,20 @@ class CausalImbalanceGenerator(CausalGenerator):
 
     deficit_name = "imbalance"
 
+    def get_imbalance_labels(self) -> np.ndarray:
+        """Return the imbalance labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that carry the imbalance deficit (the kept
+        subset), False for... none (all kept rows are affected).
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                "Imbalance labels are only available after calling "
+                "generate()."
+            )
+        return self.deficit_labels_
+
     @preprocess_inputs
     def generate(
         self,
@@ -66,9 +80,9 @@ class CausalImbalanceGenerator(CausalGenerator):
                 dropped |= np.asarray(mask, dtype=bool)
             keep = ~dropped
         else:
-            order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-                X, perturbation_nodes
-            )
+            self._validate_structure(X)
+            self._validate_perturbation_nodes(perturbation_nodes)
+            node_to_col = self.column_mapping
             # Legacy quantile-range rule: keep rows inside the intersection
             # of all perturbation-node ranges.
             lo, hi = quantile_range
@@ -89,5 +103,5 @@ class CausalImbalanceGenerator(CausalGenerator):
             y = y[keep]
         affected = np.ones(X.shape[0], dtype=bool)
 
-        yt = self._labels_inplace(y, affected, self.deficit_name)
-        return X, yt
+        self.deficit_labels_ = affected.copy()
+        return X, None

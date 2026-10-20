@@ -22,7 +22,9 @@ def test_generate__quantile_range_respected(chain_data, make_gcm_dgp):
     assert Xt.shape[1] == X.shape[1]
     lo = np.quantile(X[:, 0], 0.5)
     assert np.all(Xt[:, 0] >= lo)
-    assert list(yt) == ["imbalance"] * Xt.shape[0]
+    labels = gen.get_imbalance_labels()
+    assert labels.dtype == bool
+    assert labels.all()
 
 
 def test_generate__descendants_skewed(chain_data, make_gcm_dgp):
@@ -93,7 +95,9 @@ def test_generate__explicit_selector_drops_fired_rows(chain_data, make_gcm_dgp):
     fired = sel(X, None)["X"]
     np.testing.assert_array_equal(Xt, X[~fired])
     assert Xt.shape[0] < X.shape[0]
-    assert list(yt) == ["imbalance"] * Xt.shape[0]
+    labels = gen.get_imbalance_labels()
+    assert labels.dtype == bool
+    assert labels.all()
 
 
 def test_generate__explicit_selector_ignores_quantile_params(chain_data, make_gcm_dgp):

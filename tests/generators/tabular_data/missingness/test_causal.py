@@ -34,7 +34,9 @@ def test_generate__always_fires_everywhere(chain_data, make_gcm_dgp):
     assert np.all(np.isfinite(Xt[:, 1]))
     assert np.all(np.isfinite(Xt[:, 2]))
     # labels
-    assert list(yt) == ["missingness"] * X.shape[0]
+    labels = gen.get_missing_labels()
+    assert labels.dtype == bool
+    assert labels.all()
 
 
 def test_generate__mcar_mask_independent_of_values(chain_data, make_gcm_dgp):
@@ -132,16 +134,11 @@ def test_generate__validation_errors(chain_data, make_gcm_dgp):
         gen.generate(X, y=None, perturbation_nodes=["NOPE"])
 
 
-def test_generate__labeled_y_passes_through(chain_data, make_gcm_dgp):
+def test_generate__labels_before_generate_raises(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
-    y = np.array(["a", "b"] * (X.shape[0] // 2))
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
-    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=y, perturbation_nodes=["X"], selector=AlwaysSelector("X"),
-    )
-    # y unchanged (defect does not change targets)
-    np.testing.assert_array_equal(yt, y)
+    with pytest.raises(RuntimeError, match="only available after calling"):
+        gen.get_missing_labels()
 
 
 def test_generate__reproducible_with_explicit_rng(chain_data, make_gcm_dgp):

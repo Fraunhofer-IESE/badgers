@@ -37,6 +37,20 @@ class CausalMissingnessGenerator(CausalGenerator):
 
     deficit_name = "missingness"
 
+    def get_missing_labels(self) -> np.ndarray:
+        """Return the missingness labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that contain at least one missing value
+        (deficit fired), False for original rows.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                "Missingness labels are only available after calling "
+                "generate()."
+            )
+        return self.deficit_labels_
+
     @preprocess_inputs
     def generate(
         self,
@@ -54,15 +68,15 @@ class CausalMissingnessGenerator(CausalGenerator):
         missingness is a property of the measurement, not of the world).
         """
         self._require_fitted()
-        order, node_to_col, descendants, exogenous, perturb_cols = self._validate(
-            X, perturbation_nodes
-        )
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
+        node_to_col = self.column_mapping
         n_samples = X.shape[0]
 
         # Gate the defect by the selector: fire masks for ALL rows at once
         # (vectorized; quantile thresholds computed on the un-mutated data).
         fires = self._fire_masks(
-            X, perturbation_nodes, node_to_col, selector=selector,
+            X, perturbation_nodes, selector=selector,
         )
         affected = np.zeros(n_samples, dtype=bool)
         for node in perturbation_nodes:
@@ -70,6 +84,6 @@ class CausalMissingnessGenerator(CausalGenerator):
             X[mask, node_to_col[node]] = np.nan
             affected |= mask
 
-        yt = self._labels_inplace(y, affected, self.deficit_name)
-        return X, yt
+        self.deficit_labels_ = affected.copy()
+        return X, None
 

@@ -258,7 +258,7 @@ def test_generate__cycle_raises(rng):
 
 
 def test_generate__y_with_labels(rng):
-    """When y is provided it is passed through unchanged; labels via getter."""
+    """y is ignored (deprecated); labels are available via the getter."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
     X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
@@ -267,27 +267,6 @@ def test_generate__y_with_labels(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt, returned_y = generator.generate(
         X, y=y,
-        perturbation_nodes=["X"],
-        n_outliers=3,
-    )
-
-    assert Xt.shape == (103, 2)
-    np.testing.assert_array_equal(returned_y, y)
-
-    labels = generator.get_outliers_labels()
-    assert not labels[:100].any()
-    assert labels[100:].all()
-
-
-def test_generate__y_none_creates_labels(rng):
-    """When y is None, output y is None; labels available via getter."""
-    graph = nx.DiGraph()
-    graph.add_edges_from([("X", "Y")])
-    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
-
-    generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt, returned_y = generator.generate(
-        X, y=None,
         perturbation_nodes=["X"],
         n_outliers=3,
     )
