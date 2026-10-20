@@ -180,7 +180,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   REQUIRED (`selector=None` raises) — a per-class drift has no class-free
   default; fire masks are OR-ed. `shift_std` is now a float (one
   independent draw magnitude per class value) or a dict
-  `{class_value: std}`; the per-dimension 2D-array form is removed
+  `{class_value: std}`; entries are SIGNED (`|std|` = draw scale,
+  sign = direction). The per-dimension 2D-array form is removed
   (per-class shifts are isotropic — scale the data first for anisotropic
   drift). Class values absent from a dict are skipped. Migration:
   `generate(X, y, shift_std=np.array([2., 2., 2., 2.]))` →

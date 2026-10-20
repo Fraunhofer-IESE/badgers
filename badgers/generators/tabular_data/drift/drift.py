@@ -166,11 +166,13 @@ class RandomShiftClassesGenerator(DriftGenerator):
                          class column position. Required (a per-class rule
                          has no class-free default).
         :param shift_std: Standard deviation of the normal distribution from
-                          which the shifts are drawn. A single float (same
-                          magnitude for every class, one independent draw
-                          per class) or a dict ``{class_value: float}``.
-                          Fired rows whose class value is absent from the
-                          dict are not shifted.
+                          which the shifts are drawn. Entries are SIGNED: the
+                          magnitude (``abs``) is the scale of the draw and the
+                          sign is the shift direction — a negative entry drifts
+                          the class downward. A single float (same magnitude for
+                          every class, one independent draw per class) or a dict
+                          ``{class_value: float}``. Fired rows whose class value
+                          is absent from the dict are not shifted.
         :param variables: Columns to shift. Either a list of column positions
                           (ints) or a list of variable names resolvable through
                           ``selector.column_mapping``. Defaults to all columns
@@ -250,8 +252,9 @@ class RandomShiftClassesGenerator(DriftGenerator):
             else:
                 std = shift_std
             rows = fired if class_col is None else (fired & (X[:, class_col] == value))
-            shift = self.random_generator.normal(loc=0, scale=std, size=cols.size)
-            Xt[np.ix_(rows, cols)] += shift
+            # signed magnitude: |std| is the scale, sign(std) the direction
+            shift = self.random_generator.normal(loc=0, scale=abs(std), size=cols.size)
+            Xt[np.ix_(rows, cols)] += np.sign(std) * shift
         # inverse transform
         return scaler.inverse_transform(Xt), y
 

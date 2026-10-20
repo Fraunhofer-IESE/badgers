@@ -161,6 +161,26 @@ def test_random_shift_classes__per_class_dict_shift_std(tabular_data_labeled):
     assert np.allclose(Xt[other], Xc[other])
 
 
+def test_random_shift_classes__signed_shift_std_is_direction(tabular_data_labeled):
+    """Negative shift_std entries drift the class in the OPPOSITE direction
+    with the SAME magnitude: the mirror of the positive-std result (the rng
+    draws are identical, only the sign differs)."""
+    X, y = tabular_data_labeled
+    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    cls_col = Xc.shape[1] - 1
+    classes = np.unique(np.asarray(y))
+    column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
+    column_mapping["cls"] = cls_col
+    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in classes}}, rng=default_rng(0))
+    Xp = Xc.copy()
+    Xn = Xc.copy()
+    gp = RandomShiftClassesGenerator(random_generator=default_rng(0))
+    gn = RandomShiftClassesGenerator(random_generator=default_rng(0))
+    Xt_pos, _ = gp.generate(Xp, y, selector=selector, shift_std={c: 4.0 for c in classes})
+    Xt_neg, _ = gn.generate(Xn, y, selector=selector, shift_std={c: -4.0 for c in classes})
+    np.testing.assert_allclose(np.asarray(Xn), 2 * Xc - np.asarray(Xp))
+
+
 def test_fixed_shift__deterministic_and_exact(tabular_data):
     """FixedShiftGenerator shifts each column by exactly shift_std, reproducibly."""
     X, y = tabular_data
