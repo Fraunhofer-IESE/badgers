@@ -1,6 +1,9 @@
 /site/
 .worktrees/
 
+# Doorstop requirements (local only)
+.doorstop/
+
 # Benchmark outputs (generated, not committed)
 .benchmarks/
 

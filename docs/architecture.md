@@ -125,9 +125,8 @@ badgers/
 │   └── superpowers/                  # design specs and implementation plans
 │
 ├── experiments/                      # ad-hoc experiments and benchmark results
-├── pyproject.toml                    # project metadata and build config
-├── requirements.txt
-├── tox.ini                           # multi-version test matrix (py38–py314)
+├── pyproject.toml                    # project metadata, dependencies and build config
+├── tox.ini                           # multi-version test matrix (py311–py314)
 └── mkdocs.yml                        # documentation site config
 ```
 
@@ -157,7 +156,6 @@ The `generators` module contains the actual implementation of various data trans
    - Tabular data transformations (outliers, drift, imbalance, missingness, noise)
    - Time series modifications (changepoints, seasons, trends, transmission errors)
    - Graph-based manipulations
-   - Image processing generators
    - Text transformation tools
 
 2. **Domain-Specific Organization**: Structures generators by data type categories, making it easy to find and use appropriate transformations for specific data modalities.
