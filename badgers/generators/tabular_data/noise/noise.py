@@ -42,8 +42,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
     The data is first standardized (each column mean 0, variance 1); noise
     is drawn per fired row's class value from a normal distribution whose
     standard deviation is looked up in ``noise_std_per_class``, then the
-    data is transformed back. The class data lives in a column of ``X``
-    The class data lives in a column of ``X``.
+    data is transformed back. The class data lives in a column of ``X``.
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):

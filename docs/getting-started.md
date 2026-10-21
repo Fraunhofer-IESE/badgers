@@ -13,9 +13,9 @@ from sklearn.datasets import make_blobs
 from scipy.stats import norm
 from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator
 
-X, y = make_blobs()
+X, _ = make_blobs()
 gen = AdditiveNoiseGenerator()
-Xt, yt = gen.generate(X, y, distribution=norm(scale=0.5))
+Xt = gen.generate(X, distribution=norm(scale=0.5))
 ```
 
 More examples are available in the [tutorials](tutorials/index.md) section.

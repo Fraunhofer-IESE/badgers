@@ -130,8 +130,9 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
     Like :class:`CausalNoiseGenerator`, but the injected noise is drawn from
     a user-chosen distribution (a *frozen* scipy distribution object, e.g.
     ``scipy.stats.laplace(scale=1)``, ``scipy.stats.t(df=3)``) instead of
-    Gaussian white noise. Every row fires (no mechanism gating, no row
-    expansion — strictly in-place); the affected rows' descendants are
+    Gaussian white noise. Row gating is delegated to a ``selector``
+    (``None`` = every row fires, no row expansion); the affected rows are
+    noised in place (``rows = X + noise``) and their descendants are
     recomputed through the structural equations (Pearl surgery).
 
     Parameters

@@ -138,7 +138,7 @@ The `core` module serves as the foundation of the Badgers framework, providing e
 
 1. **Base Classes**: Defines the fundamental `GeneratorMixin` abstract base class that all generators must inherit from, ensuring a consistent interface across the entire system.
 
-2. **Standardized Interface**: Enforces a uniform `generate(X, y, **params)` method signature that returns transformed data `(Xt, yt)` for all generators.
+2. **Standardized Interface**: Enforces a uniform `generate(X, **params)` method signature that returns the single generated object `Xt` for all generators (target-like data lives inside `X`).
 
 3. **Input Preprocessing**: Provides decorator functions (`preprocess_inputs`) that automatically validate and convert input data to standardized formats (numpy arrays).
 

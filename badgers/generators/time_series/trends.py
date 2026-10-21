@@ -56,7 +56,7 @@ class GlobalAdditiveLinearTrendGenerator(TrendsGenerator):
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
         :param slope: The slope of the trend (increase per time unit). Can be a single float value or a list of slopes
                       for each feature in X.
-        :type slope: Union[float, list]
+        :type slope: float or list
         :return: The transformed signal Xt (X + linear trend).
         """
 
@@ -87,7 +87,7 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
         :param slope: The slope of the trend (increase per time unit). Can be a single float value or a list of slopes
                       for each feature in X.
-        :type slope: Union[float, list]
+        :type slope: float or list
         :param start: The starting index of the segment to apply the trend.
         :param end: The ending index of the segment to apply the trend.
         :return: The transformed signal Xt (X with the linear trend applied to the specified segment).
