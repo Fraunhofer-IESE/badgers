@@ -55,7 +55,6 @@ class CausalMissingnessGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        y,
         perturbation_nodes=None,
         selector=None,
     ):
@@ -85,5 +84,4 @@ class CausalMissingnessGenerator(CausalGenerator):
             affected |= mask
 
         self.deficit_labels_ = affected.copy()
-        return X, None
-
+        return X

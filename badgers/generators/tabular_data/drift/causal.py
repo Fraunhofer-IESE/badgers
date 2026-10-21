@@ -60,7 +60,6 @@ class CausalDriftGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        y,
         perturbation_nodes=None,
         selector=None,
         drift_std=0.5,
@@ -117,4 +116,4 @@ class CausalDriftGenerator(CausalGenerator):
             X[affected_rows] = sub
 
         self.deficit_labels_ = affected.copy()
-        return X, None
+        return X

@@ -61,7 +61,6 @@ class CausalNoiseGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        y,
         perturbation_nodes=None,
         n_copies=1,
         selector=None,
@@ -122,7 +121,7 @@ class CausalNoiseGenerator(CausalGenerator):
             rows[affected_rows] = sub
 
         self.deficit_labels_ = affected.copy()
-        return rows, None
+        return rows
 
 
 class CausalAdditiveNoiseGenerator(CausalGenerator):
@@ -178,7 +177,6 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        y,
         perturbation_nodes,
         distribution,
         noise_std=1.0,
@@ -230,4 +228,4 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
             rows[affected_rows] = sub
 
         self.deficit_labels_ = affected.copy()
-        return rows, None
+        return rows

@@ -22,8 +22,8 @@ def test_generate__always_fires_everywhere(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         selector=AlwaysSelector("X"),
     )
     # in-place: same shape
@@ -39,13 +39,51 @@ def test_generate__always_fires_everywhere(chain_data, make_gcm_dgp):
     assert labels.all()
 
 
+def test_generate__selector_receives_rows_and_labels_match_result(
+    chain_data, make_gcm_dgp
+):
+    X, graph, column_mapping = chain_data
+    gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    selector_rows = []
+
+    def selector(rows):
+        selector_rows.append(rows)
+        return {"X": np.arange(rows.shape[0]) % 2 == 0}
+
+    Xt = gen.generate(X, perturbation_nodes=["X"], selector=selector)
+
+    assert Xt is X
+    assert selector_rows == [X]
+    np.testing.assert_array_equal(
+        gen.get_missing_labels(), np.arange(X.shape[0]) % 2 == 0
+    )
+    assert gen.get_missing_labels().shape[0] == Xt.shape[0]
+
+
+def test_fire_masks__selector_receives_only_working_rows():
+    rows = np.arange(6).reshape(3, 2)
+    selector_calls = []
+
+    def selector(working_rows):
+        selector_calls.append(working_rows)
+        return {"X": np.array([True, False, True])}
+
+    masks = CausalMissingnessGenerator()._fire_masks(
+        rows, ["X"], selector=selector
+    )
+
+    assert selector_calls == [rows]
+    np.testing.assert_array_equal(masks["X"], [True, False, True])
+
+
 def test_generate__mcar_mask_independent_of_values(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         selector=BernoulliSelector("X", rate=0.5,
                                    rng=gen.random_generator),
     )
@@ -66,8 +104,8 @@ def test_generate__self_mnar_mask_depends_on_own_value(chain_data, make_gcm_dgp)
     X_orig = X.copy()
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         selector=TopQuantileSelector("X", column_mapping, quantile=0.7),
     )
     mask = np.isnan(Xt[:, 0])
@@ -86,8 +124,8 @@ def test_generate__observed_mar_depends_on_cause(chain_data, make_gcm_dgp):
     # cause = X (col 0, an ancestor of Y, fully observed); perturb Y.
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(1))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["Y"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["Y"],
         selector=TopQuantileSelector(
             "Y", column_mapping, quantile=0.5, drivers="X"
         ),
@@ -108,8 +146,8 @@ def test_generate__multi_node_only_fired_cells(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, _ = gen.generate(
-        X, y=None, perturbation_nodes=["X", "Z"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X", "Z"],
         selector=BernoulliSelector(
             ("X", "Z"), rate=0.3, rng=gen.random_generator
         ),
@@ -127,11 +165,11 @@ def test_generate__validation_errors(chain_data, make_gcm_dgp):
     gen = CausalMissingnessGenerator()
     # not fitted yet
     with pytest.raises(RuntimeError, match="no structure"):
-        gen.generate(X, y=None, perturbation_nodes=["X"])
+        gen.generate(X, perturbation_nodes=["X"])
     # unknown perturbation node
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="not found in graph"):
-        gen.generate(X, y=None, perturbation_nodes=["NOPE"])
+        gen.generate(X, perturbation_nodes=["NOPE"])
 
 
 def test_generate__labels_before_generate_raises(chain_data, make_gcm_dgp):
@@ -149,8 +187,8 @@ def test_generate__reproducible_with_explicit_rng(chain_data, make_gcm_dgp):
             random_generator=np.random.default_rng(11)
         )
         gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-        Xt, _ = gen.generate(
-            X.copy(), y=None, perturbation_nodes=["X"],
+        Xt = gen.generate(
+            X.copy(), perturbation_nodes=["X"],
             selector=BernoulliSelector("X", rate=0.4,
                                        rng=gen.random_generator),
         )
@@ -166,7 +204,7 @@ def test_generate__all_nan_input_edge(chain_data, make_gcm_dgp):
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xn = X.copy()
     Xn[:, 1] = np.nan
-    Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
+    Xt = gen.generate(Xn, perturbation_nodes=["Y"],
                          selector=AlwaysSelector("Y"))
     assert np.all(np.isnan(Xt[:, 1]))
     np.testing.assert_array_equal(Xt[:, 0], Xn[:, 0])

@@ -65,10 +65,10 @@ class CausalGenerator(GeneratorMixin):
             dgp = GcmSCMDGP(make_gcm_scm(graph, column_mapping)).fit(X)  # fit on clean X
 
             missingness = CausalMissingnessGenerator(rng=..., dgp=dgp)
-            Xm, _ = missingness.generate(X, None, ...)
+            Xm = missingness.generate(X, ...)
 
             drift = CausalDriftGenerator(rng=..., dgp=dgp)  # share
-            Xt, _ = drift.generate(Xm, None, ...)
+            Xt = drift.generate(Xm, ...)
 
         All per-stage scale computations are NaN-safe, so even the lazy
         refit path behaves sensibly; the explicitly-fitted shared
@@ -151,7 +151,7 @@ class CausalGenerator(GeneratorMixin):
         """Fire masks for ALL rows at once: dict {node: bool row-mask}.
 
         Delegates to a ``Selector`` from ``badgers.core.selectors``:
-        ``selector(rows, y) -> {node: bool mask}``.
+        ``selector(rows) -> {node: bool mask}``.
         ``None`` defaults to ``AlwaysSelector`` (every row fires).
 
         Parameters
@@ -176,7 +176,7 @@ class CausalGenerator(GeneratorMixin):
                 node: np.ones(rows.shape[0], dtype=bool)
                 for node in perturbation_nodes
             }
-        return selector(rows, None)
+        return selector(rows)
 
     # -- Validation ---------------------------------------------------------
 

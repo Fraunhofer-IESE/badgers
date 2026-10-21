@@ -26,8 +26,8 @@ def test_generate__shape_and_labels(chain_data):
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.laplace(scale=0.5),
     )
     # strictly in-place
@@ -39,21 +39,18 @@ def test_generate__shape_and_labels(chain_data):
     assert labels.all()
 
 
-def test_generate__inplace_with_y(chain_data):
+def test_generate__inplace_returns_only_rows(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalAdditiveNoiseGenerator(
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    y = np.arange(X.shape[0])
-    Xt, yt = gen.generate(
-        X, y=y, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.norm(scale=0.1),
     )
-    # y is ignored (deprecated): nothing is returned, labels live in the
-    # generator (getter)
-    assert yt is None
     assert Xt.shape == X.shape
+    assert gen.get_noise_labels().shape == (Xt.shape[0],)
 
 
 def test_generate__x_changes(chain_data):
@@ -62,8 +59,8 @@ def test_generate__x_changes(chain_data):
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    Xt, _ = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.laplace(scale=0.5),
     )
     assert not np.allclose(Xt[:, 0], X[:, 0])
@@ -78,8 +75,8 @@ def test_generate__zero_noise_descendants_untouched(chain_data):
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    Xt, _ = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.norm(), noise_std=0.0,
     )
     # zero injected noise: the perturbed root column is unchanged, but its
@@ -97,8 +94,8 @@ def test_generate__propagation(chain_data):
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    Xt, _ = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.laplace(scale=0.5),
     )
     # X changed (injected noise)
@@ -116,7 +113,7 @@ def test_generate__no_dgp_raises(chain_data):
     gen = CausalAdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(
-            X, y=None, perturbation_nodes=["X"],
+            X, perturbation_nodes=["X"],
             distribution=scipy.stats.norm(scale=0.1),
         )
 
@@ -132,7 +129,7 @@ def test_generate__no_structure_raises(chain_data):
     gen.column_mapping = None
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(
-            X, y=None, perturbation_nodes=["X"],
+            X, perturbation_nodes=["X"],
             distribution=scipy.stats.norm(scale=0.1),
         )
 
@@ -145,7 +142,7 @@ def test_generate__invalid_distribution_raises(chain_data):
     )
     with pytest.raises(TypeError, match="frozen scipy"):
         gen.generate(
-            X, y=None, perturbation_nodes=["X"],
+            X, perturbation_nodes=["X"],
             distribution="normal",
         )
 
@@ -158,7 +155,7 @@ def test_generate__negative_noise_std_raises(chain_data):
     )
     with pytest.raises(ValueError, match="noise_std"):
         gen.generate(
-            X, y=None, perturbation_nodes=["X"],
+            X, perturbation_nodes=["X"],
             distribution=scipy.stats.norm(), noise_std=-1.0,
         )
 
@@ -171,7 +168,7 @@ def test_generate__invalid_perturbation_node_raises(chain_data):
     )
     with pytest.raises(ValueError, match="not found"):
         gen.generate(
-            X, y=None, perturbation_nodes=["W"],
+            X, perturbation_nodes=["W"],
             distribution=scipy.stats.norm(),
         )
 
@@ -184,8 +181,8 @@ def test_generate__lazy_fit(chain_data, make_gcm_dgp):
         dgp=dgp,
     )
     assert not dgp.is_fitted()
-    Xt, _ = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.norm(scale=0.1),
     )
     assert dgp.is_fitted()
@@ -199,8 +196,8 @@ def test_generate__selector_gates_rows(chain_data):
         dgp=_world(X, graph, column_mapping),
     )
     # Bernoulli selector: only ~half the rows fire
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
+    Xt = gen.generate(
+        X, perturbation_nodes=["X"],
         distribution=scipy.stats.norm(scale=0.5),
         selector=BernoulliSelector("X", rate=0.5, rng=gen.random_generator),
     )
@@ -219,11 +216,10 @@ def test_generate__always_selector_equals_default(chain_data):
         gen = CausalAdditiveNoiseGenerator(
             random_generator=np.random.default_rng(0), dgp=dgp,
         )
-        Xt, yt = gen.generate(
-            X.copy(), y=None, perturbation_nodes=["X"],
+        Xt = gen.generate(
+            X.copy(), perturbation_nodes=["X"],
             distribution=scipy.stats.norm(scale=0.5),
             selector=selector,
         )
-        out.append((Xt, yt))
-    np.testing.assert_array_equal(out[0][0], out[1][0])
-    np.testing.assert_array_equal(out[0][1], out[1][1])
+        out.append(Xt)
+    np.testing.assert_array_equal(out[0], out[1])
