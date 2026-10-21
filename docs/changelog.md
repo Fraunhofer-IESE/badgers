@@ -52,7 +52,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   and the only structure param anywhere on the generator is `dgp=` (or
   `use_dgp(dgp)`). The DGP carries `graph` and `column_mapping` itself —
   build one with e.g. `dgp = GcmSCMDGP(scm).fit(X)` (see
-  `docs/dev/Using-DGPs.ipynb`). Unfitted DGPs are fitted lazily on first
+  `docs/tutorials/dev/Using-DGPs.ipynb`). Unfitted DGPs are fitted lazily on first
   `generate(X)` (`DGP.is_fitted` is respected).
 - **`fit` signature change** for the causal defect family:
   `fit(X, graph, column_mapping, dgp=None)` — `n_samples_mcmc` and
@@ -378,7 +378,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   (`badgers.core.dgp.backends.GcmSCMDGP` and `PyMCSCMDGP`): build the
   structural causal model with the wrapped library (dowhy-gcm or PyMC),
   then wrap it — `GcmSCMDGP(scm)` / `PyMCSCMDGP(pymc_model)`. See
-  `docs/dev/Using-DGPs.ipynb`.
+  `docs/tutorials/dev/Using-DGPs.ipynb`.
 - **`edits.rebuild` and `edits.reversed_graph` are removed** (and with
   them `CausalGenerator.rebuild_with_graph`). Re-estimation after a
   structural modification is out of scope: build the modified SCM with

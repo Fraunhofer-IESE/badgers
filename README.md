@@ -26,7 +26,7 @@ trf = AdditiveNoiseGenerator()
 Xt = trf.generate(X, distribution=norm(scale=0.5))
 ```
 
-More examples are available in the [tutorials](https://fraunhofer-iese.github.io/badgers/tutorials/tabular-data/Imbalance-Tabular-Data/) section.
+More examples are available in the [tutorials](https://fraunhofer-iese.github.io/badgers/tutorials/tabular-data/Imbalance/) section.
 
 The API documentation is also available in the [API](https://fraunhofer-iese.github.io/badgers/reference/badgers/) section.
 

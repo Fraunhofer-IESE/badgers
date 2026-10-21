@@ -245,7 +245,7 @@ tests/
 
 ### Key Conventions
 
-- **Fixtures over classes**: Each data type has a `conftest.py` with reusable fixtures (e.g., `tabular_small`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`). Fixtures return `(X, y)` tuples with deterministic random seeds.
+- **Fixtures over classes**: Each data type has a `conftest.py` with reusable fixtures (e.g., `tabular_small`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`). Fixtures return the input data `X` directly (with class values as a column of `X` where labeled data is needed) and use deterministic random seeds.
 - **Flat test functions**: Tests are plain `test_<subject>__<behavior>` functions (double underscore separator), not methods on `TestCase` classes.
 - **Generator tests are independent**: Generator correctness is tested directly via pytest, not through the benchmark framework's functional checks. This keeps tests fast, focused, and free of benchmark infrastructure coupling.
 
