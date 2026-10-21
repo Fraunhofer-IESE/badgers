@@ -1,6 +1,8 @@
 # Getting started:
 
-- the link to tutorial is dead
+- section 6 shall introduce "SCM" and make it more explicit what hte code is doing (intervenene and sample)
+
+- all links at the end are broken (example: https://fraunhofer-iese.github.io/badgers/tutorials/concepts/tabular-data/Outliers.ipynb shall be https://fraunhofer-iese.github.io/badgers/tutorials/tabular-data/Outliers.ipynb). Maybe move all tutorials (also the ones in docs/dev) to the same folder docs/tutorials and update the links accordingly.
 
 # Future work
 

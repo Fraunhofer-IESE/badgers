@@ -29,9 +29,9 @@ nav:
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
     -   Implementing Novel Generators:
-            -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
-            -   Creating Selectors: dev/Create-New-Selectors.ipynb
-            -   Using DGPs: dev/Using-DGPs.ipynb
+            -   Creating Tabular Generators: tutorials/dev/Create-New-Tabular-Generators.ipynb
+            -   Creating Selectors: tutorials/dev/Create-New-Selectors.ipynb
+            -   Using DGPs: tutorials/dev/Using-DGPs.ipynb
     -   About: about.md
     -   Changes: changelog.md
     - Architecture: architecture.md

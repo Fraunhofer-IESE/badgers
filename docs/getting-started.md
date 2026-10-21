@@ -18,7 +18,7 @@ gen = AdditiveNoiseGenerator()
 Xt, yt = gen.generate(X, y, distribution=norm(scale=0.5))
 ```
 
-More examples are available in the [tutorials](../tutorials/tabular-data/Imbalance-Tabular-Data/) section.
+More examples are available in the [tutorials](tutorials/tabular-data/Imbalance.ipynb) section.
 
 ## Learn the concepts
 
@@ -26,11 +26,11 @@ New to badgers? The [Understanding badgers](../tutorials/concepts/Badgers-Concep
 
 ## Build your own
 
-Those interested in developing their own generators and/or contribute to badgers can have a look at the [dev-tutorials](../dev/Create-New-Tabular-Generators/) section — three notebooks:
+Those interested in developing their own generators and/or contribute to badgers can have a look at the [dev-tutorials](../tutorials/dev/Create-New-Tabular-Generators/) section — three notebooks:
 
-* [Creating Tabular Generators](../dev/Create-New-Tabular-Generators/)
-* [Creating Selectors](../dev/Create-New-Selectors/)
-* [Using DGPs](../dev/Using-DGPs/) — the shipped backends incl. the dowhy-gcm and PyMC SCM adapters on fit / sample / intervene
+* [Creating Tabular Generators](../tutorials/dev/Create-New-Tabular-Generators/)
+* [Creating Selectors](../tutorials/dev/Create-New-Selectors/)
+* [Using DGPs](../tutorials/dev/Using-DGPs/) — the shipped backends incl. the dowhy-gcm and PyMC SCM adapters on fit / sample / intervene
 
 For the big picture, see the [architecture](architecture.md) overview and [CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md).
 
