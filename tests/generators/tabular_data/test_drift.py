@@ -13,7 +13,7 @@ from badgers.generators.tabular_data.drift.drift import (
 
 def test_random_shift__preserves_shape_and_modifies_data(tabular_data):
     """RandomShiftGenerator with scalar shift_std preserves shape and modifies data."""
-    X, y = tabular_data
+    X = tabular_data
     generator = RandomShiftGenerator(random_generator=default_rng(0))
     Xt = generator.generate(X.copy(), shift_std=0.1)
     assert len(X) == len(Xt)
@@ -24,7 +24,7 @@ def test_random_shift__preserves_shape_and_modifies_data(tabular_data):
 
 def test_random_shift__zero_shift_preserves_data(tabular_data):
     """RandomShiftGenerator with shift_std=0 produces identical output."""
-    X, y = tabular_data
+    X = tabular_data
     generator = RandomShiftGenerator(random_generator=default_rng(0))
     Xt = generator.generate(X.copy(), shift_std=0.0)
     X_np = np.asarray(X)
@@ -34,7 +34,7 @@ def test_random_shift__zero_shift_preserves_data(tabular_data):
 
 def test_random_shift__preserves_shape_array(tabular_data):
     """RandomShiftGenerator with array shift_std preserves shape and modifies data."""
-    X, y = tabular_data
+    X = tabular_data
     X_np = np.asarray(X)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
     shift_std = np.array([0.1]) if n_features == 1 else np.linspace(0.1, 1, n_features)
@@ -47,7 +47,7 @@ def test_random_shift__preserves_shape_array(tabular_data):
 
 def test_random_shift__signed_array_shift_std(tabular_data):
     """generate(X=..., shift_std=negative-array) uses sign as shift direction."""
-    X, y = tabular_data
+    X = tabular_data
     X_np = np.asarray(X)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
     # signed magnitudes: alternate positive/negative shift directions
@@ -59,11 +59,11 @@ def test_random_shift__signed_array_shift_std(tabular_data):
 
 def test_random_shift_classes__preserves_shape_and_modifies_data(tabular_data_labeled):
     """RandomShiftClassesGenerator with scalar shift_std preserves shape and modifies data."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)])
+    Xc = np.asarray(tabular_data_labeled)
+    classes = Xc[:, -1]
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = Xc.shape[1] - 1
-    selector = ClassSelector("cls", column_mapping, {"cls": {c: 0.5 for c in np.unique(y)}}, rng=default_rng(0))
+    selector = ClassSelector("cls", column_mapping, {"cls": {c: 0.5 for c in np.unique(classes)}}, rng=default_rng(0))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, shift_std=0.1)
     assert len(Xc) == len(Xt)
@@ -72,19 +72,19 @@ def test_random_shift_classes__preserves_shape_and_modifies_data(tabular_data_la
 
 def test_random_shift_classes__selector_none_raises(tabular_data_labeled):
     """A per-class rule has no class-free default: selector=None raises."""
-    X, y = tabular_data_labeled
+    Xc = np.asarray(tabular_data_labeled)
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     with pytest.raises(ValueError, match="selector"):
-        generator.generate(X.copy(), shift_std=0.1)
+        generator.generate(Xc.copy(), shift_std=0.1)
 
 
 def test_random_shift_classes__class_column_not_shifted(tabular_data_labeled):
     """Default: feature columns shift, the class column stays untouched."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
+    classes = Xc[:, -1]
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = Xc.shape[1] - 1
-    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(y)}}, rng=default_rng(0))
+    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(classes)}}, rng=default_rng(0))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, shift_std=2.0)
     Xt = np.asarray(Xt)
@@ -94,11 +94,11 @@ def test_random_shift_classes__class_column_not_shifted(tabular_data_labeled):
 
 def test_random_shift_classes__explicit_variables(tabular_data_labeled):
     """variables= restricts the shifted columns (names via column_mapping)."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
+    classes = Xc[:, -1]
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = Xc.shape[1] - 1
-    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(y)}}, rng=default_rng(0))
+    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(classes)}}, rng=default_rng(0))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, shift_std=2.0, variables=["f0"])
     Xt = np.asarray(Xt)
@@ -108,8 +108,7 @@ def test_random_shift_classes__explicit_variables(tabular_data_labeled):
 
 def test_random_shift_classes__explicit_class_column_int(tabular_data_labeled):
     """class_column as int works even with a selector without column_mapping."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
     selector = BernoulliSelector(["rows"], rate=1.0, rng=default_rng(1))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, shift_std=2.0, class_column=Xc.shape[1] - 1)
@@ -120,11 +119,11 @@ def test_random_shift_classes__explicit_class_column_int(tabular_data_labeled):
 
 def test_random_shift_classes__explicit_class_column_name(tabular_data_labeled):
     """class_column as name is resolved through selector.column_mapping."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
+    classes = Xc[:, -1]
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = Xc.shape[1] - 1
-    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(y)}}, rng=default_rng(0))
+    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(classes)}}, rng=default_rng(0))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, shift_std=2.0, class_column="cls")
     assert np.allclose(np.asarray(Xt)[:, -1], Xc[:, -1])
@@ -132,8 +131,7 @@ def test_random_shift_classes__explicit_class_column_name(tabular_data_labeled):
 
 def test_random_shift_classes__explicit_class_column_bad_name_raises(tabular_data_labeled):
     """An unresolvable class_column name raises ValueError."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
     # selector without column_mapping: a name cannot be resolved
     selector = BernoulliSelector(["rows"], rate=1.0, rng=default_rng(1))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
@@ -143,10 +141,9 @@ def test_random_shift_classes__explicit_class_column_bad_name_raises(tabular_dat
 
 def test_random_shift_classes__per_class_dict_shift_std(tabular_data_labeled):
     """Dict shift_std shifts only the listed classes, one draw per class."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)])
+    Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
-    classes = np.unique(np.asarray(y))
+    classes = np.unique(Xc[:, -1])
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = cls_col
     # fire every row (all classes), magnitudes only for the first class
@@ -164,10 +161,9 @@ def test_random_shift_classes__signed_shift_std_is_direction(tabular_data_labele
     """Negative shift_std entries drift the class in the OPPOSITE direction
     with the SAME magnitude: the mirror of the positive-std result (the rng
     draws are identical, only the sign differs)."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
-    classes = np.unique(np.asarray(y))
+    classes = np.unique(Xc[:, -1])
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = cls_col
     selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in classes}}, rng=default_rng(0))
@@ -182,7 +178,7 @@ def test_random_shift_classes__signed_shift_std_is_direction(tabular_data_labele
 
 def test_fixed_shift__deterministic_and_exact(tabular_data):
     """FixedShiftGenerator shifts each column by exactly shift_std, reproducibly."""
-    X, y = tabular_data
+    X = tabular_data
     X_np = np.asarray(X, dtype=float)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
     shift = np.linspace(1.0, -1.0, n_features)
@@ -197,12 +193,11 @@ def test_fixed_shift__deterministic_and_exact(tabular_data):
 
 def test_fixed_shift_classes__deterministic_and_per_class(tabular_data_labeled):
     """FixedShiftClassesGenerator: same input -> same output; one exact shift per class."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
     column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
     column_mapping["cls"] = cls_col
-    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(y)}}, rng=default_rng(0))
+    selector = ClassSelector("cls", column_mapping, {"cls": {c: 1.0 for c in np.unique(Xc[:, -1])}}, rng=default_rng(0))
     generator = FixedShiftClassesGenerator()
     Xt1 = generator.generate(X=Xc.copy(), selector=selector, shift=1.0)
     Xt2 = generator.generate(X=Xc.copy(), selector=selector, shift=1.0)
@@ -210,7 +205,7 @@ def test_fixed_shift_classes__deterministic_and_per_class(tabular_data_labeled):
     assert np.allclose(np.asarray(Xt1)[:, cls_col], Xc[:, cls_col])  # class col untouched
     # per-class shifts are exact: scalar shift 1.0 -> exactly 1 std per feature column
     delta = np.asarray(Xt1) - Xc
-    for c in np.unique(y):
+    for c in np.unique(Xc[:, -1]):
         rows = Xc[:, cls_col] == c
         expected = 1.0 * Xc[:, :-1].std(axis=0, ddof=0)
         np.testing.assert_allclose(
@@ -220,10 +215,9 @@ def test_fixed_shift_classes__deterministic_and_per_class(tabular_data_labeled):
 
 def test_fixed_shift_classes__dict_shift_per_class(tabular_data_labeled):
     """Dict shift applies exact shifts only to the listed classes."""
-    X, y = tabular_data_labeled
-    Xc = np.column_stack([np.asarray(X), np.asarray(y)]).astype(float)
+    Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
-    classes = np.unique(np.asarray(y))
+    classes = np.unique(Xc[:, -1])
     selector = ClassSelector("cls", {f"f{i}": i for i in range(Xc.shape[1])} | {"cls": cls_col},
                              {"cls": {c: 1.0 for c in classes}}, rng=default_rng(0))
     generator = FixedShiftClassesGenerator()

@@ -33,16 +33,15 @@ def test_outliers__correct_shape_and_labels(tabular_data):
     """For each generator and input type: Xt has original + outliers, and the
     internal labels via get_outliers_labels() are False/True aligned with rows."""
     n_outliers = 10
-    X, _ = tabular_data
-    X_np = np.asarray(X)
-    n_samples = len(X_np)
+    X = np.asarray(tabular_data)
+    n_samples = len(X)
 
     for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
         generator = gen_class(random_generator=default_rng(0))
 
         try:
             Xt = generator.generate(
-                X_np.copy(), n_outliers=n_outliers, **default_kwargs
+                X.copy(), n_outliers=n_outliers, **default_kwargs
             )
         except (NotImplementedError, AttributeError, ValueError):
             continue
@@ -52,7 +51,7 @@ def test_outliers__correct_shape_and_labels(tabular_data):
 
         # Xt has original + outlier rows
         assert Xt.shape[0] == n_samples + n_outliers
-        assert Xt.shape[1] == (X_np.shape[1] if X_np.ndim > 1 else 1)
+        assert Xt.shape[1] == (X.shape[1] if X.ndim > 1 else 1)
 
         # internal labels: False for original rows, True for outliers
         labels = generator.get_outliers_labels()
@@ -64,8 +63,7 @@ def test_outliers__correct_shape_and_labels(tabular_data):
 
 def test_outliers__reproducibility_given_same_seed(tabular_data):
     """With the same RNG seed and same inputs, generators produce the same output."""
-    X, _ = tabular_data
-    X_np = np.asarray(X)
+    X = np.asarray(tabular_data)
 
     for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
         rng1 = default_rng(42)
@@ -74,12 +72,12 @@ def test_outliers__reproducibility_given_same_seed(tabular_data):
         gen2 = gen_class(random_generator=rng2)
 
         try:
-            Xt1 = gen1.generate(X_np.copy(), n_outliers=20, **default_kwargs)
-            Xt2 = gen2.generate(X_np.copy(), n_outliers=20, **default_kwargs)
+            Xt1 = gen1.generate(X.copy(), n_outliers=20, **default_kwargs)
+            Xt2 = gen2.generate(X.copy(), n_outliers=20, **default_kwargs)
         except (NotImplementedError, AttributeError, ValueError):
             continue
 
-        if len(Xt1) == len(X_np):
+        if len(Xt1) == len(X):
             continue
 
         np.testing.assert_allclose(Xt1, Xt2)
@@ -256,7 +254,7 @@ def test_hypercube__expansion_negative_raises():
 
 def test_decomposition_and_outlier__generates_correct_shape():
     """DecompositionAndOutlierGenerator produces correct shape outliers."""
-    X, _ = make_blobs(centers=5, n_features=10, n_samples=100)
+    X = make_blobs(centers=5, n_features=10, n_samples=100)[0]
     n_outliers = 10
     outlier_generators = [
         ZScoreSamplingGenerator(),

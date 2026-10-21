@@ -13,7 +13,7 @@ class _Probe(CausalGenerator):
 
     deficit_name = "probe"
 
-    def generate(self, X, y, **params):
+    def generate(self, X, **params):
         raise NotImplementedError
 
 
@@ -79,7 +79,7 @@ def test_fire_masks__delegates_to_selector(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
 
-    def selector(X, y=None):
+    def selector(X):
         return {"X": np.zeros(X.shape[0], dtype=bool)}
 
     fires = gen._fire_masks(X, ["X"], selector=selector)

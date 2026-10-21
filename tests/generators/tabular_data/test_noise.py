@@ -17,7 +17,8 @@ def _selector(y_values, proportions=None, rng=None):
 
 
 def test_gaussian_noise_classes__preserves_shape(tabular_data_labeled):
-    X, y = tabular_data_labeled
+    Xc = np.asarray(tabular_data_labeled)
+    y = Xc[:, -1]
     selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.1 for label in np.unique(y)}
     generator = GaussianNoiseClassesGenerator()
@@ -27,7 +28,8 @@ def test_gaussian_noise_classes__preserves_shape(tabular_data_labeled):
 
 def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
     """With non-zero noise_std, data should be modified."""
-    X, y = tabular_data_labeled
+    Xc = np.asarray(tabular_data_labeled)
+    y = Xc[:, -1]
     selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.5 for label in np.unique(y)}
     generator = GaussianNoiseClassesGenerator()
@@ -37,8 +39,9 @@ def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
 
 def test_gaussian_noise_classes__per_class_magnitude(tabular_data_labeled):
     """Only classes listed in noise_std_per_class receive noise."""
-    X, y = tabular_data_labeled
-    classes = np.unique(np.asarray(y))
+    Xc_full = np.asarray(tabular_data_labeled)
+    y = Xc_full[:, -1]
+    classes = np.unique(y)
     selector, Xc = _selector(y)
     cls_col = Xc.shape[1] - 1
     generator = GaussianNoiseClassesGenerator(random_generator=default_rng(0))
@@ -51,7 +54,7 @@ def test_gaussian_noise_classes__per_class_magnitude(tabular_data_labeled):
 
 
 def test_gaussian_noise_classes__selector_none_raises(tabular_data_labeled):
-    X, y = tabular_data_labeled
+    Xc = np.asarray(tabular_data_labeled)
     generator = GaussianNoiseClassesGenerator()
     with pytest.raises(ValueError, match="selector"):
-        generator.generate(X.copy(), noise_std_per_class={0: 0.1})
+        generator.generate(Xc.copy(), noise_std_per_class={0: 0.1})

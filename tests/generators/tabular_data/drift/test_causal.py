@@ -138,12 +138,11 @@ def test_generate__drift_closed_form_exact(make_gcm_dgp):
         data, perturbation_nodes=["X"],
         drift_std=1.0,
     )
-    dX = Xt[:, 0] - data_orig[:, 0]
     np.testing.assert_allclose(
-        Xt[:, 1] - data_orig[:, 1], 2.0 * dX, rtol=1e-10, atol=1e-12
+        Xt[:, 1] - data_orig[:, 1], 2.0 * (Xt[:, 0] - data_orig[:, 0]), rtol=1e-10, atol=1e-12
     )
     np.testing.assert_allclose(
-        Xt[:, 2] - data_orig[:, 2], 1.0 * dX, rtol=1e-10, atol=1e-12
+        Xt[:, 2] - data_orig[:, 2], 1.0 * (Xt[:, 0] - data_orig[:, 0]), rtol=1e-10, atol=1e-12
     )
 
 

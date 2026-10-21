@@ -342,10 +342,10 @@ def test_generate__string_nodes_explicit_mapping(rng):
     graph.add_edges_from([("A", "B"), ("B", "C")])
     coefs = {("A", "B"): 2.0, ("B", "C"): 0.5}
     column_mapping = {"A": 0, "B": 1, "C": 2}
-    X, _ = _generate_linear_data(
+    X = _generate_linear_data(
         graph, n_samples=100, rng=rng, coefficients=coefs,
         column_mapping=column_mapping,
-    )
+    )[0]
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(

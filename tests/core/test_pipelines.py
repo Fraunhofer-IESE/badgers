@@ -1,6 +1,10 @@
 import numpy as np
+import scipy.stats
+from numpy.random import default_rng
 
 from badgers.core.pipeline import Pipeline
+from badgers.generators.tabular_data.drift.drift import RandomShiftGenerator
+from badgers.generators.tabular_data.noise.noise import AdditiveNoiseGenerator
 
 
 class RecordingGenerator:
@@ -105,3 +109,31 @@ def test_pipeline__unknown_param_keys_are_ignored():
 
     assert generator.calls[0]['params'] == {}
     assert np.array_equal(result, np.ones((1, 1)))
+
+
+def test_pipeline__real_generators_chain_to_single_array():
+    """Two real migrated tabular generators chain through Pipeline and the
+    pipeline returns a single ndarray of the same shape as X."""
+    rng = default_rng(0)
+    X = rng.normal(size=(100, 3))
+    X0 = X.copy()
+    pipeline = Pipeline({
+        'shift': RandomShiftGenerator(random_generator=default_rng(1)),
+        'noise': AdditiveNoiseGenerator(random_generator=default_rng(2)),
+    })
+    params = {
+        'shift': {'shift_std': 0.5},
+        'noise': {'distribution': scipy.stats.norm(scale=0.1), 'noise_std': 1.0},
+    }
+
+    Xt = pipeline.generate(X, params=params)
+
+    assert isinstance(Xt, np.ndarray)
+    assert not isinstance(Xt, tuple)
+    assert Xt.shape == X.shape
+    assert not np.allclose(Xt, X0)
+    # both stages applied: the pipeline output differs from a shift-only run
+    shift_only = Pipeline({
+        'shift': RandomShiftGenerator(random_generator=default_rng(1)),
+    }).generate(X0.copy(), params={'shift': {'shift_std': 0.5}})
+    assert not np.allclose(Xt, shift_only)

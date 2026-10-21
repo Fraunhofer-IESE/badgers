@@ -23,7 +23,6 @@ CLASSES = {
 # columns divide by zero in the classic MAR/MNAR normalizations).
 RNG = np.random.default_rng(123)
 X0 = RNG.normal(size=(40, 3)) @ np.diag([1.0, 5.0, 0.5]) + np.array([0.0, 10.0, -3.0])
-Y0 = RNG.integers(0, 2, size=40)
 
 
 def _entries():
@@ -31,7 +30,7 @@ def _entries():
     for seed in (0, 1, 2):
         for key, cls in CLASSES.items():
             gen = cls(random_generator=np.random.default_rng(seed))  # explicit seed!
-            Xt, _ = gen.generate(X0.copy(), Y0, percentage_missing=0.25)
+            Xt = gen.generate(X0.copy(), percentage_missing=0.25)
             out[f"{key}_{seed}_nanmask"] = np.isnan(Xt)
             idx = sorted(gen.missing_values_indices_)
             out[f"{key}_{seed}_indices"] = np.array(idx, dtype=int)

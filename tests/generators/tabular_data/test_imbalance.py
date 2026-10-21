@@ -11,14 +11,9 @@ from badgers.generators.tabular_data.imbalance.imbalance import (
 )
 
 
-def _with_class_column(X, y):
-    return np.column_stack([np.asarray(X), np.asarray(y)])
-
-
 def test_random_sampling_classes__drops_proportion_per_class(tabular_data_labeled):
     """Class selectors read X and drop the requested rows from each class."""
-    X, y = tabular_data_labeled
-    Xc = _with_class_column(X, y)
+    Xc = np.asarray(tabular_data_labeled)
     proportion_classes = {0: 0.5, 1: 0.2, 2: 0.1, 3: 0.1, 4: 0.1}
     rng = default_rng(0)
     selector = ClassSelector(
@@ -41,8 +36,7 @@ def test_random_sampling_classes__drops_proportion_per_class(tabular_data_labele
 
 def test_random_sampling_classes__selector_none_is_noop(tabular_data_labeled):
     """selector=None keeps every row and records no dropped rows."""
-    X, y = tabular_data_labeled
-    Xc = _with_class_column(X, y)
+    Xc = np.asarray(tabular_data_labeled)
     generator = RandomSamplingClassesGenerator(random_generator=default_rng(0))
 
     Xt = generator.generate(Xc.copy())
@@ -53,8 +47,7 @@ def test_random_sampling_classes__selector_none_is_noop(tabular_data_labeled):
 
 def test_random_sampling_classes__class_column_of_X(tabular_data_labeled):
     """The class variable is selected from its mapped column in X."""
-    X, y = tabular_data_labeled
-    Xc = _with_class_column(X, y)
+    Xc = np.asarray(tabular_data_labeled)
     rng = default_rng(0)
     selector = ClassSelector(
         "cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng
@@ -70,11 +63,10 @@ def test_random_sampling_classes__class_column_of_X(tabular_data_labeled):
 
 
 def test_random_sampling_features__preserves_shape_and_modifies_distribution(
-    tabular_data_labeled,
+    tabular_data,
 ):
     """Feature sampling returns one X object with replacement."""
-    X, _ = tabular_data_labeled
-    X_np = np.asarray(X)
+    X = np.asarray(tabular_data)
 
     def proba_func(X):
         feature = X[:, 0]
@@ -83,10 +75,10 @@ def test_random_sampling_features__preserves_shape_and_modifies_distribution(
         )
 
     generator = RandomSamplingFeaturesGenerator()
-    Xt = generator.generate(X_np.copy(), sampling_proba_func=proba_func)
+    Xt = generator.generate(X.copy(), sampling_proba_func=proba_func)
 
-    assert Xt.shape == X_np.shape
-    assert np.mean(Xt[:, 0]) < np.mean(X_np[:, 0])
+    assert Xt.shape == X.shape
+    assert np.mean(Xt[:, 0]) < np.mean(X[:, 0])
 
 
 def test_random_sampling_targets__resamples_with_replacement():
@@ -102,20 +94,19 @@ def test_random_sampling_targets__resamples_with_replacement():
 
 
 def test_random_sampling_targets__without_replacement_is_thinning(
-    tabular_data_labeled,
+    tabular_data,
 ):
     """replace=False yields distinct rows and honors requested output size."""
-    X, _ = tabular_data_labeled
-    X_np = np.asarray(X)
-    mapping = {name: i for i, name in enumerate(["f0", "f1", "cls"][:X_np.shape[1]])}
+    X = np.asarray(tabular_data)
+    mapping = {name: i for i, name in enumerate(["f0", "f1", "cls"][:X.shape[1]])}
     selector = ProportionalSelector("f0", mapping)
 
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
     Xt = generator.generate(
-        X_np.copy(), selector=selector, replace=False, size=5
+        X.copy(), selector=selector, replace=False, size=5
     )
 
-    assert Xt.shape == (5, X_np.shape[1])
+    assert Xt.shape == (5, X.shape[1])
     assert len({tuple(row) for row in Xt}) == 5
 
 
@@ -139,11 +130,10 @@ def test_random_sampling_targets__boolean_mask_selector_is_exact_drop():
     np.testing.assert_array_equal(generator.get_imbalance_labels(), fired)
 
 
-def test_random_sampling_targets__selector_none_raises(tabular_data_labeled):
-    X, _ = tabular_data_labeled
+def test_random_sampling_targets__selector_none_raises(tabular_data):
     generator = RandomSamplingTargetsGenerator()
     with pytest.raises(ValueError, match="selector"):
-        generator.generate(np.asarray(X).copy())
+        generator.generate(np.asarray(tabular_data).copy())
 
 
 def test_imbalance_labels__classes_generator_raises_before_generate():
@@ -153,22 +143,21 @@ def test_imbalance_labels__classes_generator_raises_before_generate():
 
 
 def test_imbalance_labels__features_generator_tracks_dropped_rows(
-    tabular_data_labeled,
+    tabular_data,
 ):
     """False labels are sampled; True labels are absent from the output."""
-    X, _ = tabular_data_labeled
-    X_np = np.asarray(X)
+    X = np.asarray(tabular_data)
     generator = RandomSamplingFeaturesGenerator(random_generator=default_rng(0))
 
-    Xt = generator.generate(X_np.copy())
+    Xt = generator.generate(X.copy())
 
     labels = generator.get_imbalance_labels()
     assert labels.dtype == bool
-    assert len(labels) == X_np.shape[0]
+    assert len(labels) == X.shape[0]
     drawn = set(map(tuple, Xt))
-    for row in X_np[~labels]:
+    for row in X[~labels]:
         assert tuple(row) in drawn
-    for row in X_np[labels]:
+    for row in X[labels]:
         assert tuple(row) not in drawn
 
 
@@ -189,8 +178,7 @@ def test_imbalance_labels__targets_generator_fractional_selector():
 
 
 def test_imbalance_labels__classes_generator_match_class_column(tabular_data_labeled):
-    X, y = tabular_data_labeled
-    Xc = _with_class_column(X, y)
+    Xc = np.asarray(tabular_data_labeled)
     rng = default_rng(0)
     selector = ClassSelector(
         "cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng
