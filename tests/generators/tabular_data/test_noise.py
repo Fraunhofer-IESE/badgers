@@ -16,16 +16,13 @@ def _selector(y_values, proportions=None, rng=None):
     return ClassSelector("cls", column_mapping, {"cls": props}, rng=rng or default_rng(0)), Xc
 
 
-def test_gaussian_noise_classes__preserves_shape_and_y(tabular_data_labeled):
+def test_gaussian_noise_classes__preserves_shape(tabular_data_labeled):
     X, y = tabular_data_labeled
     selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.1 for label in np.unique(y)}
     generator = GaussianNoiseClassesGenerator()
-    Xt, yt = generator.generate(Xc.copy(), y, selector=selector, noise_std_per_class=noise_std_per_class)
+    Xt = generator.generate(Xc.copy(), selector=selector, noise_std_per_class=noise_std_per_class)
     assert len(Xc) == len(Xt)
-    assert len(y) == len(yt)
-    # y is passed through unchanged (no class relabeling)
-    np.testing.assert_array_equal(np.asarray(yt), np.asarray(y))
 
 
 def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
@@ -34,7 +31,7 @@ def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
     selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.5 for label in np.unique(y)}
     generator = GaussianNoiseClassesGenerator()
-    Xt, _ = generator.generate(Xc.copy(), y, selector=selector, noise_std_per_class=noise_std_per_class)
+    Xt = generator.generate(Xc.copy(), selector=selector, noise_std_per_class=noise_std_per_class)
     assert not np.allclose(Xt, Xc)
 
 
@@ -46,7 +43,7 @@ def test_gaussian_noise_classes__per_class_magnitude(tabular_data_labeled):
     cls_col = Xc.shape[1] - 1
     generator = GaussianNoiseClassesGenerator(random_generator=default_rng(0))
     noise_std_per_class = {classes[0]: 0.5}
-    Xt, _ = generator.generate(Xc.copy(), y, selector=selector, noise_std_per_class=noise_std_per_class)
+    Xt = generator.generate(Xc.copy(), selector=selector, noise_std_per_class=noise_std_per_class)
     fired_cls0 = Xc[:, cls_col] == classes[0]
     other = Xc[:, cls_col] != classes[0]
     assert not np.allclose(Xt[fired_cls0], Xc[fired_cls0])
@@ -57,4 +54,4 @@ def test_gaussian_noise_classes__selector_none_raises(tabular_data_labeled):
     X, y = tabular_data_labeled
     generator = GaussianNoiseClassesGenerator()
     with pytest.raises(ValueError, match="selector"):
-        generator.generate(X.copy(), y, noise_std_per_class={0: 0.1})
+        generator.generate(X.copy(), noise_std_per_class={0: 0.1})

@@ -69,16 +69,13 @@ class MissingValueGenerator(GeneratorMixin):
         return X
 
     @abc.abstractmethod
-    def generate(self, X, y, **params):
+    def generate(self, X, **params):
         """
         Abstract method to generate missing values in the input data.
         This should be overridden by subclasses.
 
         :param X: Input features, can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: Target variable, can be a pandas Series or a numpy array.
-                  If None, it is assumed that the target is not provided and will be ignored.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param params: Additional keyword arguments that might be required for specific implementations.
         :type params: dict
         """
@@ -105,19 +102,15 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, percentage_missing: float = 0.1):
+    def generate(self, X, percentage_missing: float = 0.1):
         """
         Introduces missing values into the input features `X` completely at random according to a specified percentage.
 
         :param X: The input features, which can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: The target variable, which can be a pandas Series or a numpy array.
-                  If not provided, it is assumed that the target is not needed and will be ignored.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param percentage_missing: The proportion of values to be replaced with missing values, expressed as a float between 0 and 1.
         :type percentage_missing: float
-        :return: A tuple containing the modified input features `Xt` with introduced missing values and the original target `y`.
-        :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
+        :return: The modified input features `Xt` with introduced missing values.
         """
         assert 0 <= percentage_missing <= 1
         # Route the row selection through the shared ExactCountSelector
@@ -127,10 +120,10 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
             self._positional_names(X), rate=percentage_missing,
             rng=self.random_generator,
         )
-        masks = selector(X, y)
+        masks = selector(X)
         self._write_missing(X, masks)
 
-        return X, y
+        return X
 
 
 class DummyMissingAtRandom(MissingValueGenerator):
@@ -155,7 +148,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, percentage_missing: float = 0.1):
+    def generate(self, X, percentage_missing: float = 0.1):
         """
         Introduces missing values into the input features `X` at random based on another feature,
         where the probability of a data instance X[_,i] missing depends upon another feature X[_,j],
@@ -163,13 +156,9 @@ class DummyMissingAtRandom(MissingValueGenerator):
 
         :param X: The input features, which can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: The target variable, which can be a pandas Series or a numpy array.
-                  If not provided, it is assumed that the target is not needed and will be ignored.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param percentage_missing: The proportion of values to be replaced with missing values, expressed as a float between 0 and 1.
         :type percentage_missing: float
-        :return: A tuple containing the modified input features `Xt` with introduced missing values and the original target `y`.
-        :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
+        :return: The modified input features `Xt` with introduced missing values.
         """
         assert 0 <= percentage_missing <= 1
         # Route the row selection through the shared ExactCountSelector
@@ -179,13 +168,13 @@ class DummyMissingAtRandom(MissingValueGenerator):
         # -- exactly the legacy RNG call order.
         selector = ExactCountSelector(
             self._positional_names(X), rate=percentage_missing,
-            weights=lambda X_, y_=None: _mar_weights(X_, self.random_generator),
+            weights=lambda X_: _mar_weights(X_, self.random_generator),
             rng=self.random_generator,
         )
-        masks = selector(X, y)
+        masks = selector(X)
         self._write_missing(X, masks)
 
-        return X, y
+        return X
 
 
 class DummyMissingNotAtRandom(MissingValueGenerator):
@@ -209,7 +198,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, percentage_missing):
+    def generate(self, X, percentage_missing):
         """
         Introduces missing values into the input features `X` not at random, where the probability of a data instance X[i,j] missing
         depends linearly upon its own value. Specifically, a data point X[i,j] = max(X[:,j]) has a missing probability of 1, and a
@@ -217,13 +206,9 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
 
         :param X: The input features, which can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: The target variable, which can be a pandas Series or a numpy array.
-                  If not provided, it is assumed that the target is not needed and will be ignored.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param percentage_missing: The proportion of values to be replaced with missing values, expressed as a float between 0 and 1.
         :type percentage_missing: float
-        :return: A tuple containing the modified input features `Xt` with introduced missing values and the original target `y`.
-        :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
+        :return: The modified input features `Xt` with introduced missing values.
         """
         assert 0 <= percentage_missing <= 1
         # Route the row selection through the shared ExactCountSelector
@@ -231,10 +216,10 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         # own value) enters via per-row weights.
         selector = ExactCountSelector(
             self._positional_names(X), rate=percentage_missing,
-            weights=lambda X_, y_=None: _mnar_weights(X_),
+            weights=lambda X_: _mnar_weights(X_),
             rng=self.random_generator,
         )
-        masks = selector(X, y)
+        masks = selector(X)
         self._write_missing(X, masks)
 
-        return X, y
+        return X

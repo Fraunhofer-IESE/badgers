@@ -24,12 +24,11 @@ class NoiseGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params):
+    def generate(self, X, **params):
         """
         Abstract method to generate noisy data. Must be implemented by subclasses.
 
         :param X: Input features (pandas DataFrame or numpy array).
-        :param y: Target variable (pandas Series or numpy array).
         :param params: Additional parameters required for noise generation.
         """
         pass
@@ -44,7 +43,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
     is drawn per fired row's class value from a normal distribution whose
     standard deviation is looked up in ``noise_std_per_class``, then the
     data is transformed back. The class data lives in a column of ``X``
-    (``y`` is not used for selection and is passed through unchanged).
+    The class data lives in a column of ``X``.
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -57,13 +56,12 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, *, selector=None, noise_std_per_class=dict()):
+    def generate(self, X, *, selector=None, noise_std_per_class=dict()):
         """
         Add Gaussian white noise to the rows fired by the selector, with a
         standard deviation looked up per class value.
 
         :param X: Input features (pandas DataFrame or numpy array).
-        :param y: Target variable (optional, passed through unchanged; not used for selection).
         :param selector: A selector deciding which rows receive noise. A
                          :class:`badgers.core.selectors.ClassSelector` over
                          the class column (typical), or any selector whose
@@ -74,19 +72,18 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         :param noise_std_per_class: A dictionary mapping class values to the
             noise standard deviation for that class. Fired rows whose class
             value is absent from the dict receive no noise.
-        :return: Xt, yt where Xt is the noisy input features and yt is the unchanged target variable y.
+        :return: The noisy input features.
         """
         if selector is None:
             raise ValueError(
                 "GaussianNoiseClassesGenerator needs a selector deciding "
                 "which rows receive noise (e.g. ClassSelector over the "
-                "class column): classes are columns of X with discrete values,"
-                "y is not used for selection."
+                "class column): classes are columns of X with discrete values."
             )
-        masks = list(selector(X, y).values())
+        masks = list(selector(X).values())
         fired = masks[0] if len(masks) == 1 else np.logical_or.reduce(masks)
         if not fired.any():
-            return X, y
+            return X
         # resolve the class column from the selector's column_mapping
         class_col = resolve_class_column(selector, X)
         if class_col is None:
@@ -111,7 +108,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
             Xt[rows] += noise
         # inverse standardization
         Xt = scaler.inverse_transform(Xt)
-        return Xt, y
+        return Xt
 
 
 class AdditiveNoiseGenerator(NoiseGenerator):
@@ -134,18 +131,17 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, distribution, noise_std=1.0, perturbation_nodes=None):
+    def generate(self, X, distribution, noise_std=1.0, perturbation_nodes=None):
         """
         Add noise drawn from an arbitrary distribution to the input data.
 
         :param X: Input features (pandas DataFrame or numpy array).
-        :param y: Target variable (pandas Series or numpy array), which remains unchanged.
         :param distribution: A frozen scipy distribution object (e.g. ``scipy.stats.laplace()``)
             that exposes ``.rvs(size=..., random_state=...)``. Drawn samples are added as-is.
         :param noise_std: Global multiplier applied to the drawn noise (default 1.0 = raw draw).
         :param perturbation_nodes: Optional list of column indices to perturb.
             If None, noise is added to all columns.
-        :return: Xt, yt where Xt is the noisy input features and yt is the unchanged target variable y.
+        :return: The noisy input features.
         """
         rvs = getattr(distribution, "rvs", None)
         if not callable(rvs):
@@ -169,4 +165,4 @@ class AdditiveNoiseGenerator(NoiseGenerator):
             mask = np.zeros(X.shape[1], dtype=bool)
             mask[perturbation_nodes] = True
             noise[:, ~mask] = 0.0
-        return X + noise, y
+        return X + noise

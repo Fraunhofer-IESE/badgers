@@ -24,7 +24,7 @@ class DriftGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params):
+    def generate(self, X, **params):
         pass
 
 
@@ -46,7 +46,7 @@ class RandomShiftGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, shift_std: Union[float, np.array, list] = 0.1):
+    def generate(self, X, shift_std: Union[float, np.array, list] = 0.1):
         r"""
         Randomly shift (geometrical translation) values of each column independently of one another.
         Data are first standardized (mean = 0, var = 1), and a random number drawn from a normal distribution
@@ -54,14 +54,13 @@ class RandomShiftGenerator(DriftGenerator):
         The ith column is simply translated: `$x_i \leftarrow x_i + \epsilon_i$`, where $\epsilon_i \sim \mathcal{N}(0, \text{shift\_std})$.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param y: Target variable, a 1D array-like object (optional). Not used in this implementation.
         :param shift_std: Magnitude of the random shift applied to each column. Can be a single float
                           (applied to all columns) or an array of floats (one per column). The values
                           are interpreted as standard deviations: a random number drawn from a normal
                           distribution is multiplied by ``shift_std`` (absolute value used as the
                           scale, the sign used as the shift direction). A negative entry shifts the
                           column in the negative direction.
-        :return: A tuple containing the modified feature matrix `X'` and the original target `y`.
+        :return: The modified feature matrix `X'`.
         """
         # check that if shift_std is an array, it is of length == X.shape[1]
         shift_std = np.asarray(shift_std, dtype=float)
@@ -80,7 +79,7 @@ class RandomShiftGenerator(DriftGenerator):
         # add shift
         Xt += shift
         # inverse transform
-        return scaler.inverse_transform(Xt), y
+        return scaler.inverse_transform(Xt)
 
 
 class FixedShiftGenerator(DriftGenerator):
@@ -100,18 +99,17 @@ class FixedShiftGenerator(DriftGenerator):
         super().__init__(random_generator=None)
 
     @preprocess_inputs
-    def generate(self, X, y=None, shift_std: Union[float, np.array, list] = 0.1):
+    def generate(self, X, shift_std: Union[float, np.array, list] = 0.1):
         r"""
         Deterministically shift each column by exactly ``shift_std``.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param y: Target variable (optional, passed through unchanged; not used in this implementation).
         :param shift_std: Shift applied to each column. A single float (applied to all columns)
                           or an array of floats (one per column). The value is the shift in
                           units of column standard deviation (data are standardized first):
                           a positive entry moves the column up, a negative entry moves it
                           down. The same input always produces the same output.
-        :return: A tuple containing the modified feature matrix `X'` and the original target `y`.
+        :return: The modified feature matrix `X'`.
         """
         shift_std = np.asarray(shift_std, dtype=float)
         if shift_std.ndim == 1 and shift_std.size > 1:
@@ -126,7 +124,7 @@ class FixedShiftGenerator(DriftGenerator):
         # add shift
         Xt += shift
         # inverse transform
-        return scaler.inverse_transform(Xt), y
+        return scaler.inverse_transform(Xt)
 
 
 class RandomShiftClassesGenerator(DriftGenerator):
@@ -136,8 +134,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
 
     Data are first standardized (mean = 0, var = 1); for each class value
     of the class column a random shift is drawn and added to the FIRED rows
-    of that class. The class data lives in a column of ``X`` (``y`` is not
-    used for selection).
+    of that class. The class data lives in a column of ``X``.
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -151,13 +148,12 @@ class RandomShiftClassesGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, *, selector=None, shift_std=0.1, variables=None, class_column=None):
+    def generate(self, X, *, selector=None, shift_std=0.1, variables=None, class_column=None):
         """
         Randomly shift the rows fired by the selector, one independent
         shift per class value of the class column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param y: Target variable (optional, passed through unchanged; not used for selection).
         :param selector: A selector deciding which rows are shifted. A
                          :class:`badgers.core.selectors.ClassSelector` over
                          the class column (typical), or any selector whose
@@ -188,19 +184,18 @@ class RandomShiftClassesGenerator(DriftGenerator):
                           from the selector's ``column_mapping``; when neither
                           is available, all fired rows are treated as one
                           class and every column may be shifted.
-        :return: A tuple containing the modified feature matrix `X'` and the original target `y`.
+        :return: The modified feature matrix `X'`.
         """
         if selector is None:
             raise ValueError(
                 "RandomShiftClassesGenerator needs a selector deciding "
                 "which rows shift (e.g. ClassSelector over the class "
-                "column): classes are columns of X, y is not used for "
-                "selection."
+                "column): classes are columns of X."
             )
-        masks = list(selector(X, y).values())
+        masks = list(selector(X).values())
         fired = masks[0] if len(masks) == 1 else np.logical_or.reduce(masks)
         if not fired.any():
-            return X, y
+            return X
         # resolve the class column: explicit parameter first, selector sniffing as fallback
         class_col = class_column
         if class_col is not None and isinstance(class_col, str):
@@ -234,7 +229,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
             # all columns except the class column
             cols = np.array([i for i in range(X.shape[1]) if i != class_col], dtype=int)
         if cols.size == 0:
-            return X, y
+            return X
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
@@ -256,7 +251,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
             shift = self.random_generator.normal(loc=0, scale=abs(std), size=cols.size)
             Xt[np.ix_(rows, cols)] += np.sign(std) * shift
         # inverse transform
-        return scaler.inverse_transform(Xt), y
+        return scaler.inverse_transform(Xt)
 
 
 class FixedShiftClassesGenerator(DriftGenerator):
@@ -266,8 +261,8 @@ class FixedShiftClassesGenerator(DriftGenerator):
 
     Data are first standardized (mean = 0, var = 1); each class value of the
     class column gets an exact shift (no draw), applied to the rows fired by
-    the selector. The class data lives in a column of ``X`` (``y`` is not
-    used for selection). Repeated calls with the same input return the same
+    the selector. The class data lives in a column of ``X``. Repeated calls
+    with the same input return the same
     output.
     """
 
@@ -276,13 +271,12 @@ class FixedShiftClassesGenerator(DriftGenerator):
         super().__init__(random_generator=None)
 
     @preprocess_inputs
-    def generate(self, X, y=None, *, selector=None, shift=0.1, variables=None, class_column=None):
+    def generate(self, X, *, selector=None, shift=0.1, variables=None, class_column=None):
         """
         Deterministically shift the rows fired by the selector, one exact
         shift per class value of the class column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param y: Target variable (optional, passed through unchanged; not used for selection).
         :param selector: A selector deciding which rows are shifted (required; its masks
                          are OR-ed to the affected rows).
         :param shift: The exact shift applied to the fired rows of each class, in units of
@@ -303,19 +297,18 @@ class FixedShiftClassesGenerator(DriftGenerator):
                              ``column_mapping``; when neither is available, all fired
                              rows are treated as one class and every column may be
                              shifted.
-        :return: A tuple containing the modified feature matrix `X'` and the original target `y`.
+        :return: The modified feature matrix `X'`.
         """
         if selector is None:
             raise ValueError(
                 "FixedShiftClassesGenerator needs a selector deciding "
                 "which rows shift (e.g. ClassSelector over the class "
-                "column): classes are columns of X, y is not used for "
-                "selection."
+                "column): classes are columns of X."
             )
-        masks = list(selector(X, y).values())
+        masks = list(selector(X).values())
         fired = masks[0] if len(masks) == 1 else np.logical_or.reduce(masks)
         if not fired.any():
-            return X, y
+            return X
         # resolve the class column: explicit parameter first, selector sniffing as fallback
         class_col = class_column
         if class_col is not None and isinstance(class_col, str):
@@ -349,7 +342,7 @@ class FixedShiftClassesGenerator(DriftGenerator):
             # all columns except the class column
             cols = np.array([i for i in range(X.shape[1]) if i != class_col], dtype=int)
         if cols.size == 0:
-            return X, y
+            return X
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
@@ -371,4 +364,4 @@ class FixedShiftClassesGenerator(DriftGenerator):
             rows = fired if class_col is None else (fired & (X[:, class_col] == value))
             Xt[np.ix_(rows, cols)] += shift_value
         # inverse transform
-        return scaler.inverse_transform(Xt), y
+        return scaler.inverse_transform(Xt)
