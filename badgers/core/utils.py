@@ -23,6 +23,27 @@ def normalize_proba(p: np.array) -> np.array:
     return p
 
 
+def resolve_class_column(selector, X: np.ndarray):
+    """Recover the class column position from a value-reading selector.
+
+    Value-reading selector presets (``TopQuantileSelector``,
+    ``ClassSelector``, ...) expose a ``column_mapping`` attribute mapping
+    variable names to column positions; the first variable whose position
+    exists in ``X`` is used as the class column. Returns ``None`` when the
+    selector has no such attribute (the consuming generator then treats
+    all fired rows as one class, or requires a plain magnitude).
+    """
+    column_mapping = getattr(selector, "column_mapping", None)
+    variables = getattr(selector, "variables", None)
+    if column_mapping is None or not variables:
+        return None
+    for name in variables:
+        pos = column_mapping.get(name)
+        if pos is not None and 0 <= pos < X.shape[1]:
+            return pos
+    return None
+
+
 def random_sign(random_generator: numpy.random.Generator = default_rng(0), size: Tuple[int] = (1,)) -> np.array:
     """
     Generates an array full of ones, with randomly assigned signs.

@@ -36,3 +36,33 @@ SCENARIO_LARGE_BLOBS = Scenario(
     factory=_make_blobs_factory(5000, 10),
     tags=["large", "10D", "classification"],
 )
+
+
+def _make_blobs_classes_factory(n_samples, n_features):
+    """Like _make_blobs_factory but stacks the classes as the LAST column of X
+    (per-class generators read classes from an X column; y is deprecated as
+    a data carrier)."""
+    def factory(rng):
+        X, y = make_blobs(
+            n_samples=n_samples,
+            n_features=n_features,
+            centers=5,
+            random_state=42,
+        )
+        return np.column_stack([X, y]), y
+    return factory
+
+
+SCENARIO_SMALL_BLOBS_CLASSES = Scenario(
+    name="small_blobs_2d_classes",
+    data_type="tabular",
+    factory=_make_blobs_classes_factory(100, 2),
+    tags=["small", "2D", "classification", "classes-column"],
+)
+
+SCENARIO_MEDIUM_BLOBS_CLASSES = Scenario(
+    name="medium_blobs_5d_classes",
+    data_type="tabular",
+    factory=_make_blobs_classes_factory(1000, 5),
+    tags=["medium", "5D", "classification", "classes-column"],
+)

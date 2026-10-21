@@ -1,6 +1,6 @@
 import numpy as np
 
-from badgers.generators.tabular_data.missingness import MissingValueGenerator
+from badgers.generators.tabular_data.missingness.missingness import MissingValueGenerator
 
 
 def test_missingness__preserves_shape_and_inserts_nans(tabular_data):

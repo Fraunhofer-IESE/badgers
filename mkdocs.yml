@@ -6,15 +6,15 @@ repo_name: Fraunhofer-IESE/badgers
 nav:
     -   Home: index.md
     -   Getting started: getting-started.md
-    -   About: about.md
-    -   Changes: changelog.md
+    -   Concepts:
+            -   Understanding badgers: tutorials/concepts/Badgers-Concepts.ipynb
     -   Tutorials:
             -   Tabular Data:
-                    -   Generating Imbalanced Data: tutorials/tabular-data/Imbalance-Tabular-Data.ipynb
-                    -   Generating Missing Data: tutorials/tabular-data/Missingness-Tabular-Data.ipynb
-                    -   Generating Noise: tutorials/tabular-data/Noise-Tabular-Data.ipynb
-                    -   Generating Outliers: tutorials/tabular-data/Outliers-Tabular-Data.ipynb
-                    -   Generating Outliers (Using Causal Graphs): tutorials/tabular-data/Causal-Outlier-Propagation.ipynb
+                    -   Generating Outliers: tutorials/tabular-data/Outliers.ipynb
+                    -   Generating Noise: tutorials/tabular-data/Noise.ipynb
+                    -   Generating Missing Data: tutorials/tabular-data/Missingness.ipynb
+                    -   Generating Imbalanced Data: tutorials/tabular-data/Imbalance.ipynb
+                    -   Generating Drift: tutorials/tabular-data/Drift.ipynb
             -   Text Data:
                     -   Generating Typos: tutorials/text/Typos-Text.ipynb
             -   Time Series Data:
@@ -28,8 +28,12 @@ nav:
                     -   Generating "Transmissions Errors": tutorials/time-series/Transmission-Errors-Time-Series.ipynb
             -   Pipelines:
                     -   Chaining Generators: tutorials/Pipeline-Tabular-Data.ipynb
-            -   Implementing Novel Generators:
-                    -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
+    -   Implementing Novel Generators:
+            -   Creating Tabular Generators: dev/Create-New-Tabular-Generators.ipynb
+            -   Creating Selectors: dev/Create-New-Selectors.ipynb
+            -   Using DGPs: dev/Using-DGPs.ipynb
+    -   About: about.md
+    -   Changes: changelog.md
     - Architecture: architecture.md
     -   Benchmarking: benchmarking.md
     -   API: reference/

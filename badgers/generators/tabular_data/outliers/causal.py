@@ -1,16 +1,8 @@
 """Causal outlier propagation generator."""
 
-import networkx as nx
 import numpy as np
-from numpy.random import default_rng
 
-from badgers.core.causal_graph import (
-    get_ancestors,
-    get_descendants,
-    get_parents,
-    topological_order,
-    validate_dag,
-)
+from badgers.core.causal_graph import get_ancestors, get_descendants
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.sampling import (
     WithinDistributionSampler,
@@ -18,38 +10,38 @@ from badgers.core.sampling import (
     create_within_distribution_sampler,
     create_out_of_distribution_sampler,
 )
-from badgers.core.utils import random_sign
-from badgers.generators.tabular_data.outliers import OutliersGenerator
+from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
-class CausalOutlierPropagationGenerator(OutliersGenerator):
+class CausalOutlierPropagationGenerator(CausalGenerator):
     """
     Generates outliers by intervening on one or more nodes in a causal
     graph and propagating the effect to all descendants.
 
-    Implements the do()-style intervention: incoming edges to perturbation
-    nodes are severed, ancestors are sampled from their distributions,
-    perturbation nodes are set directly to outlier values, and only
-    descendants are computed via forward pass.
+    Implements the do()-style intervention via the shared DGP machinery:
+    incoming edges to perturbation nodes are severed (their values are
+    pinned), ancestors are sampled from their distributions, perturbation
+    nodes are set directly to outlier values, and only descendants are
+    recomputed through the fitted DGP (``dgp.intervene`` — Pearl surgery
+    with fresh noise, uniform across backends).
 
     Parameters
     ----------
     random_generator : numpy.random.Generator, default=rng(seed=0)
         Random number generator instance.
+    dgp : DGP or None, default=None
+        DGP instance (fitted or unfitted) carrying the graph and
+        column_mapping. No other structure is accepted: if None,
+        ``generate()`` raises (build one with e.g.
+        ``GcmSCMDGP(scm).fit(X)``).
 
     generate() parameters (passed via **params)
     ----------
-    graph : nx.DiGraph
-        Causal DAG. All nodes must be strings.
-    column_mapping : dict of str -> int
-        Mapping from graph node names to column indices in X. Required.
     perturbation_nodes : list of str
         Nodes where the intervention is applied. Each outlier row gets
         perturbations at ALL of these nodes simultaneously.
     n_outliers : int, default=10
         Number of outlier rows to generate.
-    outlier_magnitude : float, default=3.0
-        Number of standard deviations to perturb by.
     within_distribution_sampler : WithinDistributionSampler or str, default="normal"
         Sampling strategy for exogenous (ancestor) nodes.
         A string is resolved via :func:`create_within_distribution_sampler`.
@@ -58,12 +50,32 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
         A string is resolved via :func:`create_out_of_distribution_sampler`.
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
-        super().__init__(random_generator)
+    deficit_name = "outliers"
+
+    def __init__(self, random_generator, dgp=None):
+        super().__init__(random_generator=random_generator, dgp=dgp)
+        self.outlier_labels_ = None
+
+    def get_outliers_labels(self) -> np.ndarray:
+        """
+        Return the outlier labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that are outliers, False for original rows.
+        """
+        if self.outlier_labels_ is None:
+            raise RuntimeError(
+                "Outlier labels are only available after calling generate()."
+            )
+        return self.outlier_labels_
+
+    def _set_outlier_labels(self, n_original: int, n_outliers: int):
+        self.outlier_labels_ = np.concatenate(
+            [np.zeros(n_original, dtype=bool), np.ones(n_outliers, dtype=bool)]
+        )
 
     @preprocess_inputs
-    def generate(self, X, y, graph=None, perturbation_nodes=None,
-                 column_mapping=None, n_outliers=10,
+    def generate(self, X, y=None, perturbation_nodes=None, n_outliers=10,
                  within_distribution_sampler=None,
                  out_of_distribution_sampler=None):
         """
@@ -75,21 +87,13 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
         X : np.ndarray of shape (n_samples, n_features)
             Input data.
         y : np.ndarray or None
-            Target values. If None, a label array is created with
-            "original" for input rows and "outliers" for generated rows.
-            If provided, "outliers" labels are appended.
-        graph : nx.DiGraph
-            Causal DAG.
+            Ignored (deprecated). The target is not modified; use
+            ``get_outliers_labels()`` for the per-row outlier labels of
+            the generated output.
         perturbation_nodes : list of int or str
             Nodes where the intervention is applied.
-        column_mapping : dict of str -> int
-            Mapping from graph node names to column indices in X.
-            Required. Every graph node must have an entry, and all
-            values must be unique integers in 0..n_features-1.
         n_outliers : int, default=10
             Number of outlier rows to generate.
-        outlier_magnitude : float, default=3.0
-            Number of standard deviations to perturb by.
         within_distribution_sampler : WithinDistributionSampler or str, default="normal"
             Sampling strategy for exogenous (ancestor) nodes.
             A string is resolved via
@@ -103,98 +107,34 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
         -------
         Xt : np.ndarray of shape (n_samples + n_outliers, n_features)
             Original data with outlier rows appended.
-        yt : np.ndarray
-            Labels: "original" for input rows, "outliers" for generated rows.
+        y : np.ndarray or None
+            Ignored (deprecated). The target is not modified; use
+            ``get_outliers_labels()`` for the per-row outlier labels of
+            the generated output.
         """
-        if graph is None:
-            raise ValueError("graph parameter is required")
+        self._validate_structure(X)
+        self._validate_perturbation_nodes(perturbation_nodes)
+        node_to_col = self.column_mapping
+        graph = self.graph
 
-        validate_dag(graph)
-
-        if perturbation_nodes is None:
-            raise ValueError("perturbation_nodes parameter is required")
-
-        if not isinstance(perturbation_nodes, list):
-            raise ValueError(
-                "perturbation_nodes must be a list, "
-                f"got {type(perturbation_nodes).__name__}"
-            )
-
-        if len(perturbation_nodes) == 0:
-            raise ValueError("perturbation_nodes must not be empty")
-
-        for node in perturbation_nodes:
-            if node not in graph.nodes:
-                raise ValueError(
-                    f"perturbation node '{node}' not found in graph"
-                )
-
-        n_samples, n_features = X.shape
-        if n_features != len(graph.nodes):
-            raise ValueError(
-                f"X has {n_features} columns but graph has "
-                f"{len(graph.nodes)} nodes"
-            )
+        # Graph algebra for the propagation: descendants of the perturbation
+        # nodes, and their exogenous (ancestor) nodes -- sampled from their
+        # distributions rather than intervened on.
+        descendants = set()
+        for pn in perturbation_nodes:
+            descendants |= get_descendants(graph, pn)
+        ancestors = set()
+        for pn in perturbation_nodes:
+            ancestors |= get_ancestors(graph, pn)
+        exogenous = ancestors - set(perturbation_nodes) - descendants
+        perturb_cols = [node_to_col[n] for n in perturbation_nodes]
 
         if n_outliers <= 0:
             raise ValueError(
                 f"n_outliers must be positive, got {n_outliers}"
             )
 
-        # Validate column_mapping
-        if column_mapping is None:
-            raise ValueError("column_mapping parameter is required")
-
-        if not isinstance(column_mapping, dict):
-            raise ValueError(
-                "column_mapping must be a dict, "
-                f"got {type(column_mapping).__name__}"
-            )
-
-        # Check all graph nodes are strings
-        for node in graph.nodes:
-            if not isinstance(node, str):
-                raise ValueError(
-                    f"graph nodes must be strings, "
-                    f"got {type(node).__name__} for node '{node}'"
-                )
-
-        # Check every graph node has a mapping entry
-        missing = set(graph.nodes) - set(column_mapping.keys())
-        if missing:
-            raise ValueError(
-                f"column_mapping missing node(s): {sorted(missing)}"
-            )
-
-        # Check no extra entries
-        extra = set(column_mapping.keys()) - set(graph.nodes)
-        if extra:
-            raise ValueError(
-                f"column_mapping has unknown node(s): {sorted(extra)}"
-            )
-
-        # Check all values are int and in range
-        for node, idx in column_mapping.items():
-            if not isinstance(idx, int):
-                raise ValueError(
-                    f"column_mapping values must be int, "
-                    f"got {type(idx).__name__} for node '{node}'"
-                )
-            if idx < 0 or idx >= n_features:
-                raise ValueError(
-                    f"column index {idx} for node '{node}' "
-                    f"is out of range [0, {n_features - 1}]"
-                )
-
-        # Check no duplicate column indices
-        seen = {}
-        for node, idx in column_mapping.items():
-            if idx in seen:
-                raise ValueError(
-                    f"duplicate column index {idx} "
-                    f"for nodes {sorted([seen[idx], node])}"
-                )
-            seen[idx] = node
+        n_samples, n_features = X.shape
 
         # Resolve within-distribution sampler (for exogenous nodes)
         if within_distribution_sampler is None:
@@ -224,52 +164,12 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
                 f"got {type(out_of_distribution_sampler).__name__}"
             )
 
-        # Compute topological order
-        order = topological_order(graph)
+        # Require a (lazily) fitted DGP on the ORIGINAL data before any
+        # column mutation. Unfitted DGPs are fitted here; there is no
+        # implicit default backend.
+        self._require_dgp(X)
 
-        # Use the explicit column mapping directly
-        node_to_col = column_mapping
-
-        # Fit linear coefficients: for each node v, regress X[:,v] on X[:,parents(v)]
-        coefficients = {}
-        for node in order:
-            parents = get_parents(graph, node)
-            if not parents:
-                continue
-            parent_cols = [node_to_col[p] for p in parents]
-            X_parents = X[:, parent_cols]
-            X_target = X[:, node_to_col[node]]
-            beta, _, _, _ = np.linalg.lstsq(X_parents, X_target, rcond=None)
-            for i, parent in enumerate(parents):
-                coefficients[(parent, node)] = beta[i]
-
-        # Compute column stds for perturbation magnitude
-        col_stds = np.std(X, axis=0)
-        col_stds[col_stds == 0] = 1.0
-
-        # ---- do()-style intervention algorithm ----
-
-        perturb_set = set(perturbation_nodes)
-
-        # Identify all descendants of perturbation nodes (these propagate)
-        descendants = set()
-        for pn in perturbation_nodes:
-            descendants |= get_descendants(graph, pn)
-
-        # Identify exogenous nodes: ancestors of perturbation_nodes that
-        # are NOT themselves perturbed and NOT descendants of perturbed nodes.
-        # These are sampled from their natural distributions.
-        ancestors = set()
-        for pn in perturbation_nodes:
-            ancestors |= get_ancestors(graph, pn)
-        exogenous = ancestors - perturb_set - descendants
         exog_cols = [node_to_col[n] for n in exogenous]
-
-        # Nodes that need forward-pass computation: descendants only
-        descendant_cols = {node_to_col[n] for n in descendants}
-
-        # Perturbation column indices
-        perturb_cols = [node_to_col[n] for n in perturbation_nodes]
 
         # Generate n_outliers outlier rows
         outliers = np.zeros((n_outliers, n_features))
@@ -289,38 +189,15 @@ class CausalOutlierPropagationGenerator(OutliersGenerator):
                 self.random_generator, X, perturb_cols, n_outliers,
             )
 
-        # Step 3: Forward-pass only to descendants of perturbation nodes.
-        for node in order:
-            col = node_to_col[node]
-            if col not in descendant_cols:
-                continue
-            parents = get_parents(graph, node)
-            if not parents:
-                continue
-            parent_cols = [node_to_col[p] for p in parents]
-            parent_vals = outliers[:, parent_cols]
-            coefs = np.array([
-                coefficients.get((p, node), 0.0) for p in parents
-            ])
-            predicted = parent_vals @ coefs
-            residual_std = np.std(
-                X[:, col] - X[:, parent_cols] @ coefs
-            )
-            if residual_std == 0:
-                residual_std = col_stds[col] * 0.1
-            outliers[:, col] = predicted + self.random_generator.normal(
-                0, residual_std, size=n_outliers
-            )
+        # Step 3: Propagate the descendants through the DGP (Pearl surgery:
+        # pinned perturbation values stay pinned; every descendant is
+        # recomputed from its parents via the fitted mechanisms with fresh
+        # noise — same generic cascade as every other causal generator).
+        self.dgp.intervene(outliers, perturbation_nodes,
+                           rng=self.random_generator)
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        if y is None:
-            yt = np.array(
-                ["original"] * n_samples + ["outliers"] * n_outliers
-            )
-        else:
-            yt = np.append(y, ["outliers"] * n_outliers)
-
-        return Xt, yt
+        self._set_outlier_labels(n_samples, n_outliers)
+        return Xt, None

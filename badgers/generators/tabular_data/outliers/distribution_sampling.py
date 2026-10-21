@@ -29,7 +29,7 @@ class HyperCubeSampling(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10, expansion: float = 0.0):
+    def generate(self, X, y=None, n_outliers: int = 10, expansion: float = 0.0):
         """
 
         How to set the values for expansion.
@@ -67,14 +67,8 @@ class HyperCubeSampling(OutliersGenerator):
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        n_samples = len(X)
-        if y is None:
-            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
-        else:
-            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
-
-        return Xt, yt
+        self._set_outlier_labels(len(X), n_outliers)
+        return Xt, y
 
 
 class ZScoreSamplingGenerator(OutliersGenerator):
@@ -98,8 +92,8 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10, scale: float = 1.0):
-        """
+    def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
+        r"""
         Randomly generates outliers as data points with a z-score > 3.
 
         The process involves the following steps:
@@ -143,14 +137,8 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        n_samples = len(X)
-        if y is None:
-            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
-        else:
-            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
-
-        return Xt, yt
+        self._set_outlier_labels(len(X), n_outliers)
+        return Xt, y
 
 
 class HypersphereSamplingGenerator(OutliersGenerator):
@@ -175,7 +163,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
 
     @preprocess_inputs
     def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
-        """
+        r"""
         Randomly generates outliers by sampling points from a hypersphere.
 
         The process involves the following steps:
@@ -223,11 +211,5 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        n_samples = len(X)
-        if y is None:
-            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
-        else:
-            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
-
-        return Xt, yt
+        self._set_outlier_labels(len(X), n_outliers)
+        return Xt, y

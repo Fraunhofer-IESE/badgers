@@ -125,9 +125,8 @@ badgers/
 │   └── superpowers/                  # design specs and implementation plans
 │
 ├── experiments/                      # ad-hoc experiments and benchmark results
-├── pyproject.toml                    # project metadata and build config
-├── requirements.txt
-├── tox.ini                           # multi-version test matrix (py38–py314)
+├── pyproject.toml                    # project metadata, dependencies and build config
+├── tox.ini                           # multi-version test matrix (py311–py314)
 └── mkdocs.yml                        # documentation site config
 ```
 
@@ -157,7 +156,6 @@ The `generators` module contains the actual implementation of various data trans
    - Tabular data transformations (outliers, drift, imbalance, missingness, noise)
    - Time series modifications (changepoints, seasons, trends, transmission errors)
    - Graph-based manipulations
-   - Image processing generators
    - Text transformation tools
 
 2. **Domain-Specific Organization**: Structures generators by data type categories, making it easy to find and use appropriate transformations for specific data modalities.
@@ -206,13 +204,13 @@ Create a `_<name>.py` file in the appropriate `benchmarks/generators/<category>/
 from benchmarks.models import GeneratorBenchmark
 from benchmarks.registry import register
 from benchmarks.scenarios.tabular import SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS
-from badgers.generators.tabular_data.noise import GaussianNoiseGenerator
+from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator
 
 register(GeneratorBenchmark(
-    generator_cls=GaussianNoiseGenerator,
-    name="GaussianNoise",
+    generator_cls=AdditiveNoiseGenerator,
+    name="AdditiveNoise",
     module_path="tabular_data.noise",
-    default_params={"noise_std": 0.5},
+    default_params={"distribution": scipy.stats.norm(scale=0.5)},
     scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
 ))
 ```
@@ -343,3 +341,44 @@ python -m benchmarks compare --baseline v0.0.13
 **Regression thresholds:** >20% time increase or >30% memory increase triggers a flag in `comparator.py`.
 
 **Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.
+
+## Causal defect family: three-layer design
+
+1. **Structure** (static, user-provided): the structural `nx.DiGraph` (latent
+   variables), the `column_mapping` (node -> integer column), and an optional
+   observation `nx.DiGraph` (measurement nodes, `R_<name>` indicator nodes,
+   derivation edges). Validation is functions in `badgers.core.causal_graph`.
+2. **Fitted knowledge** (the `DGP` protocol): backends implement exactly one
+   operation — `fit_node(node, parents, data)` — and expose two views:
+   `response(node, parent_values)` (the fitted deterministic part) and
+   `draw_noise(node, rng, n)` (the node's own shock; parametric or
+   empirical). `fit(X)` is a provided topological loop. The DGP is
+   **immutable and rngless**: every stochastic method takes the caller's
+   `rng`; nothing retains training data.
+3. **Deficit algebra** (written once, backend-blind): the generic
+   `DGPMixin` cascade — `intervene(rows, nodes, values=None, *, rng=None)`
+   (Pearl surgery on given rows: fix the nodes, recompute ALL descendants
+   in topological order with fresh noise; intervened nodes stay pinned)
+   and `sample(rng, n)` — both start by calling the
+   **`pick_parameters(rng)` hook** (default: `self`; the PyMC backend
+   overrides it to pin one coherent posterior draw per cascade).
+   Structure edits are **free functions** in `badgers.core.dgp.edits`
+   (the DGP itself has NO edit methods): `scale_edge`/`remove_edge`
+   (edge reweighting with variance-budget calibration — no coefficient
+   access needed), `exogenize` (make a node a root; INTERVENTION-ONLY
+   semantics), `set_form` (replace a node's functional form),
+   `add_edge_contribution` (ANM-scoped cheap edge addition). Re-
+   estimation after a structural modification is out of scope: build
+   the modified SCM with the wrapped library's own API, fit it, and
+   wrap it again with `GcmSCMDGP`/`PyMCSCMDGP`. Edits return
+   read-only views and never mutate the base DGP. Indicator derivation
+   from the observation graph lives in the missingness generator
+   (structure-layer helpers + generator-local firing/spread logic).
+
+Backend selection is **object injection only** (`dgp=...` / `use_dgp`).
+Deficit semantics live in the generators; they never see which backend ran.
+The generator carries NO structure of its own: `CausalGenerator.__init__`
+accepts only `random_generator=` and `dgp=`, derives its `graph`/`
+column_mapping` views from the DGP, and there is no generator-side `fit` or
+implicit default backend — a missing `dgp=` is a hard error. Unfitted DGPs are
+fitted lazily on first `generate(X)`.

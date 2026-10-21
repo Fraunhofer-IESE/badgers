@@ -1,45 +1,60 @@
 import numpy as np
-from badgers.generators.tabular_data.noise import (
-    GaussianNoiseGenerator, GaussianNoiseClassesGenerator,
+import pytest
+from numpy.random import default_rng
+
+from badgers.core.selectors import ClassSelector
+from badgers.generators.tabular_data.noise.noise import (
+    GaussianNoiseClassesGenerator,
 )
 
 
-def test_gaussian_noise__preserves_shape(tabular_data):
-    X, y = tabular_data
-    generator = GaussianNoiseGenerator()
-    Xt, _ = generator.generate(X.copy(), y=None, noise_std=1)
-    assert len(X) == len(Xt)
+def _selector(y_values, proportions=None, rng=None):
+    Xc = np.column_stack([np.zeros(len(y_values)), np.asarray(y_values)])
+    column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
+    column_mapping["cls"] = Xc.shape[1] - 1
+    props = proportions if proportions is not None else {c: 1.0 for c in np.unique(y_values)}
+    return ClassSelector("cls", column_mapping, {"cls": props}, rng=rng or default_rng(0)), Xc
 
 
-def test_gaussian_noise__increases_variance(tabular_data):
-    X, y = tabular_data
-    generator = GaussianNoiseGenerator()
-    Xt, _ = generator.generate(X.copy(), y=None, noise_std=1)
-    assert (np.var(Xt, axis=0) > np.var(X, axis=0)).all()
-
-
-def test_gaussian_noise__zero_std_preserves_data(tabular_data):
-    """With noise_std=0, the data should be unchanged."""
-    X, y = tabular_data
-    X_copy = X.copy()
-    generator = GaussianNoiseGenerator()
-    Xt, _ = generator.generate(X_copy, y=None, noise_std=0)
-    assert np.allclose(Xt, X_copy)
-
-
-def test_gaussian_noise_classes__preserves_shape(tabular_data_labeled):
+def test_gaussian_noise_classes__preserves_shape_and_y(tabular_data_labeled):
     X, y = tabular_data_labeled
+    selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.1 for label in np.unique(y)}
     generator = GaussianNoiseClassesGenerator()
-    Xt, yt = generator.generate(X.copy(), y, noise_std_per_class=noise_std_per_class)
-    assert len(X) == len(Xt)
+    Xt, yt = generator.generate(Xc.copy(), y, selector=selector, noise_std_per_class=noise_std_per_class)
+    assert len(Xc) == len(Xt)
     assert len(y) == len(yt)
+    # y is passed through unchanged (no class relabeling)
+    np.testing.assert_array_equal(np.asarray(yt), np.asarray(y))
 
 
 def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
     """With non-zero noise_std, data should be modified."""
     X, y = tabular_data_labeled
+    selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.5 for label in np.unique(y)}
     generator = GaussianNoiseClassesGenerator()
-    Xt, yt = generator.generate(X.copy(), y, noise_std_per_class=noise_std_per_class)
-    assert not np.allclose(Xt, X)
+    Xt, _ = generator.generate(Xc.copy(), y, selector=selector, noise_std_per_class=noise_std_per_class)
+    assert not np.allclose(Xt, Xc)
+
+
+def test_gaussian_noise_classes__per_class_magnitude(tabular_data_labeled):
+    """Only classes listed in noise_std_per_class receive noise."""
+    X, y = tabular_data_labeled
+    classes = np.unique(np.asarray(y))
+    selector, Xc = _selector(y)
+    cls_col = Xc.shape[1] - 1
+    generator = GaussianNoiseClassesGenerator(random_generator=default_rng(0))
+    noise_std_per_class = {classes[0]: 0.5}
+    Xt, _ = generator.generate(Xc.copy(), y, selector=selector, noise_std_per_class=noise_std_per_class)
+    fired_cls0 = Xc[:, cls_col] == classes[0]
+    other = Xc[:, cls_col] != classes[0]
+    assert not np.allclose(Xt[fired_cls0], Xc[fired_cls0])
+    assert np.allclose(Xt[other], Xc[other])
+
+
+def test_gaussian_noise_classes__selector_none_raises(tabular_data_labeled):
+    X, y = tabular_data_labeled
+    generator = GaussianNoiseClassesGenerator()
+    with pytest.raises(ValueError, match="selector"):
+        generator.generate(X.copy(), y, noise_std_per_class={0: 0.1})

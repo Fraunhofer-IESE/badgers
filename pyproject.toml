@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "badgers"
-version = "0.0.14"
+version = "0.0.15"
 keywords = ["data quality", "bad data", "data science"]
 authors = [
     { name = "Julien Siebert", email = "julien.siebert@iese.fraunhofer.de" },
@@ -30,6 +30,13 @@ dependencies = [
     "scipy~=1.17.0",
 ]
 [project.optional-dependencies]
+pymc = [
+    "pymc>=5.0",
+    "pytensor>=2.0",
+]
+dowhy = [
+    "dowhy>=0.13",
+]
 dev = [
     "tox>=4.34.1,<4.62.0",
     "mkdocs~=1.6.1",
@@ -41,7 +48,6 @@ dev = [
     "mkdocs-jupyter>=0.25.1,<0.27.0",
     "jupyterlab>=4.5.2,<4.7.0",
     "matplotlib>=3.10.8,<3.12.0",
-    "seaborn~=0.13.2",
     "pytest>=9.0.2,<9.2.0",
     "pytest-timeout~=2.4.0",
     "pytest-benchmark>=5.2.3,<5.4.0",

@@ -70,14 +70,8 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        n_samples = len(X)
-        if y is None:
-            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
-        else:
-            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
-
-        return Xt, yt
+        self._set_outlier_labels(len(X), n_outliers)
+        return Xt, y
 
 
 class HistogramSamplingGenerator(OutliersGenerator):
@@ -169,14 +163,8 @@ class HistogramSamplingGenerator(OutliersGenerator):
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        n_samples = len(X)
-        if y is None:
-            yt = np.array(["original"] * n_samples + ["outliers"] * n_outliers)
-        else:
-            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * n_outliers)
-
-        return Xt, yt
+        self._set_outlier_labels(len(X), n_outliers)
+        return Xt, y
 
 
 class LowDensitySamplingGenerator(OutliersGenerator):
@@ -262,22 +250,11 @@ class LowDensitySamplingGenerator(OutliersGenerator):
 
         # in the case no outliers could be generated
         if outliers.shape[0] == 0:
-            # Build yt labels even when no outliers
-            n_samples = len(X)
-            if y is None:
-                yt = np.array(["original"] * n_samples)
-            else:
-                yt = np.asarray(y, dtype=str)
-            return X, yt
+            self._set_outlier_labels(len(X), 0)
+            return X, y
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        # Build yt labels
-        n_samples = len(X)
-        if y is None:
-            yt = np.array(["original"] * n_samples + ["outliers"] * len(outliers))
-        else:
-            yt = np.append(np.asarray(y, dtype=str), ["outliers"] * len(outliers))
-
-        return Xt, yt
+        self._set_outlier_labels(len(X), len(outliers))
+        return Xt, y
