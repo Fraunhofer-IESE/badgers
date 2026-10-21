@@ -11,7 +11,7 @@ _WORDS = [
 
 
 def _word_list_factory(rng):
-    return list(_WORDS), None
+    return list(_WORDS)
 
 
 SCENARIO_WORD_LIST = Scenario(

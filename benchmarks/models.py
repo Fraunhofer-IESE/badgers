@@ -1,16 +1,17 @@
 """Data models for the benchmark framework."""
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Tuple, Type
+from typing import Any, Callable, Dict, List, Type
 
 import numpy as np
 
 
 @dataclass
 class Scenario:
-    """A named data factory that produces (X, y) for benchmarking."""
+    """A named data factory that produces a single generated object (array,
+    list, or graph) for benchmarking."""
     name: str
     data_type: str  # "tabular", "time_series", "graph", "text"
-    factory: Callable[[np.random.Generator], Tuple[Any, Any]]
+    factory: Callable[[np.random.Generator], Any]
     tags: List[str] = field(default_factory=list)
 
 

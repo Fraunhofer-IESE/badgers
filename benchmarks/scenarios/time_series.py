@@ -6,13 +6,13 @@ from benchmarks.models import Scenario
 def _sine_wave_factory(rng):
     t = np.linspace(0, 4 * np.pi, 200)
     X = np.sin(t).reshape(-1, 1)
-    return X, None
+    return X
 
 
 def _random_walk_factory(rng):
     steps = rng.normal(0, 1, size=(200, 1))
     X = np.cumsum(steps, axis=0)
-    return X, None
+    return X
 
 
 SCENARIO_SINE_WAVE = Scenario(

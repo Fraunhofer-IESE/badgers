@@ -5,14 +5,15 @@ from benchmarks.models import Scenario
 
 
 def _make_blobs_factory(n_samples, n_features):
+    """Build a scenario factory producing the blob feature matrix only."""
     def factory(rng):
-        X, y = make_blobs(
+        X, _ = make_blobs(
             n_samples=n_samples,
             n_features=n_features,
             centers=5,
             random_state=42,
         )
-        return X, y
+        return X
     return factory
 
 
@@ -39,9 +40,9 @@ SCENARIO_LARGE_BLOBS = Scenario(
 
 
 def _make_blobs_classes_factory(n_samples, n_features):
-    """Like _make_blobs_factory but stacks the classes as the LAST column of X
-    (per-class generators read classes from an X column; y is deprecated as
-    a data carrier)."""
+    """Build a scenario factory producing one matrix: the blob features with
+    the class column stacked as the LAST column of X (per-class generators
+    read classes from an X column; y is deprecated as a data carrier)."""
     def factory(rng):
         X, y = make_blobs(
             n_samples=n_samples,
@@ -49,7 +50,7 @@ def _make_blobs_classes_factory(n_samples, n_features):
             centers=5,
             random_state=42,
         )
-        return np.column_stack([X, y]), y
+        return np.column_stack([X, y])
     return factory
 
 
