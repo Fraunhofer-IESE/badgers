@@ -38,7 +38,7 @@ dowhy = [
     "dowhy>=0.13",
 ]
 dev = [
-    "tox>=4.34.1,<4.62.0",
+    "tox>=4.34.1,<4.68.0",
     "mkdocs~=1.6.1",
     "mkdocstrings~=1.0.1",
     "mkdocstrings-python~=2.0.1",
@@ -51,7 +51,7 @@ dev = [
     "pytest>=9.0.2,<9.2.0",
     "pytest-timeout~=2.4.0",
     "pytest-benchmark>=5.2.3,<5.4.0",
-    "flake8~=7.3.0",
+    "flake8>=7.3,<7.5",
 ]
 [project.urls]
 "Homepage" = "https://github.com/Fraunhofer-IESE/badgers"
