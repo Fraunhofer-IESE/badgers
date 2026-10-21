@@ -42,16 +42,13 @@ class ImbalanceGenerator(GeneratorMixin):
         return self.imbalance_labels_
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params):
+    def generate(self, X, **params):
         """
         Abstract method to generate imbalanced data from the input data.
         This should be overridden
 
         :param X: Input features, can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: Target variable, can be a pandas Series or a numpy array.
-                  If None, it is assumed that the target is not provided.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param params: Additional keyword arguments that might be required for specific implementations.
         :type params: dict
         """
@@ -78,7 +75,7 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, sampling_proba_func=lambda X: _column_sampling_proba(X[:, 0])):
+    def generate(self, X, sampling_proba_func=lambda X: _column_sampling_proba(X[:, 0])):
         """
         Randomly samples instances based on the feature values in X using a specified sampling probability function.
 
@@ -87,27 +84,21 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
 
         :param X: Input features, can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: Target variable, can be a pandas Series or a numpy array.
-                  If None, it is assumed that the target is not provided.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param sampling_proba_func: A function that takes as input data (X) and returns a series of sampling probabilities.
                                     The function should ensure that the probabilities are normalized.
         :type sampling_proba_func: callable
-        :return: A tuple containing the sampled features (Xt) and the corresponding target values (yt).
-                 If y is None, only the sampled features (Xt) are returned.
-        :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
+        :return: The sampled features (Xt).
         """
         # total number of instances that will be missing
         # sampling
         sampling_proba = sampling_proba_func(X)
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_proba, size=X.shape[0], replace=True)
         Xt = X[sampling_mask, :]
-        yt = y[sampling_mask] if y is not None else y
         # rows that never got drawn carry the deficit (dropped from the output)
         labels = np.ones(X.shape[0], dtype=bool)
         labels[sampling_mask] = False
         self.imbalance_labels_ = labels
-        return Xt, yt
+        return Xt
 
 
 class RandomSamplingClassesGenerator(ImbalanceGenerator):
@@ -126,7 +117,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, selector=None):
+    def generate(self, X, selector=None):
         """
         Drops the rows fired by the selector (subsampling deficit),
         per-class: exactly ``int(prop * n_rows)`` rows of each listed class
@@ -134,33 +125,27 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
 
         :param X: Input features, can be a pandas DataFrame or a numpy array.
         :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param y: Target variable, can be a pandas Series or a numpy array.
-                  If None, it is assumed that the target is not provided.
-        :type y: Union[pandas.Series, numpy.ndarray, None], optional
         :param selector: A selector (e.g.
                          :class:`badgers.core.selectors.ClassSelector`)
                          deciding which rows are dropped. ``None`` =
                          no-op (all rows kept). The class variable is a
                          column of ``X`` (resolved via the selector's
-                         ``column_mapping``); ``y`` is not used for
-                         selection, only passed through.
+                         ``column_mapping``).
         :type selector: callable, optional
-        :return: A tuple containing the sampled features (Xt) and the corresponding target values (yt).
-        :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
+        :return: The sampled features (Xt).
         """
         if selector is None:
             self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
-            return X, y
-        masks = list(selector(X, y).values())
+            return X
+        masks = list(selector(X).values())
         if len(masks) == 1:
             fired = masks[0]
         else:
             # a row is dropped if fired in any class column
             fired = np.logical_or.reduce(masks)
         Xt = X[~fired, :]
-        yt = y[~fired] if y is not None else None
         self.imbalance_labels_ = fired
-        return Xt, yt
+        return Xt
 
 
 class RandomSamplingTargetsGenerator(ImbalanceGenerator):
@@ -189,7 +174,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, *, selector=None, replace=True, size=None):
+    def generate(self, X, *, selector=None, replace=True, size=None):
         """
         Resamples instances from a selector's deficit probabilities.
 
@@ -200,24 +185,23 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         low deficit probability are kept/replicated).
 
         :param X: Input features, can be a pandas DataFrame or a numpy array.
-        :param y: Target variable (optional, passed through; not used for selection).
         :param selector: A selector deciding which rows get the deficit.
             E.g. ``ProportionalSelector("col", column_mapping)`` (deficit
             probability proportional to a column), a ``BernoulliSelector``,
-            or any callable returning ``dict[str, array]`` of per-row
-            scores. Required (``None`` raises).
+            or any callable accepting X and returning ``dict[str, array]``
+            of per-row scores. Required (``None`` raises).
         :param replace: Whether to sample with replacement (default True:
             rows may be duplicated). ``False`` gives a weighted thinning.
         :param size: Number of rows to draw (default: the input row count).
-        :return: A tuple (Xt, yt) of the resampled features and target.
+        :return: The resampled features (Xt).
         """
         if selector is None:
             raise ValueError(
                 "RandomSamplingTargetsGenerator needs a selector deciding "
                 "which rows get the deficit (e.g. ProportionalSelector "
-                "over a column of X): y is not used for selection."
+                "over a column of X)."
             )
-        scores = [np.asarray(s, dtype=float) for s in selector(X, y).values()]
+        scores = [np.asarray(s, dtype=float) for s in selector(X).values()]
         if len(scores) == 1:
             deficit_proba = scores[0]
         else:
@@ -244,11 +228,10 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             if size is not None and size < len(kept):
                 kept = self.random_generator.choice(kept, size=size, replace=False)
             Xt = X[kept, :]
-            yt = y[kept] if y is not None else None
             fired = np.ones(X.shape[0], dtype=bool)
             fired[kept] = False
             self.imbalance_labels_ = fired
-            return Xt, yt
+            return Xt
         # Fractional scores: normalize the keep weights into a probability
         # vector and resample from them.
         p = normalize_proba(keep_weights.reshape(-1, 1)).ravel()
@@ -257,8 +240,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             replace=replace,
         )
         Xt = X[n, :]
-        yt = y[n] if y is not None else None
         fired = np.ones(X.shape[0], dtype=bool)
         fired[n] = False
         self.imbalance_labels_ = fired
-        return Xt, yt
+        return Xt

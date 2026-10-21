@@ -63,7 +63,6 @@ class CausalImbalanceGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        y,
         selector=None,
         perturbation_nodes=None,
         quantile_range=(0.5, 1.0),
@@ -76,7 +75,7 @@ class CausalImbalanceGenerator(CausalGenerator):
             # Explicit selector: rows FIRED by the selector are dropped
             # (subsampling polarity). Union over the selector's variables.
             dropped = np.zeros(n_samples, dtype=bool)
-            for mask in selector(X, y).values():
+            for mask in selector(X).values():
                 dropped |= np.asarray(mask, dtype=bool)
             keep = ~dropped
         else:
@@ -99,9 +98,7 @@ class CausalImbalanceGenerator(CausalGenerator):
                 keep &= (X[:, col] >= b_lo) & (X[:, col] <= b_hi)
 
         X = X[keep]
-        if y is not None:
-            y = y[keep]
         affected = np.ones(X.shape[0], dtype=bool)
 
         self.deficit_labels_ = affected.copy()
-        return X, None
+        return X
