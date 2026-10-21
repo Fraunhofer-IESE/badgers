@@ -1,5 +1,4 @@
 import abc
-from typing import Tuple
 
 import numpy as np
 from numpy.random import default_rng
@@ -41,14 +40,13 @@ class MissingAtRandomGenerator(MissingValuesGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_missing: int = 10) -> Tuple:
+    def generate(self, X, n_missing: int = 10):
         """
         Randomly sets a specified number of values in the input array X to np.nan, representing missing values.
 
         :param X: A numpy array of shape (n_samples, n_features) containing the input time-series data.
-        :param y: A numpy array of shape (n_samples,) containing the target values. This parameter is not modified by this method.
         :param n_missing: The number of missing values to randomly introduce into the data. Defaults to 10.
-        :return: A tuple (X_out, y_out) where X_out is the modified array with missing values and y_out is the original target array.
+        :return: The modified array with missing values.
         """
         # generate missing values indices and values
         rows = self.random_generator.choice(X.shape[0], size=n_missing, replace=False, p=None)
@@ -59,4 +57,4 @@ class MissingAtRandomGenerator(MissingValuesGenerator):
         # vectorized assignment via .values
         X[rows, cols] = np.nan
 
-        return X, y
+        return X

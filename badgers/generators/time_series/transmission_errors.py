@@ -1,5 +1,4 @@
 import abc
-from typing import Tuple
 
 import numpy as np
 from numpy.random import default_rng
@@ -25,14 +24,13 @@ class TransmissionErrorGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple[np.ndarray, np.ndarray]:
+    def generate(self, X, **params):
         """
         Abstract method to generate transmission errors on the input data.
 
         :param X: Input features, expected to be a pandas DataFrame.
-        :param y: Target variable, expected to be a pandas Series.
         :param params: Additional parameters that might be needed for generating errors.
-        :return: A tuple containing the modified input features and target variable with transmission errors applied.
+        :return: The modified input features with transmission errors applied.
         """
         pass
 
@@ -54,18 +52,15 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
         self.switch_indices_ = None
 
     @preprocess_inputs
-    def generate(self, X, y, n_switches: int = 10) -> Tuple:
+    def generate(self, X, n_switches: int = 10):
         """
         Introduces `n_switches` random switches in the input time series data X.
 
         This method randomly selects `n_switches` pairs of consecutive indices (i, i+1) and swaps their values in X.
-        The target variable y remains unchanged.
 
         :param X: A pandas DataFrame representing the input time series data.
-        :param y: A pandas Series representing the target variable (remains unchanged).
         :param n_switches: An integer specifying the number of random switches to introduce in X.
-        :return: A tuple (Xt, y) where Xt is the modified input time series data with random switches applied,
-                 and y is the original target variable.
+        :return: The modified input time series data with random switches applied.
         """
         assert n_switches > 0, 'n_switches should be strictly greater than 0'
 
@@ -75,7 +70,7 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
         tmp = X[i].copy()
         X[i] = X[i + 1]
         X[i + 1] = tmp
-        return X, y
+        return X
 
 
 class RandomRepeatGenerator(TransmissionErrorGenerator):
@@ -98,22 +93,19 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
         self.repeats_ = None  # to store the indices of the repeats (from the original X) and the length of the repeat
 
     @preprocess_inputs
-    def generate(self, X, y, n_repeats: int = 10, min_nb_repeats: int = 1,
-                 max_nb_repeats: int = 10) -> Tuple:
+    def generate(self, X, n_repeats: int = 10, min_nb_repeats: int = 1,
+                 max_nb_repeats: int = 10):
         """
         Introduces `n_repeats` random repetitions in the input time series data X.
 
         This method randomly selects `n_repeats` indices from X and repeats each selected value a random number of times between
         `min_nb_repeats` and `max_nb_repeats`. The repeated values are inserted immediately after the selected index in X.
-        The target variable y remains unchanged.
 
         :param X: A pandas DataFrame representing the input time series data.
-        :param y: A pandas Series representing the target variable (remains unchanged).
         :param n_repeats: An integer specifying the number of random repetitions to introduce in X.
         :param min_nb_repeats: An integer specifying the minimum number of times a value can be repeated.
         :param max_nb_repeats: An integer specifying the maximum number of times a value can be repeated.
-        :return: A tuple (Xt, y) where Xt is the modified input time series data with random repetitions applied,
-                 and y is the original target variable.
+        :return: The modified input time series data with random repetitions applied (length increased).
         """
         assert n_repeats > 0, 'n_repeats should be strictly greater than 0'
 
@@ -133,7 +125,7 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
             Xt = np.insert(Xt, i + offset, repeat, axis=0)
             offset += l
 
-        return Xt, y
+        return Xt
 
 
 class RandomDropGenerator(TransmissionErrorGenerator):
@@ -156,18 +148,15 @@ class RandomDropGenerator(TransmissionErrorGenerator):
         self.drops_indices_ = None  # to store the indices of the drops
 
     @preprocess_inputs
-    def generate(self, X, y, n_drops: int = 10) -> Tuple:
+    def generate(self, X, n_drops: int = 10):
         """
         Introduces `n_drops` random drops in the input time series data X.
 
         This method randomly selects `n_drops` indices from X and removes the corresponding rows.
-        The target variable y remains unchanged.
 
         :param X: A pandas DataFrame representing the input time series data.
-        :param y: A pandas Series representing the target variable (remains unchanged).
         :param n_drops: An integer specifying the number of random drops to introduce in X.
-        :return: A tuple (Xt, y) where Xt is the modified input time series data with random drops applied,
-                 and y is the original target variable.
+        :return: The modified input time series data with random drops applied (length decreased).
         """
         assert n_drops > 0, 'n_drops should be strictly greater than 0'
 
@@ -176,7 +165,7 @@ class RandomDropGenerator(TransmissionErrorGenerator):
 
         Xt = np.delete(X, self.drops_indices_, axis=0)
 
-        return Xt, y
+        return Xt
 
 
 class LocalRegionsRandomDropGenerator(TransmissionErrorGenerator):
@@ -197,23 +186,21 @@ class LocalRegionsRandomDropGenerator(TransmissionErrorGenerator):
         self.drops_probabilities_ = None # to store the probability of dropping values
 
     @preprocess_inputs
-    def generate(self, X, y, n_drops: int = 10, n_regions: int = 5, min_width_regions: int = 5,
-                 max_width_regions: int = 10) -> Tuple:
+    def generate(self, X, n_drops: int = 10, n_regions: int = 5, min_width_regions: int = 5,
+                 max_width_regions: int = 10):
         """
         Introduces `n_drops` random drops in the input time series data X within `n_regions` specific time regions.
 
         This method randomly defines `n_regions` time regions within the time series, each having a width between
         `min_width_regions` and `max_width_regions`. Within each region, values are randomly dropped until the total number of
-        dropped values reaches `n_drops`. The target variable y remains unchanged.
+        dropped values reaches `n_drops`.
 
         :param X: A pandas DataFrame representing the input time series data.
-        :param y: A pandas Series representing the target variable (remains unchanged).
         :param n_drops: An integer specifying the total number of random drops to introduce in X.
         :param n_regions: An integer specifying the number of time regions where values will be dropped.
         :param min_width_regions: An integer specifying the minimum width of the time regions (intervals).
         :param max_width_regions: An integer specifying the maximum width of the time regions (intervals).
-        :return: A tuple (Xt, y) where Xt is the modified input time series data with random drops applied within specific
-                 time regions, and y is the original target variable.
+        :return: The modified input time series data with random drops applied within specific time regions (length decreased).
         """
         assert n_drops > 0, 'n_drops should be strictly greater than 0'
 
@@ -231,7 +218,7 @@ class LocalRegionsRandomDropGenerator(TransmissionErrorGenerator):
 
         Xt = np.delete(X, self.drops_indices_, axis=0)
 
-        return Xt, y
+        return Xt
 
 
 class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
@@ -252,27 +239,24 @@ class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
         self.repeats_probabilities_ = None  # to store the probability of repeating values
 
     @preprocess_inputs
-    def generate(self, X, y, n_repeats: int = 10, min_nb_repeats: int = 1,
+    def generate(self, X, n_repeats: int = 10, min_nb_repeats: int = 1,
                  max_nb_repeats: int = 10, n_regions: int = 5, min_width_regions: int = 5,
-                 max_width_regions: int = 10) -> Tuple:
+                 max_width_regions: int = 10):
         """
         Introduces `n_repeats` random repetitions in the input time series data X within `n_regions` specific time regions.
 
         This method randomly defines `n_regions` time regions within the time series, each having a width between
         `min_width_regions` and `max_width_regions`. Within each region, values are randomly selected and repeated a random number of times
         between `min_nb_repeats` and `max_nb_repeats`. The repeated values are inserted immediately after the selected index in X.
-        The target variable y remains unchanged.
 
         :param X: A pandas DataFrame representing the input time series data.
-        :param y: A pandas Series representing the target variable (remains unchanged).
         :param n_repeats: An integer specifying the total number of random repetitions to introduce in X.
         :param min_nb_repeats: An integer specifying the minimum number of times a value can be repeated.
         :param max_nb_repeats: An integer specifying the maximum number of times a value can be repeated.
         :param n_regions: An integer specifying the number of time regions where values will be repeated.
         :param min_width_regions: An integer specifying the minimum width of the time regions (intervals).
         :param max_width_regions: An integer specifying the maximum width of the time regions (intervals).
-        :return: A tuple (Xt, y) where Xt is the modified input time series data with random repetitions applied within specific
-                 time regions, and y is the original target variable.
+        :return: The modified input time series data with random repetitions applied within specific time regions (length increased).
         """
         assert n_repeats > 0, 'n_repeats should be strictly greater than 0'
 
@@ -301,4 +285,4 @@ class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
             Xt = np.insert(Xt, i + offset, repeat, axis=0)
             offset += l
 
-        return Xt, y
+        return Xt

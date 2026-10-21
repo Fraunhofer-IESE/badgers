@@ -1,5 +1,4 @@
 import abc
-from typing import Tuple
 
 import numpy as np
 from numpy.random import default_rng
@@ -25,16 +24,15 @@ class OutliersGenerator(GeneratorMixin):
         self.outliers_indices_ = []
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, **params):
         """
         Generate point outliers in the given time-series data.
 
         This method should be overridden by subclasses to implement specific outlier generation strategies.
 
         :param X: Input features (time-series data).
-        :param y: Target values (optional, may be None).
         :param params: Additional parameters that may be required for outlier generation.
-        :return: A tuple containing the modified data with outliers and any additional information.
+        :return: The modified data with outliers.
         """
         pass
 
@@ -54,15 +52,14 @@ class RandomZerosGenerator(OutliersGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10) -> Tuple:
+    def generate(self, X, n_outliers: int = 10):
         """
         Randomly set a specified number of values in the input data to zero.
 
         :param X: The input features (time-series data), expected to be a 2D numpy array.
-        :param y: The target values, optional and can be None.
         :param n_outliers: The number of outliers to generate by setting to zero.
                            Defaults to 10.
-        :return: A tuple containing the modified data with outliers and the indices of the generated outliers.
+        :return: The modified data with outliers.
         """
         # generate extreme values indices and values
         rows = self.random_generator.choice(X.shape[0], size=n_outliers, replace=False, p=None)
@@ -73,7 +70,7 @@ class RandomZerosGenerator(OutliersGenerator):
         # vectorized assignment via .values
         X[rows, cols] = 0
 
-        return X, y
+        return X
 
 
 class LocalZScoreGenerator(OutliersGenerator):
@@ -92,7 +89,7 @@ class LocalZScoreGenerator(OutliersGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_outliers: int = 10,
+    def generate(self, X, n_outliers: int = 10,
                  local_window_size: int = 10):
         """
         Generates outliers based on local Z-scores.
@@ -102,10 +99,9 @@ class LocalZScoreGenerator(OutliersGenerator):
         [local_mean - 3 * local_std, local_mean + 3 * local_std]. The sign of the outlier value is the same as the sign of the original value.
 
         :param X: The input features (time-series data), expected to be a 2D numpy array.
-        :param y: The target values, optional and can be None.
         :param n_outliers: The number of outliers to generate. Defaults to 10.
         :param local_window_size: The width (number of data points) of the local window used to compute the local Z-score. Defaults to 10.
-        :return: A tuple containing the modified data with outliers and the indices of the generated outliers.
+        :return: The modified data with outliers.
         """
         # generate extreme values indices and values
         delta = int(local_window_size / 2)
@@ -126,4 +122,4 @@ class LocalZScoreGenerator(OutliersGenerator):
                 3. * local_std + self.random_generator.exponential())
         X[rows, cols] = values
 
-        return X, y
+        return X

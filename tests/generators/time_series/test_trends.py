@@ -14,7 +14,7 @@ def test_global_additive_linear_trend__matches_expected():
 
     expected_Xt = np.array([np.linspace(0, len(X) * s, len(X)) for s in slope]).T
 
-    Xt, _ = generator.generate(X, None, slope=slope)
+    Xt = generator.generate(X, slope=slope)
     np.testing.assert_array_equal(Xt, expected_Xt)
 
 
@@ -38,7 +38,7 @@ def test_additive_linear_trend__matches_expected():
         [0., 2., 4., 8.],
     ])
 
-    Xt, _ = generator.generate(X, None, slope=slope, start=3, end=7)
+    Xt = generator.generate(X, slope=slope, start=3, end=7)
     np.testing.assert_array_equal(Xt, expected_Xt)
 
 
@@ -48,7 +48,7 @@ def test_randomly_spaced_linear_trends__outside_intervals_constant():
     generator = RandomlySpacedLinearTrends(random_generator=rng)
     X = np.zeros(shape=(100, 4))
 
-    Xt, _ = generator.generate(X, None, n_patterns=5, min_width_pattern=5, max_width_patterns=10)
+    Xt = generator.generate(X, n_patterns=5, min_width_pattern=5, max_width_patterns=10)
 
     for i in range(1, len(generator.patterns_indices_)):
         s = generator.patterns_indices_[i - 1][1]

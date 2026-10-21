@@ -1,5 +1,4 @@
 import abc
-from typing import Tuple
 
 from numpy.random import default_rng
 
@@ -22,16 +21,15 @@ class ChangePointsGenerator(GeneratorMixin):
         self.changepoints = None
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, **params):
         """
         Abstract method that generates changepoints in the given time-series data.
 
         This method must be overridden by subclasses.
 
         :param X: Input features of the time-series data.
-        :param y: Target values of the time-series data.
         :param params: Additional parameters required for changepoint generation.
-        :return: A tuple containing the modified time-series data and the generated changepoints.
+        :return: The modified time-series data.
         """
         pass
 
@@ -50,17 +48,16 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_changepoints: int = 10, min_change: float = -5,
-                 max_change: float = 5) -> Tuple:
+    def generate(self, X, n_changepoints: int = 10, min_change: float = -5,
+                 max_change: float = 5):
         """
         Generate random changepoints in the time-series data where the mean changes at each changepoint.
 
         :param X: Input features of the time-series data.
-        :param y: Target values of the time-series data.
         :param n_changepoints: Number of changepoints to generate.
         :param min_change: Minimum value of the change in mean.
         :param max_change: Maximum value of the change in mean.
-        :return: A tuple containing the modified time-series data and the generated changepoints.
+        :return: The modified time-series data.
         """
         # Generate change points
         self.changepoints = list(
@@ -73,4 +70,4 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
         for idx, change in self.changepoints:
             X[idx:] += change
 
-        return X, y
+        return X

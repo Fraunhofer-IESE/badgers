@@ -1,5 +1,4 @@
 import abc
-from typing import Tuple, Union
 
 import numpy as np
 from numpy.random import default_rng
@@ -24,14 +23,13 @@ class TrendsGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, **params):
         """
         Abstract method to generate trends in time-series data.
 
         :param X: The input features, typically a 2D array where each row represents a time step.
-        :param y: The target variable, typically a 1D array.
         :param params: Additional parameters that can be used by the generating method.
-        :return: A tuple containing the modified features and target variable with generated trends.
+        :return: The modified features with generated trends.
         """
         pass
 
@@ -51,21 +49,20 @@ class GlobalAdditiveLinearTrendGenerator(TrendsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, slope) -> Tuple:
+    def generate(self, X, slope):
         """
         Add a global linear trend to the input time-series data.
 
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
-        :param y: The target variable, which remains unchanged in this transformation.
         :param slope: The slope of the trend (increase per time unit). Can be a single float value or a list of slopes
                       for each feature in X.
         :type slope: Union[float, list]
-        :return: A tuple containing the transformed signal Xt (X + linear trend) and the unchanged target variable y.
+        :return: The transformed signal Xt (X + linear trend).
         """
 
         offset = np.linspace(0, slope * len(X), len(X))
         Xt = X + offset
-        return Xt, y
+        return Xt
 
 
 class AdditiveLinearTrendGenerator(TrendsGenerator):
@@ -83,19 +80,17 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, slope, start: int, end: int) -> Tuple:
+    def generate(self, X, slope, start: int, end: int):
         """
         Add a linear trend to a specified segment of the input time-series data.
 
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
-        :param y: The target variable, which remains unchanged in this transformation.
         :param slope: The slope of the trend (increase per time unit). Can be a single float value or a list of slopes
                       for each feature in X.
         :type slope: Union[float, list]
         :param start: The starting index of the segment to apply the trend.
         :param end: The ending index of the segment to apply the trend.
-        :return: A tuple containing the transformed signal Xt (X with the linear trend applied to the specified segment)
-                 and the unchanged target variable y.
+        :return: The transformed signal Xt (X with the linear trend applied to the specified segment).
         """
         if start is None:
             # when start is not given, it is chosen randomly in the first half of the signal
@@ -114,7 +109,7 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
         offset[end:, :] = offset[end - 1, :]
 
         Xt = X + offset
-        return Xt, y
+        return Xt
 
 
 class RandomlySpacedLinearTrends(TrendsGenerator):
@@ -133,21 +128,20 @@ class RandomlySpacedLinearTrends(TrendsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
-                 max_width_patterns: int = 10, slope_min: float = -0.05, slope_max: float = 0.05) -> Tuple:
+    def generate(self, X, n_patterns: int = 10, min_width_pattern: int = 5,
+                 max_width_patterns: int = 10, slope_min: float = -0.05, slope_max: float = 0.05):
         """
         Generates randomly spaced time intervals where a linear trend is added to the signal.
         Slopes, time interval locations, and widths are chosen randomly.
 
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
-        :param y: The target variable, which remains unchanged in this transformation.
         :param n_patterns: The total number of time intervals where a linear trend is added.
         :param min_width_pattern: The minimum width of the time intervals.
         :param max_width_patterns: The maximum width of the time intervals.
         :param slope_min: The minimum value of the slope. The slope is chosen uniformly at random between `slope_min` and `slope_max` for each time interval and each column of X.
         :param slope_max: The maximum value of the slope. The slope is chosen uniformly at random between `slope_min` and `slope_max` for each time interval and each column of X.
 
-        :return: A tuple containing the transformed signal Xt (X with randomly spaced linear trends added) and the unchanged target variable y.
+        :return: The transformed signal Xt (X with randomly spaced linear trends added).
         """
 
         # generate patterns indices and values
@@ -172,4 +166,4 @@ class RandomlySpacedLinearTrends(TrendsGenerator):
             offset[end:, :] = offset[end - 1, :]
 
         Xt = X + offset
-        return Xt, y
+        return Xt
