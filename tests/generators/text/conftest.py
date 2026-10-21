@@ -11,5 +11,5 @@ _WORDS = [
 
 @pytest.fixture
 def text_word_list():
-    """List of 20 technical words as (words, None)."""
-    return list(_WORDS), None
+    """List of 20 technical words."""
+    return list(_WORDS)

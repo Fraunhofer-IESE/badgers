@@ -1,5 +1,4 @@
 import abc
-from typing import Tuple
 
 from numpy.random import default_rng
 
@@ -21,7 +20,7 @@ class TyposGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, **params):
         pass
 
 
@@ -40,16 +39,15 @@ class SwapLettersGenerator(TyposGenerator):
         """
         super().__init__(random_generator)
 
-    def generate(self, X, y, swap_proba:float=0.1) -> Tuple:
+    def generate(self, X, swap_proba:float=0.1):
         """
         For each word with a length greater than 3, apply a single swap with probability `swap_proba`.
         The position of the swap is chosen randomly among possible adjacent pairs of letters,
         excluding the first and last letters of the word.
         :param X: A list of words where typos are introduced.
-        :param y: Not used in this method.
         :param swap_proba: Probability that a word with more than 3 characters will have one adjacent pair of letters swapped.
                            This probability applies to each eligible word independently.
-        :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
+        :return: The list of words where eligible words have been swapped in place.
         """
         for i in range(len(X)):
             if len(X[i]) > 3 and self.random_generator.random() <= swap_proba:
@@ -61,7 +59,7 @@ class SwapLettersGenerator(TyposGenerator):
                 # save the word with switched letters as string
                 X[i] = ''.join(word)
 
-        return X, y
+        return X
 
 
 class LeetSpeakGenerator(TyposGenerator):
@@ -123,15 +121,14 @@ class LeetSpeakGenerator(TyposGenerator):
 
         return letter
 
-    def generate(self, X, y, replacement_proba: float = 0.1) -> Tuple:
+    def generate(self, X, replacement_proba: float = 0.1):
         """
         Apply leet speak transformation to a list of words.
 
         :param X: A list of words where leet speak transformation is applied.
-        :param y: The labels associated with the words, which remain unchanged.
         :param replacement_proba: The probability of replacing a letter with its leet counterpart.
                                   This probability applies to each letter in each word independently.
-        :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
+        :return: The list of transformed words in leet speak.
         """
         assert 0 <= replacement_proba <= 1
         Xt = [
@@ -139,7 +136,7 @@ class LeetSpeakGenerator(TyposGenerator):
             for word in X
         ]
 
-        return Xt, y
+        return Xt
 
 class SwapCaseGenerator(TyposGenerator):
 
@@ -168,15 +165,14 @@ class SwapCaseGenerator(TyposGenerator):
 
         return letter
 
-    def generate(self, X, y, swapcase_proba: float = 0.1) -> Tuple:
+    def generate(self, X, swapcase_proba: float = 0.1):
         """
         Apply random case swapping to each letter in a list of words.
 
         :param X: A list of words where random case swapping is applied.
-        :param y: The labels associated with the words, which remain unchanged.
         :param swapcase_proba: The probability of swapping the case of each letter.
                                This probability applies to each letter in each word independently.
-        :return: A tuple containing the transformed list of words and the original labels `y` (unchanged).
+        :return: The list of words with randomly swapped letter cases.
         """
         assert 0 <= swapcase_proba <= 1
         Xt = [
@@ -184,4 +180,4 @@ class SwapCaseGenerator(TyposGenerator):
             for word in X
         ]
 
-        return Xt, y
+        return Xt
