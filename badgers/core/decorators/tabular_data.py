@@ -6,15 +6,14 @@ import pandas as pd
 
 def preprocess_inputs(generate_func):
     """
-    Validates and converts X and y for tabular data generators.
+    Validates and converts X for tabular data generators.
 
     Preprocessing:
     X is converted to a 2D numpy array.
-    y is converted to a 1D numpy array (or left as None).
     """
 
     @functools.wraps(generate_func)
-    def wrapper(self, X, y=None, **kwargs):
+    def wrapper(self, X, **kwargs):
         # Validate and preprocess X
         if isinstance(X, list):
             X = np.array(X)
@@ -43,23 +42,7 @@ def preprocess_inputs(generate_func):
                 "X has more than 2 dimensions where it is expected to have either 1 or 2!"
             )
 
-        # Validate and preprocess y
-        if y is not None:
-            if isinstance(y, list):
-                y = np.array(y)
-            elif isinstance(y, pd.Series):
-                y = y.values
-            elif isinstance(y, pd.DataFrame):
-                y = y.values.ravel()
-            elif isinstance(y, np.ndarray):
-                pass
-            else:
-                raise ValueError(
-                    f"y must be a list, numpy array, pandas Series, or pandas DataFrame\n"
-                    f"y is: {type(y)}"
-                )
-
-        # Call the original function with the preprocessed inputs
-        return generate_func(self, X, y, **kwargs)
+        # Call the original function with the preprocessed input
+        return generate_func(self, X, **kwargs)
 
     return wrapper
