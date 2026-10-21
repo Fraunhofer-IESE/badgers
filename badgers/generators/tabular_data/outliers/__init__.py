@@ -17,9 +17,7 @@ class OutliersGenerator(GeneratorMixin):
     After each ``generate()`` call the generator stores a boolean label
     vector describing ITS OWN output: ``get_outliers_labels()`` returns a
     per-row array aligned with the generated features, ``True`` where the
-    row is an outlier (the deficit), ``False`` for an original row. The
-    target ``y`` is only a pass-through -- deficit labels never ride in
-    ``yt``.
+    row is an outlier (the deficit), ``False`` for an original row.
     """
 
     def __init__(self, random_generator: np.random.Generator = default_rng(seed=0)):
@@ -56,12 +54,11 @@ class OutliersGenerator(GeneratorMixin):
         ])
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params):
+    def generate(self, X, **params):
         """
         Abstract method to generate outliers data. Must be implemented by subclasses.
 
         :param X: Input features (pandas DataFrame or numpy array).
-        :param y: Target variable (pandas Series or numpy array, or None; passed through unchanged).
         :param params: Additional parameters required for the generation.
         """
         pass
@@ -124,7 +121,7 @@ class StructuredOutlierGenerator(OutliersGenerator):
         self.preprocessor = preprocessor
 
     @preprocess_inputs
-    def generate(self, X, y=None, **params):
+    def generate(self, X, **params):
         """
         Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)
         and an outlier transformer.
@@ -135,9 +132,8 @@ class StructuredOutlierGenerator(OutliersGenerator):
         4. Inverse the dimensionality reduction and the standardization transformations (or the custom ``preprocessor``)
 
         :param X: the input features
-        :param y: the regression target, class labels, or None
         :param params:
-        :return:
+        :return: The generated features in the original feature space.
         """
 
         # standardize the data and apply the dimensionality reduction transformer
@@ -150,11 +146,11 @@ class StructuredOutlierGenerator(OutliersGenerator):
             )
         Xt = pipeline.fit_transform(X)
         # add outliers using the zscore_transformer
-        Xt, yt = self.outlier_generator.generate(Xt, y, **params)
+        Xt = self.outlier_generator.generate(Xt, **params)
         # propagate the inner generator's labels (aligned with Xt's rows)
         self.outlier_labels_ = self.outlier_generator.get_outliers_labels()
         # inverse the manifold and standardization transformations
-        return pipeline.inverse_transform(Xt), yt
+        return pipeline.inverse_transform(Xt)
 
 
 # Backwards-compatible alias (renamed in 0.0.15)

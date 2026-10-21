@@ -29,7 +29,7 @@ class HyperCubeSampling(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10, expansion: float = 0.0):
+    def generate(self, X, n_outliers: int = 10, expansion: float = 0.0):
         """
 
         How to set the values for expansion.
@@ -47,11 +47,9 @@ class HyperCubeSampling(OutliersGenerator):
         For expanding the hypercube by 10% use expansion = 0.1, for 20% use 0.2, etc.
 
         :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (if not provided).
         :param n_outliers: The number of outliers to generate.
         :param expansion: how much the hypercube shall be expanded beyond (min,max) range, in percent (0.1 == 10%)
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
+        :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
         assert expansion >= 0
@@ -68,7 +66,7 @@ class HyperCubeSampling(OutliersGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), n_outliers)
-        return Xt, y
+        return Xt
 
 
 class ZScoreSamplingGenerator(OutliersGenerator):
@@ -92,7 +90,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
+    def generate(self, X, n_outliers: int = 10, scale: float = 1.0):
         r"""
         Randomly generates outliers as data points with a z-score > 3.
 
@@ -105,13 +103,11 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         3. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
 
         :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (if not provided).
         :param n_outliers: The number of outliers to generate.
         :param scale: float or array_like of floats (the scale parameter from https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
                     The scale parameter, :math:`\beta = 1/\lambda`. Must be
                     non-negative.
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
+        :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
         assert scale > 0
@@ -138,7 +134,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), n_outliers)
-        return Xt, y
+        return Xt
 
 
 class HypersphereSamplingGenerator(OutliersGenerator):
@@ -162,7 +158,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10, scale: float = 1.0):
+    def generate(self, X, n_outliers: int = 10, scale: float = 1.0):
         r"""
         Randomly generates outliers by sampling points from a hypersphere.
 
@@ -176,13 +172,11 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         4. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
 
         :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (if not provided).
         :param n_outliers: The number of outliers to generate.
         :param scale: float (the scale parameter from https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
                     The scale parameter, :math:`\beta = 1/\lambda`. Must be
                     non-negative.
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
+        :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
         assert scale > 0
@@ -212,4 +206,4 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), n_outliers)
-        return Xt, y
+        return Xt

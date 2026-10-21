@@ -19,15 +19,13 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10):
+    def generate(self, X, n_outliers: int = 10):
         """
 
 
         :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (if not provided).
         :param n_outliers: The number of outliers to generate.
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                 If `y` is None, the returned target values will also be None.
+        :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
 
@@ -43,4 +41,4 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), n_outliers)
-        return Xt, y
+        return Xt

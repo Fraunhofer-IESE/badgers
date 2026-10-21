@@ -24,7 +24,7 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10, bins: int = 10):
+    def generate(self, X, n_outliers: int = 10, bins: int = 10):
         """
         Randomly generates outliers from low density regions.
         Low density regions are estimated through several independent histograms (one for each feature).
@@ -35,11 +35,9 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         All values generated for each feature are simply concatenated (independence hypothesis!).
 
         :param X: the input features (pandas DataFrame or numpy array).
-        :param y: the class labels, target values, or None (not used).
         :param n_outliers: The number of outliers to generate.
         :param bins: The number of bins to use when creating histograms for each feature.
-        :return: A tuple containing the augmented feature matrix with added outliers and the corresponding target values.
-                  If `y` is None, the returned target values will also be None.
+        :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
         assert bins > 0
@@ -71,7 +69,7 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), n_outliers)
-        return Xt, y
+        return Xt
 
 
 class HistogramSamplingGenerator(OutliersGenerator):
@@ -99,7 +97,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         super().__init__(random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10,
+    def generate(self, X, n_outliers: int = 10,
                  threshold_low_density: float = 0.1, bins: int = 10):
         """
         Randomly generates outliers from low density regions. Low density regions are estimated through histograms
@@ -110,7 +108,6 @@ class HistogramSamplingGenerator(OutliersGenerator):
         4. Inverse the standardization transformation
 
         :param X: the input features
-        :param y: not used
         :param n_outliers: The number of outliers to generate
         :param threshold_low_density: the threshold that defines a low density region (must be between 0 and 1)
         :param bins: number of bins for the histogram
@@ -164,7 +161,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), n_outliers)
-        return Xt, y
+        return Xt
 
 
 class LowDensitySamplingGenerator(OutliersGenerator):
@@ -186,7 +183,7 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         self.density_estimator: KernelDensity = KernelDensity(bandwidth="scott")
 
     @preprocess_inputs
-    def generate(self, X, y=None, n_outliers: int = 10, threshold_low_density: float = 0.1, max_samples: int = 100):
+    def generate(self, X, n_outliers: int = 10, threshold_low_density: float = 0.1, max_samples: int = 100):
         """
         Generate data points belonging to low density regions.
 
@@ -198,7 +195,6 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         - Estimate the density of the new points and filter out the ones with a density that is above the threshold
 
         :param X: the input features
-        :param y: not used
         :param n_outliers: The number of outliers to generate
         :param threshold_low_density: the threshold that defines a low density region (must be between 0 and 1)
         :param max_samples:
@@ -251,10 +247,10 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         # in the case no outliers could be generated
         if outliers.shape[0] == 0:
             self._set_outlier_labels(len(X), 0)
-            return X, y
+            return X
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(len(X), len(outliers))
-        return Xt, y
+        return Xt

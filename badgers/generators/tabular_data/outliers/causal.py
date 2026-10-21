@@ -75,7 +75,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         )
 
     @preprocess_inputs
-    def generate(self, X, y=None, perturbation_nodes=None, n_outliers=10,
+    def generate(self, X, perturbation_nodes=None, n_outliers=10,
                  within_distribution_sampler=None,
                  out_of_distribution_sampler=None):
         """
@@ -86,10 +86,6 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         ----------
         X : np.ndarray of shape (n_samples, n_features)
             Input data.
-        y : np.ndarray or None
-            Ignored (deprecated). The target is not modified; use
-            ``get_outliers_labels()`` for the per-row outlier labels of
-            the generated output.
         perturbation_nodes : list of int or str
             Nodes where the intervention is applied.
         n_outliers : int, default=10
@@ -107,10 +103,6 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         -------
         Xt : np.ndarray of shape (n_samples + n_outliers, n_features)
             Original data with outlier rows appended.
-        y : np.ndarray or None
-            Ignored (deprecated). The target is not modified; use
-            ``get_outliers_labels()`` for the per-row outlier labels of
-            the generated output.
         """
         self._validate_structure(X)
         self._validate_perturbation_nodes(perturbation_nodes)
@@ -200,4 +192,4 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         Xt = np.vstack([X, outliers])
 
         self._set_outlier_labels(n_samples, n_outliers)
-        return Xt, None
+        return Xt
