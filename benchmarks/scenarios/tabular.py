@@ -42,7 +42,7 @@ SCENARIO_LARGE_BLOBS = Scenario(
 def _make_blobs_classes_factory(n_samples, n_features):
     """Build a scenario factory producing one matrix: the blob features with
     the class column stacked as the LAST column of X (per-class generators
-    read classes from an X column; y is deprecated as a data carrier)."""
+    read classes from an X column)."""
     def factory(rng):
         X, y = make_blobs(
             n_samples=n_samples,
