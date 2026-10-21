@@ -158,3 +158,124 @@ def test_random_sampling_targets__y_is_unused_for_selection(tabular_data_labeled
     Xt1, _ = g1.generate(X_np.copy(), y, selector=selector)
     Xt2, _ = g2.generate(X_np.copy(), None, selector=selector)
     np.testing.assert_allclose(Xt1, Xt2)
+
+
+# --- get_imbalance_labels(): the fired/dropped mask of the last generate() call ---
+
+
+def test_imbalance_labels__classes_generator_matches_dropped_rows(tabular_data_labeled):
+    """RandomSamplingClassesGenerator: labels True exactly where rows were dropped."""
+    X, y = tabular_data_labeled
+    X_np = np.asarray(X)
+    Xc = np.column_stack([X_np, np.asarray(y)])
+    rng = default_rng(0)
+    selector = ClassSelector("cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng)
+    generator = RandomSamplingClassesGenerator(random_generator=rng)
+    Xt, yt = generator.generate(Xc.copy(), y, selector=selector)
+
+    labels = generator.get_imbalance_labels()
+    assert labels.dtype == bool
+    assert len(labels) == Xc.shape[0]
+    # kept rows = complement of the fired mask
+    np.testing.assert_array_equal(np.asarray(Xt), Xc[~labels])
+    # only rows of class 0 can have fired
+    assert labels[np.asarray(Xc[:, -1]) != 0].sum() == 0
+    # output row count == number of False labels
+    assert np.sum(~labels) == Xc.shape[0] - labels.sum() == len(yt)
+
+
+def test_imbalance_labels__classes_generator_selector_none_all_false(tabular_data_labeled):
+    """selector=None is a no-op: every label False."""
+    X, y = tabular_data_labeled
+    generator = RandomSamplingClassesGenerator(random_generator=default_rng(0))
+    generator.generate(np.asarray(X).copy(), y)
+    labels = generator.get_imbalance_labels()
+    assert not labels.any()
+
+
+def test_imbalance_labels__classes_generator_raises_before_generate(tabular_data_labeled):
+    """The getter raises when no generate() call happened yet."""
+    generator = RandomSamplingClassesGenerator(random_generator=default_rng(0))
+    with pytest.raises(RuntimeError, match="generate"):
+        generator.get_imbalance_labels()
+
+
+def test_imbalance_labels__features_generator_is_complement_of_output(tabular_data_labeled):
+    """RandomSamplingFeaturesGenerator: every False label row is drawn (rows may repeat)."""
+    X, y = tabular_data_labeled
+    X_np = np.asarray(X)
+    generator = RandomSamplingFeaturesGenerator(random_generator=default_rng(0))
+    Xt, _ = generator.generate(X_np.copy(), y)
+    labels = generator.get_imbalance_labels()
+    assert labels.dtype == bool
+    assert len(labels) == X_np.shape[0]
+    # every kept (False) row appears in the resampled output
+    drawn = set(map(tuple, np.asarray(Xt)))
+    for row in X_np[~labels]:
+        assert tuple(row) in drawn
+    # every True label row is absent from the output
+    for row in X_np[labels]:
+        assert tuple(row) not in drawn
+
+
+def test_imbalance_labels__targets_generator_boolean_selector_exact(tabular_data_labeled):
+    """RandomSamplingTargetsGenerator with a boolean selector: True == dropped."""
+    X, y = tabular_data_labeled
+    X_np = np.asarray(X)
+    n = X_np.shape[0]
+    keep_idx = np.arange(0, n, 2)
+    fired = np.ones(n, dtype=bool)
+    fired[keep_idx] = False
+
+    class FixedMaskSelector:
+        def __call__(self, X, y=None):
+            return {"f0": fired}
+
+    generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
+    Xt, _ = generator.generate(X_np.copy(), y, selector=FixedMaskSelector(), replace=False)
+    labels = generator.get_imbalance_labels()
+    assert labels.dtype == bool
+    np.testing.assert_array_equal(labels, fired)
+    np.testing.assert_array_equal(np.asarray(Xt), X_np[~labels])
+
+
+def test_imbalance_labels__targets_generator_fractional_selector_all_fired_dropped():
+    """Fractional scores: rows never drawn carry the deficit (True)."""
+    X = np.column_stack([np.arange(6.0), np.zeros(6)])
+    selector = ProportionalSelector("f0", {"f0": 0, "f1": 1})
+    generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
+    # replace=False: distinct rows -> the strict complement invariant holds
+    Xt, _ = generator.generate(X, np.arange(6), selector=selector, replace=False, size=4)
+    labels = generator.get_imbalance_labels()
+    assert labels.dtype == bool
+    assert len(labels) == 6
+    np.testing.assert_array_equal(sorted(map(tuple, np.asarray(Xt))),
+                                  sorted(map(tuple, X[~labels])))
+    # replace=True: rows may repeat, but kept (False) rows and dropped (True)
+    # rows are still disjoint in the output
+    generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
+    Xt2, _ = generator.generate(X, np.arange(6), selector=selector, replace=True)
+    labels2 = generator.get_imbalance_labels()
+    drawn = set(map(tuple, np.asarray(Xt2)))
+    for row in X[~labels2]:
+        assert tuple(row) in drawn
+    for row in X[labels2]:
+        assert tuple(row) not in drawn
+
+
+def test_imbalance_labels__last_call_wins(tabular_data_labeled):
+    """The labels describe the LAST generate() call, not an earlier one."""
+    X, y = tabular_data_labeled
+    X_np = np.asarray(X)
+    Xc = np.column_stack([X_np, np.asarray(y)])
+    rng = default_rng(0)
+    generator = RandomSamplingClassesGenerator(random_generator=rng)
+    # first call: drops half of class 0
+    generator.generate(Xc.copy(), y,
+                       selector=ClassSelector("cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng))
+    n_dropped_first = generator.get_imbalance_labels().sum()
+    # second call: no-op
+    generator.generate(Xc.copy(), y)
+    labels = generator.get_imbalance_labels()
+    assert labels.sum() == 0
+    assert n_dropped_first > 0

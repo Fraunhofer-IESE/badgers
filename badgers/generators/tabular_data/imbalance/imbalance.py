@@ -22,6 +22,24 @@ class ImbalanceGenerator(GeneratorMixin):
         :type random_generator: numpy.random.Generator
         """
         self.random_generator = random_generator
+        self.imbalance_labels_: np.ndarray | None = None
+
+    def get_imbalance_labels(self) -> np.ndarray:
+        """
+        Per-row imbalance labels of the LAST generated output.
+
+        :return: A boolean array aligned with the rows of the LAST input
+            passed to ``generate()``; ``True`` marks a row on which the
+            deficit fired (the row was dropped from the output), ``False``
+            a row that is part of the generated output.
+        :raises RuntimeError: if ``generate()`` has not been called yet.
+        """
+        if self.imbalance_labels_ is None:
+            raise RuntimeError(
+                "no labels available: call generate() first "
+                "(the labels describe the LAST input to generate())"
+            )
+        return self.imbalance_labels_
 
     @abc.abstractmethod
     def generate(self, X, y=None, **params):
@@ -85,6 +103,10 @@ class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
         sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_proba, size=X.shape[0], replace=True)
         Xt = X[sampling_mask, :]
         yt = y[sampling_mask] if y is not None else y
+        # rows that never got drawn carry the deficit (dropped from the output)
+        labels = np.ones(X.shape[0], dtype=bool)
+        labels[sampling_mask] = False
+        self.imbalance_labels_ = labels
         return Xt, yt
 
 
@@ -102,7 +124,6 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
-        self.transformed_labels_ = None
 
     @preprocess_inputs
     def generate(self, X, y=None, selector=None):
@@ -128,6 +149,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         :rtype: Tuple[Union[pandas.DataFrame, numpy.ndarray], Union[pandas.Series, numpy.ndarray, None]]
         """
         if selector is None:
+            self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
             return X, y
         masks = list(selector(X, y).values())
         if len(masks) == 1:
@@ -137,6 +159,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
             fired = np.logical_or.reduce(masks)
         Xt = X[~fired, :]
         yt = y[~fired] if y is not None else None
+        self.imbalance_labels_ = fired
         return Xt, yt
 
 
@@ -222,6 +245,9 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
                 kept = self.random_generator.choice(kept, size=size, replace=False)
             Xt = X[kept, :]
             yt = y[kept] if y is not None else None
+            fired = np.ones(X.shape[0], dtype=bool)
+            fired[kept] = False
+            self.imbalance_labels_ = fired
             return Xt, yt
         # Fractional scores: normalize the keep weights into a probability
         # vector and resample from them.
@@ -232,4 +258,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         )
         Xt = X[n, :]
         yt = y[n] if y is not None else None
+        fired = np.ones(X.shape[0], dtype=bool)
+        fired[n] = False
+        self.imbalance_labels_ = fired
         return Xt, yt
