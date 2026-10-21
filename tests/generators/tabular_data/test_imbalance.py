@@ -202,3 +202,29 @@ def test_imbalance_labels__classes_generator_match_class_column(tabular_data_lab
     labels = generator.get_imbalance_labels()
     np.testing.assert_array_equal(Xt, Xc[~labels])
     assert labels[Xc[:, -1] != 0].sum() == 0
+
+
+def test_imbalance_labels__classes_generator_tracks_most_recent_call():
+    """The getter reports dropped rows from the latest X-only generation."""
+    X = np.arange(4.0).reshape(-1, 1)
+    first_mask = np.array([True, False, False, False])
+    second_mask = np.array([False, False, False, True])
+
+    class FixedMaskSelector:
+        def __init__(self, mask):
+            self.mask = mask
+
+        def __call__(self, X):
+            return {"feature": self.mask}
+
+    generator = RandomSamplingClassesGenerator(random_generator=default_rng(0))
+
+    Xt_first = generator.generate(X.copy(), selector=FixedMaskSelector(first_mask))
+    np.testing.assert_array_equal(Xt_first, X[~first_mask])
+    np.testing.assert_array_equal(generator.get_imbalance_labels(), first_mask)
+
+    Xt_second = generator.generate(
+        X.copy(), selector=FixedMaskSelector(second_mask)
+    )
+    np.testing.assert_array_equal(Xt_second, X[~second_mask])
+    np.testing.assert_array_equal(generator.get_imbalance_labels(), second_mask)

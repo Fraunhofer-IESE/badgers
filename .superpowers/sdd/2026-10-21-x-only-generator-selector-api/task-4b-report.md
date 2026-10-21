@@ -43,3 +43,23 @@ missing optional `dowhy.gcm` dependency; the selector branch was additionally
 smoke-tested without that dependency. An untracked `docs/examples/` directory was present at final check and could
 not be removed because another process held it open; it is not included in the
 task commit.
+
+## Regression Finding Follow-up
+
+- Added `test_imbalance_labels__classes_generator_tracks_most_recent_call`,
+  an X-only regression test that invokes the same generator twice with
+  different drop masks and verifies both outputs and the getter after the
+  second call.
+- The current implementation correctly replaces `imbalance_labels_` on each
+  generation, so no production code change was needed. For RED evidence, the
+  new test was run against a temporary stale-label mutant that retained the
+  first mask; it failed at the second-call getter assertion as intended. The
+  production implementation was restored before GREEN verification.
+- `python -m pytest -v tests/generators/tabular_data/test_imbalance.py` —
+  **37 passed**.
+- `python -m pytest -v tests/generators/tabular_data/imbalance/test_causal.py`
+  — **7 skipped** because optional `dowhy.gcm` is unavailable.
+- A direct causal X-only selector smoke test invoked `generate()` twice,
+  checked the second output, and confirmed the getter's labels align with that
+  latest output.
+- Focused Flake8 syntax/name checks — **0 errors**; `git diff --check` — clean.
