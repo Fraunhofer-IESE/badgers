@@ -2,7 +2,7 @@
 
 A SELECTOR decides which rows of the input get a data quality deficit
 
-    Selector = Callable[[X, y], dict[str, bool-mask | score]]
+    Selector = Callable[[X], dict[str, bool-mask | score]]
 
 - keys   = variable names (the subscript in ``R_X``: which column the mask gates)
 - values = per-row boolean masks or float SCORES, ``len(mask) == X.shape[0]``
@@ -39,6 +39,8 @@ GATING consumers preserve the input's shape and only ALTER the fired cells
 (missingness, noise, outliers, ...); SUBSAMPLING consumers (imbalance) DROP
 the fired rows, so their output is smaller than the input. The contract
 itself is only "which rows fire".
+All data used to determine selection, including class and driver columns,
+is supplied as ``X``; there is no separate target argument.
 """
 
 from collections.abc import Callable, Sequence
@@ -73,7 +75,7 @@ class AlwaysSelector:
 
     Calling
     -------
-    ``__call__(X, y=None)``: returns an all-True mask per variable. No
+    ``__call__(X)``: returns an all-True mask per variable. No
     intensity kwarg — there is nothing to sweep (any intensity knob lives
     in the DEFICIT itself, e.g. noise_std).
     """
@@ -84,7 +86,6 @@ class AlwaysSelector:
     def __call__(
         self,
         X: np.ndarray,
-        y: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
         return {
             name: np.ones(X.shape[0], dtype=bool)
@@ -99,8 +100,8 @@ class AlwaysSelector:
 class Selector(Protocol):
     """Protocol for selectors: callables producing per-variable deficit masks.
 
-    Implementations (preset objects or user callables) must accept
-    ``(X, y=None)`` and return a ``dict[str, numpy.ndarray]`` mapping each
+    Implementations (preset objects or user callables) accept only ``X``
+    and return a ``dict[str, numpy.ndarray]`` mapping each
     gated variable name to a boolean mask with one entry per input row,
     ``True`` meaning the deficit is applied to that row.
 
@@ -113,9 +114,7 @@ class Selector(Protocol):
     consumers, selection weights for resampling consumers).
     """
 
-    def __call__(
-        self, X: np.ndarray, y: np.ndarray | None = None
-    ) -> dict[str, np.ndarray]:
+    def __call__(self, X: np.ndarray) -> dict[str, np.ndarray]:
         ...  # pragma: no cover
 
 
@@ -124,7 +123,7 @@ class BernoulliSelector:
 
     For each requested variable, whether a row is affected (``R = 1``) is an
     independent Bernoulli draw with probability ``rate``, independent of the
-    data values and of ``y``. In the missingness literature this pattern is
+    data values. In the missingness literature this pattern is
     called "completely at random"; the class name here describes the RULE
     (iid Bernoulli firing), not the deficit, because the same rule gates any
     observation-side deficit form (missing values, noise, out-of-distribution
@@ -135,9 +134,9 @@ class BernoulliSelector:
     variables : str or sequence of str
         Name(s) of the variables this selector gates: one dict key and one
         INDEPENDENT mask per name (a single vectorized 2D draw). Names are
-        graph-node names -- ``X``/``y`` are positional numpy arrays, so the
-        consuming generator resolves names to column positions via its
-        column_mapping (the same binding as for ``rng``). This selector never
+        Graph-node names; the consuming generator resolves names to column
+        positions via its column_mapping (the same binding as for ``rng``).
+        This selector never
         reads column values (value-free rule).
     rng : numpy.random.Generator or None, default=None
         Random generator used for the draws. The consuming generator binds
@@ -146,7 +145,7 @@ class BernoulliSelector:
 
     Calling
     -------
-    ``__call__(X, y=None)``: returns one mask per variable.
+    ``__call__(X)``: returns one mask per variable.
 
     Examples
     --------
@@ -154,7 +153,7 @@ class BernoulliSelector:
     >>> selector = BernoulliSelector("temperature", rate=0.3,
     ...                              rng=np.random.default_rng(0))
     >>> X = np.arange(20.0).reshape(10, 2)
-    >>> masks = selector(X, y=None)
+    >>> masks = selector(X)
     >>> list(masks) == ["temperature"]
     True
     >>> masks["temperature"].dtype
@@ -164,7 +163,7 @@ class BernoulliSelector:
 
     >>> selector = BernoulliSelector(["a", "b"], rate=0.5,
     ...                              rng=np.random.default_rng(0))
-    >>> sorted(selector(X, y=None))
+    >>> sorted(selector(X))
     ['a', 'b']
     """
 
@@ -181,7 +180,6 @@ class BernoulliSelector:
     def __call__(
         self,
         X: np.ndarray,
-        y: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
         if self.rng is None:
             raise ValueError(
@@ -250,8 +248,8 @@ class ExactCountSelector:
         must have shape ``(X.shape[0], len(variables))`` with non-negative
         entries summing to (approximately) 1 per column -- pass them
         through :func:`badgers.core.utils.normalize_proba` first if
-        needed. A callable ``(X, y=None) -> (n_rows, k)`` array is
-        evaluated per call -- this is how data-driven coupling is
+        needed. A callable ``(X) -> (n_rows, k)`` array is evaluated per
+        call -- this is how data-driven coupling is
         expressed (the caller binds any randomness, e.g. rng, inside the
         callable).
     rng : numpy.random.Generator or None, default=None
@@ -261,7 +259,7 @@ class ExactCountSelector:
 
     Calling
     -------
-    ``__call__(X, y=None)``: the affected count is ``int(rate * n_rows)``
+    ``__call__(X)``: the affected count is ``int(rate * n_rows)``
     (floor, classic semantics).
 
     Examples
@@ -270,7 +268,7 @@ class ExactCountSelector:
     >>> selector = ExactCountSelector("temperature", rate=0.4,
     ...                               rng=np.random.default_rng(0))
     >>> X = np.arange(20.0).reshape(10, 2)
-    >>> selector(X, y=None)["temperature"].sum()
+    >>> selector(X)["temperature"].sum()
     4
     """
 
@@ -279,7 +277,7 @@ class ExactCountSelector:
         variables: str | Sequence[str],
         rate: float,
         weights: np.ndarray
-        | Callable[[np.ndarray, np.ndarray | None], np.ndarray]
+        | Callable[[np.ndarray], np.ndarray]
         | None = None,
         rng: np.random.Generator | None = None,
     ):
@@ -288,13 +286,11 @@ class ExactCountSelector:
         self.weights = weights
         self.rng = rng
 
-    def _resolve_weights(
-        self, X: np.ndarray, y: np.ndarray | None
-    ) -> np.ndarray | None:
+    def _resolve_weights(self, X: np.ndarray) -> np.ndarray | None:
         k = len(self.variables)
         if self.weights is None:
             return None
-        w = self.weights(X, y) if callable(self.weights) else self.weights
+        w = self.weights(X) if callable(self.weights) else self.weights
         w = np.asarray(w, dtype=float)
         if w.shape != (X.shape[0], k):
             raise ValueError(
@@ -307,7 +303,6 @@ class ExactCountSelector:
     def __call__(
         self,
         X: np.ndarray,
-        y: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
         if self.rng is None:
             raise ValueError(
@@ -321,7 +316,7 @@ class ExactCountSelector:
         # may consume rng draws itself (e.g. choosing driver columns), and
         # those must precede the per-variable row draws (draw-order parity
         # with the classic generators).
-        weights = self._resolve_weights(X, y)
+        weights = self._resolve_weights(X)
         masks = {}
         for i, name in enumerate(self.variables):
             # Sampling without replacement: sequential by nature -- the
@@ -380,7 +375,7 @@ class TopQuantileSelector:
 
     Calling
     -------
-    ``__call__(X, y=None)``: one mask per gated variable; a row fires
+    ``__call__(X)``: one mask per gated variable; a row fires
     when the (driver) column's value is ``>=`` the column's quantile
     threshold computed on the passed rows.
     """
@@ -421,7 +416,6 @@ class TopQuantileSelector:
     def __call__(
         self,
         X: np.ndarray,
-        y: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
         masks = {}
         for name, driver in zip(self.variables, self.drivers or self.variables):
@@ -477,11 +471,11 @@ class ClassSelector:
 
     Calling
     -------
-    ``__call__(X, y=None)``: one mask per class column; a row fires if it
+    ``__call__(X)``: one mask per class column; a row fires if it
     belongs to a fired class. With several class columns the masks are
     INDEPENDENT per column -- consumers typically OR them (a row dropped
-    if fired in any column). ``y`` is unused: class columns are columns
-    of ``X`` (the target is being deprecated as a data carrier).
+    if fired in any column). Selection data, including class columns,
+    belongs in ``X``; selectors do not accept a separate target array.
 
     Examples
     --------
@@ -521,7 +515,6 @@ class ClassSelector:
     def __call__(
         self,
         X: np.ndarray,
-        y: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
         if self.rng is None:
             raise ValueError(
@@ -583,7 +576,7 @@ class ProportionalSelector:
 
     Calling
     -------
-    ``__call__(X, y=None)``: one float score array per variable (the
+    ``__call__(X)``: one float score array per variable (the
     normalized column values, summing to 1).
 
     Examples
@@ -610,7 +603,6 @@ class ProportionalSelector:
     def __call__(
         self,
         X: np.ndarray,
-        y: np.ndarray | None = None,
     ) -> dict[str, np.ndarray]:
         scores = {}
         for name in self.variables:

@@ -26,7 +26,7 @@ class TestSelectorProtocol:
         assert isinstance(selector, Selector)
 
     def test_plain_function_satisfies_protocol(self):
-        def selector(X, y=None):
+        def selector(X):
             return {"a": np.ones(len(X), dtype=bool)}
 
         assert isinstance(selector, Selector)
@@ -35,13 +35,31 @@ class TestSelectorProtocol:
         assert not isinstance(object(), Selector)
 
 
+@pytest.mark.parametrize(
+    "selector",
+    [
+        AlwaysSelector("a"),
+        BernoulliSelector("a", rate=0.3, rng=np.random.default_rng(0)),
+        ExactCountSelector("a", rate=0.3, rng=np.random.default_rng(0)),
+        TopQuantileSelector("a", {"a": 0}, quantile=0.5),
+        ClassSelector(
+            "a", {"a": 0}, {"a": {0: 0.3}}, rng=np.random.default_rng(0)
+        ),
+        ProportionalSelector("a", {"a": 0}),
+    ],
+)
+def test_builtin_selectors_reject_extra_positional_argument(selector):
+    with pytest.raises(TypeError):
+        selector(_X(), np.arange(10))
+
+
 class TestBernoulliSelector:
     def test_returns_dict_keyed_by_variable(self):
         selector = BernoulliSelector(
             "temperature", rate=0.3, rng=np.random.default_rng(0)
         )
         X = _X()
-        masks = selector(X, y=None)
+        masks = selector(X)
         assert set(masks) == {"temperature"}
         (mask,) = masks.values()
         assert mask.shape == (X.shape[0],)
@@ -52,7 +70,7 @@ class TestBernoulliSelector:
             ["pressure", "temperature"], rate=0.5,
             rng=np.random.default_rng(0)
         )
-        masks = selector(_X(50), y=None)
+        masks = selector(_X(50))
         assert set(masks) == {"pressure", "temperature"}
         for mask in masks.values():
             assert mask.shape == (50,)
@@ -62,7 +80,7 @@ class TestBernoulliSelector:
         selector = BernoulliSelector(
             ["a", "b"], rate=0.5, rng=np.random.default_rng(0)
         )
-        masks = selector(_X(200), y=None)
+        masks = selector(_X(200))
         assert not np.array_equal(masks["a"], masks["b"])
 
     def test_single_string_is_normalized_to_tuple(self):
@@ -89,21 +107,21 @@ class TestBernoulliSelector:
         selector = BernoulliSelector(
             "a", rate=0.0, rng=np.random.default_rng(0)
         )
-        (mask,) = selector(_X(), y=None).values()
+        (mask,) = selector(_X()).values()
         assert not mask.any()
 
     def test_rate_one_all_true(self):
         selector = BernoulliSelector(
             "a", rate=1.0, rng=np.random.default_rng(0)
         )
-        (mask,) = selector(_X(), y=None).values()
+        (mask,) = selector(_X()).values()
         assert mask.all()
 
     def test_rate_fraction(self):
         selector = BernoulliSelector(
             "a", rate=0.5, rng=np.random.default_rng(0)
         )
-        (mask,) = selector(_X(2000), y=None).values()
+        (mask,) = selector(_X(2000)).values()
         assert 0.45 < mask.mean() < 0.55
 
     def test_rate_stored_on_object(self):
@@ -111,20 +129,10 @@ class TestBernoulliSelector:
         selector = BernoulliSelector("a", rate=0.25)
         assert selector.rate == 0.25
 
-    def test_y_is_ignored(self):
-        # Two identically-seeded selectors: passing y must not change the draw
-        m1 = BernoulliSelector("a", rate=0.3, rng=np.random.default_rng(7))(
-            _X(), y=None
-        )
-        m2 = BernoulliSelector("a", rate=0.3, rng=np.random.default_rng(7))(
-            _X(), y=np.arange(10)
-        )
-        assert np.array_equal(m1["a"], m2["a"])
-
     def test_missing_rng_raises_on_call(self):
         selector = BernoulliSelector("a", rate=0.3)
         with pytest.raises(ValueError, match="random generator"):
-            selector(_X(), y=None)
+            selector(_X())
 
     def test_rate_validation_at_construction(self):
         with pytest.raises(ValueError, match="rate"):
@@ -135,8 +143,8 @@ class TestBernoulliSelector:
     def test_reproducible_for_same_seed(self):
         s1 = BernoulliSelector("a", rate=0.3, rng=np.random.default_rng(5))
         s2 = BernoulliSelector("a", rate=0.3, rng=np.random.default_rng(5))
-        m1 = s1(_X(), y=None)
-        m2 = s2(_X(), y=None)
+        m1 = s1(_X())
+        m2 = s2(_X())
         assert np.array_equal(m1["a"], m2["a"])
 
     def test_repr_is_informative(self):
@@ -156,37 +164,39 @@ class TestExactCountSelector:
         selector = self._selector()
         assert isinstance(selector, Selector)
         X = _X(50)
-        (mask,) = selector(X, y=None).values()
-        assert mask.shape == (50,) and mask.sum() == int(0.3 * 50)
+        (mask,) = selector(X).values()
+        assert mask.shape == (50,)
+        assert mask.dtype == bool
+        assert mask.sum() == int(0.3 * 50)
 
     def test_accepts_list_of_variables_independent_masks(self):
         selector = ExactCountSelector(["a", "b"], rate=0.3,
                                       rng=np.random.default_rng(0))
-        masks = selector(_X(30), y=None)
+        masks = selector(_X(30))
         assert set(masks) == {"a", "b"}
         # counts match but selections are independent
         assert masks["a"].sum() == masks["b"].sum() == int(0.3 * 30)
         assert not np.array_equal(masks["a"], masks["b"])
 
-    def test_weights_callable_receives_X_and_y(self):
+    def test_weights_callable_receives_X(self):
         seen = {}
 
-        def weights(X, y=None):
-            seen["X"], seen["y"] = X, y
+        def weights(X):
+            seen["X"] = X
             return np.full((X.shape[0], 1), 1.0 / X.shape[0])
 
         selector = ExactCountSelector("a", rate=0.2, weights=weights,
                                       rng=np.random.default_rng(0))
-        y = np.arange(10)
-        (mask,) = selector(_X(), y=y).values()
-        assert seen["y"] is y and mask.sum() == 2
+        X = _X()
+        (mask,) = selector(X).values()
+        assert seen["X"] is X and mask.sum() == 2
 
     def test_weights_skew_toward_high_p(self):
         p = np.zeros((10, 1))
         p[:2, 0] = 0.5  # mass only on first two rows
         selector = ExactCountSelector("a", rate=0.2, weights=p,
                                       rng=np.random.default_rng(0))
-        (mask,) = selector(_X(), y=None).values()
+        (mask,) = selector(_X()).values()
         assert mask.sum() == 2 and set(np.where(mask)[0]) <= {0, 1}
 
     def test_weights_2d_shape_mismatch_raises_on_call(self):
@@ -194,24 +204,24 @@ class TestExactCountSelector:
                                       weights=np.ones((10, 1)),
                                       rng=np.random.default_rng(0))
         with pytest.raises(ValueError, match="weights"):
-            selector(_X(), y=None)
+            selector(_X())
 
     def test_weights_negative_raises_on_call(self):
         selector = ExactCountSelector("a", rate=0.3,
                                       weights=np.full((10, 1), -0.5),
                                       rng=np.random.default_rng(0))
         with pytest.raises(ValueError, match="weights"):
-            selector(_X(), y=None)
+            selector(_X())
 
     def test_rate_one_selects_all_rows(self):
         selector = ExactCountSelector("a", rate=1.0,
                                       rng=np.random.default_rng(0))
-        (mask,) = selector(_X(), y=None).values()
+        (mask,) = selector(_X()).values()
         assert mask.all()
 
     def test_missing_rng_raises_on_call(self):
         with pytest.raises(ValueError, match="random generator"):
-            ExactCountSelector("a", rate=0.3)(_X(), y=None)
+            ExactCountSelector("a", rate=0.3)(_X())
 
     def test_rate_validation_at_construction(self):
         with pytest.raises(ValueError, match="rate"):
@@ -226,8 +236,8 @@ class TestExactCountSelector:
     def test_reproducible_for_same_seed(self):
         s1 = ExactCountSelector("a", rate=0.3, rng=np.random.default_rng(5))
         s2 = ExactCountSelector("a", rate=0.3, rng=np.random.default_rng(5))
-        m1 = s1(_X(), y=None)
-        m2 = s2(_X(), y=None)
+        m1 = s1(_X())
+        m2 = s2(_X())
         assert np.array_equal(m1["a"], m2["a"])
 
     def test_repr_is_informative(self):
@@ -253,14 +263,14 @@ class TestTopQuantileSelector:
         # quantile=0.75 -> keep everything above Q3
         selector = TopQuantileSelector("a", self.MAPPING, quantile=0.75)
         X = _X(10, 3)  # col 0 == 0..9
-        (mask,) = selector(X, y=None).values()
+        (mask,) = selector(X).values()
         thr = np.quantile(X[:, 0], 0.75)
         np.testing.assert_array_equal(mask, X[:, 0] >= thr)
         assert mask.sum() >= 1  # at least the maximum fires
 
     def test_returns_dict_keyed_by_variable(self):
         selector = TopQuantileSelector(["a", "b"], self.MAPPING, quantile=0.8)
-        masks = selector(_X(10, 3), y=None)
+        masks = selector(_X(10, 3))
         assert set(masks) == {"a", "b"}
         for mask in masks.values():
             assert mask.dtype == bool and mask.shape == (10,)
@@ -271,7 +281,7 @@ class TestTopQuantileSelector:
         selector = TopQuantileSelector(["a", "b"], self.MAPPING, quantile=0.7)
         X = _X(10, 3)
         X[:, 1] = X[::-1, 0]
-        masks = selector(X, y=None)
+        masks = selector(X)
         assert not np.array_equal(masks["a"], masks["b"])
 
     def test_driver_mode_single_str_broadcast(self):
@@ -281,7 +291,7 @@ class TestTopQuantileSelector:
             ["b", "c"], self.MAPPING, quantile=0.8, drivers="a"
         )
         X = _X(10, 3)
-        masks = selector(X, y=None)
+        masks = selector(X)
         thr = np.quantile(X[:, 0], 0.8)
         expected = X[:, 0] >= thr
         np.testing.assert_array_equal(masks["b"], expected)
@@ -293,7 +303,7 @@ class TestTopQuantileSelector:
             ["b", "c"], self.MAPPING, quantile=0.8, drivers=["a", "b"]
         )
         X = _X(10, 3)
-        masks = selector(X, y=None)
+        masks = selector(X)
         np.testing.assert_array_equal(masks["b"], X[:, 0] >= np.quantile(X[:, 0], 0.8))
         np.testing.assert_array_equal(masks["c"], X[:, 1] >= np.quantile(X[:, 1], 0.8))
 
@@ -302,20 +312,20 @@ class TestTopQuantileSelector:
         # constructor needs no rng.
         selector = TopQuantileSelector("a", self.MAPPING, quantile=0.8)
         X = _X(10, 3)
-        m1 = selector(X, y=None)["a"]
-        m2 = selector(X, y=None)["a"]
+        m1 = selector(X)["a"]
+        m2 = selector(X)["a"]
         assert np.array_equal(m1, m2)
 
     def test_quantile_one_fires_only_max_rows(self):
         # threshold = column max; rows equal to the max still fire (>=)
         selector = TopQuantileSelector("a", self.MAPPING, quantile=1.0)
         X = _X(10, 3)
-        (mask,) = selector(X, y=None).values()
+        (mask,) = selector(X).values()
         assert mask.sum() == int((X[:, 0] == X[:, 0].max()).sum())
 
     def test_quantile_zero_fires_all_rows(self):
         selector = TopQuantileSelector("a", self.MAPPING, quantile=0.0)
-        (mask,) = selector(_X(10, 3), y=None).values()
+        (mask,) = selector(_X(10, 3)).values()
         assert mask.all()
 
     def test_unknown_variable_raises_at_construction(self):
@@ -353,7 +363,7 @@ class TestAlwaysSelector:
 
     def test_all_true_masks(self):
         selector = AlwaysSelector(["a", "b"])
-        masks = selector(_X(7), y=None)
+        masks = selector(_X(7))
         assert set(masks) == {"a", "b"}
         for mask in masks.values():
             assert mask.dtype == bool and mask.shape == (7,) and mask.all()
@@ -361,7 +371,7 @@ class TestAlwaysSelector:
     def test_no_intensity_kwarg(self):
         # the trivial rule has nothing to sweep
         selector = AlwaysSelector("a")
-        masks = selector(_X(5), y=None)
+        masks = selector(_X(5))
         assert masks["a"].all()
 
     def test_empty_variables_raise(self):
@@ -394,6 +404,8 @@ class TestClassSelector:
             rng=np.random.default_rng(0),
         )
         mask = selector(X)["cls"]
+        assert mask.shape == (20,)
+        assert mask.dtype == bool
         # proportions are shares of the TOTAL row count (20 rows)
         assert mask.sum() == 10 + 5
         assert mask[X[:, 1] == 0].sum() == 10
@@ -423,7 +435,7 @@ class TestClassSelector:
             ClassSelector("cls", {"cls": 1}, {"cls": {0: 1.5}},
                           rng=np.random.default_rng(0))
 
-    def test_reserved_y_name_reads_target(self):
+    def test_variable_named_y_reads_X_column(self):
         X = _X(10)
         X[:, 1] = np.repeat([0, 1], 5)
         selector = ClassSelector("y", {"y": 1}, {"y": {0: 0.4}}, rng=np.random.default_rng(0))
@@ -431,15 +443,6 @@ class TestClassSelector:
         assert mask.sum() == min(int(0.4 * 10), 5) == 4
         assert mask[X[:, 1] == 0].sum() == 4
         assert mask[X[:, 1] == 1].sum() == 0
-
-    def test_y_is_unused_for_selection(self):
-        # y is deprecated as a data carrier: selection must not depend on it
-        X = self._X_classes(10)
-        selector = ClassSelector("cls", {"cls": 1}, {"cls": {0: 0.5}},
-                                 rng=np.random.default_rng(0))
-        mask_a = selector(X, y=np.arange(20))["cls"]
-        mask_b = selector(X, y=None)["cls"]
-        np.testing.assert_array_equal(mask_a, mask_b)
 
     def test_calling_without_rng_raises(self):
         selector = ClassSelector("cls", {"cls": 1}, {"cls": {0: 0.5}})
@@ -469,6 +472,8 @@ class TestProportionalSelector:
         scores = selector(self._X())["f0"]
         # min-max to [0, 1], then normalized to sum 1
         np.testing.assert_allclose(scores, [0.0, 0.2 / 1.6, 0.4 / 1.6, 1.0 / 1.6])
+        assert scores.shape == (4,)
+        assert np.issubdtype(scores.dtype, np.floating)
         assert scores.sum() == pytest.approx(1.0)
 
     def test_fulfills_protocol(self):
