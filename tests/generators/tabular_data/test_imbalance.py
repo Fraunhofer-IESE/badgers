@@ -3,10 +3,8 @@ import pytest
 from numpy.random import default_rng
 
 from badgers.core.selectors import ClassSelector, ProportionalSelector
-from badgers.core.utils import normalize_proba
 from badgers.generators.tabular_data.imbalance.imbalance import (
     RandomSamplingClassesGenerator,
-    RandomSamplingFeaturesGenerator,
     RandomSamplingTargetsGenerator,
 )
 
@@ -62,23 +60,24 @@ def test_random_sampling_classes__class_column_of_X(tabular_data_labeled):
     assert np.sum(Xt[:, -1] == 0) == expected
 
 
-def test_random_sampling_features__preserves_shape_and_modifies_distribution(
+def test_random_sampling_targets__continuous_selector_preserves_shape(
     tabular_data,
 ):
-    """Feature sampling returns one X object with replacement."""
+    """A fractional selector over a continuous column resamples n rows with
+    replacement; every generated row comes from the input."""
     X = np.asarray(tabular_data)
+    mapping = {f"col{i}": i for i in range(X.shape[1])}
+    selector = ProportionalSelector("col0", mapping)
 
-    def proba_func(X):
-        feature = X[:, 0]
-        return normalize_proba(
-            (np.max(feature) - feature) / (np.max(feature) - np.min(feature))
-        )
-
-    generator = RandomSamplingFeaturesGenerator()
-    Xt = generator.generate(X.copy(), sampling_proba_func=proba_func)
+    generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), selector=selector, replace=True)
 
     assert Xt.shape == X.shape
-    assert np.mean(Xt[:, 0]) < np.mean(X[:, 0])
+    input_rows = {tuple(row) for row in X}
+    for row in Xt:
+        assert tuple(row) in input_rows
+    labels = generator.get_imbalance_labels()
+    assert labels.dtype == bool and len(labels) == X.shape[0]
 
 
 def test_random_sampling_targets__resamples_with_replacement():
@@ -142,23 +141,25 @@ def test_imbalance_labels__classes_generator_raises_before_generate():
         generator.get_imbalance_labels()
 
 
-def test_imbalance_labels__features_generator_tracks_dropped_rows(
-    tabular_data,
+def test_random_sampling_targets__class_selector_is_exact_per_class_drop(
+    tabular_data_labeled,
 ):
-    """False labels are sampled; True labels are absent from the output."""
-    X = np.asarray(tabular_data)
-    generator = RandomSamplingFeaturesGenerator(random_generator=default_rng(0))
+    """A boolean ClassSelector fed to the resampler drops exactly the fired
+    rows of that class (the removed per-class behavior, one generator)."""
+    Xc = np.asarray(tabular_data_labeled)
+    rng = default_rng(0)
+    selector = ClassSelector(
+        "cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng
+    )
+    generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
 
-    Xt = generator.generate(X.copy())
+    Xt = generator.generate(Xc.copy(), selector=selector, replace=False)
 
     labels = generator.get_imbalance_labels()
-    assert labels.dtype == bool
-    assert len(labels) == X.shape[0]
-    drawn = set(map(tuple, Xt))
-    for row in X[~labels]:
-        assert tuple(row) in drawn
-    for row in X[labels]:
-        assert tuple(row) not in drawn
+    np.testing.assert_array_equal(Xt, Xc[~labels])
+    expected_dropped = min(int(0.5 * Xc.shape[0]), np.sum(Xc[:, -1] == 0))
+    assert np.sum(labels & (Xc[:, -1] == 0)) == expected_dropped
+    assert labels[Xc[:, -1] != 0].sum() == 0
 
 
 def test_imbalance_labels__targets_generator_fractional_selector():

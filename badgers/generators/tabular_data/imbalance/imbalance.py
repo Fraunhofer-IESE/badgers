@@ -56,52 +56,6 @@ class ImbalanceGenerator(GeneratorMixin):
         pass
 
 
-def _column_sampling_proba(col: np.ndarray) -> np.ndarray:
-    """Min-max a column to [0, 1] and normalize into a probability vector."""
-    col = np.asarray(col, dtype=float)
-    span = col.max() - col.min()
-    unit = (col - col.min()) / span if span > 0 else np.ones_like(col)
-    return normalize_proba(unit)
-
-
-class RandomSamplingFeaturesGenerator(ImbalanceGenerator):
-
-    def __init__(self, random_generator=default_rng(seed=0), ):
-        """
-        Initialize the RandomSamplingFeaturesGenerator with a specified random number generator.
-        :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
-        :type random_generator: numpy.random.Generator
-        """
-        super().__init__(random_generator=random_generator)
-
-    @preprocess_inputs
-    def generate(self, X, sampling_proba_func=lambda X: _column_sampling_proba(X[:, 0])):
-        """
-        Randomly samples instances based on the feature values in X using a specified sampling probability function.
-
-        The sampling probability function is applied to the input features X to determine the probability of each instance being sampled.
-        By default, the first column of X is used to compute the normalized sampling probabilities.
-
-        :param X: Input features, can be a pandas DataFrame or a numpy array.
-        :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param sampling_proba_func: A function that takes as input data (X) and returns a series of sampling probabilities.
-                                    The function should ensure that the probabilities are normalized.
-        :type sampling_proba_func: callable
-        :return: The sampled features (Xt).
-        """
-        # total number of instances that will be missing
-        # sampling
-        sampling_proba = sampling_proba_func(X)
-        sampling_mask = self.random_generator.choice(X.shape[0], p=sampling_proba, size=X.shape[0], replace=True)
-        Xt = X[sampling_mask, :]
-        # rows that never got drawn carry the deficit (dropped from the output)
-        labels = np.ones(X.shape[0], dtype=bool)
-        labels[sampling_mask] = False
-        self.imbalance_labels_ = labels
-        return Xt
-
-
 class RandomSamplingClassesGenerator(ImbalanceGenerator):
     """
     Randomly samples data points within predefined classes
@@ -154,6 +108,14 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
     realizes the fractional scores as KEEP weights
     (``1 - deficit_probability``, noisy-OR combined over the selector's
     variables) and resamples rows from those weights.
+
+    This is the single score-driven resampler of the imbalance family,
+    covering the two former classes: a FRACTIONAL selector over a
+    continuous column (e.g. ``ProportionalSelector``) gives the
+    value-weighted resample of the removed ``RandomSamplingFeaturesGenerator``,
+    while a BOOLEAN selector over a discrete class column (e.g.
+    ``ClassSelector``) gives an exact per-class subsample (the fired rows
+    are dropped).
 
     With ``replace=True`` (default) rows may be DUPLICATED -- the classic
     importance-resampling deficit. With ``replace=False`` the output is a

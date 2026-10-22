@@ -8,18 +8,9 @@ from benchmarks.scenarios.tabular import (
 )
 from badgers.core.selectors import ClassSelector, ProportionalSelector
 from badgers.generators.tabular_data.imbalance import (
-    RandomSamplingFeaturesGenerator,
     RandomSamplingClassesGenerator,
     RandomSamplingTargetsGenerator,
 )
-
-register(GeneratorBenchmark(
-    generator_cls=RandomSamplingFeaturesGenerator,
-    name="RandomSamplingFeatures",
-    module_path="tabular_data.imbalance",
-    default_params={},
-    scenarios=[SCENARIO_SMALL_BLOBS],
-))
 
 register(GeneratorBenchmark(
     generator_cls=RandomSamplingClassesGenerator,

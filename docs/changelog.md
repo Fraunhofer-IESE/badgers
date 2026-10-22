@@ -185,6 +185,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   (sample ∝ target values) becomes
   `ProportionalSelector("col", {"col": idx})` over whichever `X` column
   holds the signal (e.g. the stacked target column).
+- **`RandomSamplingFeaturesGenerator` removed (breaking).** It was the
+  free-probability twin of the resampler; its value-weighted resample is
+  now `RandomSamplingTargetsGenerator(selector=ProportionalSelector(
+  "col", column_mapping))`, and its per-class behavior is the same
+  generator with a boolean selector (`ClassSelector` over the class
+  column).
 - **`RandomShiftClassesGenerator` takes a `selector` (breaking).** The
   class variable is read from a column of `X` (resolved via the
   selector's `column_mapping`). Signature:

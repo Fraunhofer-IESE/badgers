@@ -69,7 +69,7 @@ so that specifications/requirements can be derived directly from them.
   - Exact-count vs iid-rate semantics for MCAR; how `percentage_missing` maps onto the selector
     presets' intensity knobs (`rate`, `quantile`, ...).
 
-## 3. `RandomSamplingFeaturesGenerator` must use a selector
+## 3. `RandomSamplingFeaturesGenerator` must use a selector ✅ DONE
 
 - **Current**
   ([imbalance/imbalance.py](badgers/generators/tabular_data/imbalance/imbalance.py)): resamples
@@ -87,6 +87,15 @@ so that specifications/requirements can be derived directly from them.
 - **Open decisions**:
   - Merge `RandomSamplingFeaturesGenerator` and `RandomSamplingTargetsGenerator` (both are
     score-driven resamplers) or document their difference.
+- **Implementation status**: done — the free-probability twin was removed (breaking):
+  `_column_sampling_proba` and `RandomSamplingFeaturesGenerator` deleted from
+  [imbalance.py](badgers/generators/tabular_data/imbalance/imbalance.py) and its `__init__`;
+  `RandomSamplingTargetsGenerator` is the single score-driven resampler (`selector` REQUIRED,
+  `selector=None` raises; boolean selectors such as `ClassSelector` realize an exact per-class
+  subsample, fractional selectors such as `ProportionalSelector` reproduce the former
+  first-column-weighted default). The class docstring documents the two selector flavors; the
+  Imbalance tutorial now shows both flavors on the one generator. Covered by rewritten/new tests
+  in [test_imbalance.py](tests/generators/tabular_data/test_imbalance.py) (37 pass).
 
 ## 4. `RandomShiftGenerator` and `FixedShiftGenerator` must take a selector ✅ DONE
 
