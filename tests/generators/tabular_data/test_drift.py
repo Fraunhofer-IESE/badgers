@@ -2,13 +2,116 @@ import numpy as np
 import pytest
 from numpy.random import default_rng
 
-from badgers.core.selectors import BernoulliSelector, ClassSelector
+from badgers.core.selectors import (
+    AlwaysSelector,
+    BernoulliSelector,
+    ClassSelector,
+    TopQuantileSelector,
+)
 from badgers.generators.tabular_data.drift.drift import (
     FixedShiftClassesGenerator,
     FixedShiftGenerator,
     RandomShiftGenerator,
     RandomShiftClassesGenerator,
 )
+
+
+def test_random_shift__selector_none_matches_whole_data_shift(tabular_data):
+    """selector=None keeps the backward-compatible behavior: every row shifts."""
+    X = np.asarray(tabular_data, dtype=float)
+    generator = RandomShiftGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), shift_std=0.1, selector=None)
+    # every row moved by the same per-column amount
+    delta = Xt - X
+    np.testing.assert_allclose(delta, np.broadcast_to(delta[0], delta.shape), atol=1e-8)
+
+
+def test_random_shift__selector_restricts_shifted_rows(tabular_data):
+    """Only the rows fired by the selector are shifted; others stay untouched."""
+    X = np.asarray(tabular_data, dtype=float)
+    selector = TopQuantileSelector("col", {"col": 0}, 0.8)
+    generator = RandomShiftGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), shift_std=2.0, selector=selector)
+    fired = selector(X)["col"]
+    assert fired.any() and not fired.all()
+    np.testing.assert_allclose(Xt[~fired], X[~fired], atol=1e-12)
+    assert not np.allclose(Xt[fired], X[fired])
+
+
+def test_random_shift__class_selector_shifts_only_that_class(tabular_data_labeled):
+    """A ClassSelector over the class column shifts only the listed class's rows."""
+    Xc = np.asarray(tabular_data_labeled)
+    cls_col = Xc.shape[1] - 1
+    classes = np.unique(Xc[:, cls_col])
+    column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
+    column_mapping["cls"] = cls_col
+    selector = ClassSelector("cls", column_mapping, {"cls": {classes[0]: 1.0}}, rng=default_rng(0))
+    generator = RandomShiftGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(Xc.copy(), selector=selector, shift_std=2.0)
+    target = Xc[:, cls_col] == classes[0]
+    assert not np.allclose(Xt[target], Xc[target])
+    assert np.allclose(Xt[~target], Xc[~target])
+
+
+def test_random_shift__masks_computed_on_unmutated_input():
+    """The selector sees the original rows (compute-all-masks-first invariant)."""
+    seen = []
+
+    class Spy:
+        column_mapping = None
+
+        def __call__(self, X):
+            seen.append(np.array(X, copy=True))
+            return {"rows": np.ones(X.shape[0], dtype=bool)}
+
+    X = np.arange(12.0).reshape(6, 2)
+    generator = RandomShiftGenerator(random_generator=default_rng(0))
+    generator.generate(X.copy(), shift_std=1.0, selector=Spy())
+    assert len(seen) == 1
+    np.testing.assert_array_equal(seen[0], X)
+
+
+def test_random_shift__always_selector_equals_selector_none(tabular_data):
+    """AlwaysSelector is the degenerate gate and reproduces the default path."""
+    X = np.asarray(tabular_data, dtype=float)
+    g1 = RandomShiftGenerator(random_generator=default_rng(0))
+    g2 = RandomShiftGenerator(random_generator=default_rng(0))
+    Xt_none = g1.generate(X.copy(), shift_std=0.1, selector=None)
+    Xt_always = g2.generate(X.copy(), shift_std=0.1, selector=AlwaysSelector("rows"))
+    np.testing.assert_array_equal(Xt_none, Xt_always)
+
+
+def test_fixed_shift__selector_none_matches_whole_data_shift(tabular_data):
+    """selector=None keeps the backward-compatible behavior: every row shifts."""
+    X = np.asarray(tabular_data, dtype=float)
+    generator = FixedShiftGenerator()
+    Xt = generator.generate(X.copy(), shift_std=1.0, selector=None)
+    delta = Xt - X
+    np.testing.assert_allclose(delta, np.broadcast_to(delta[0], delta.shape), atol=1e-8)
+
+
+def test_fixed_shift__selector_restricts_shifted_rows(tabular_data):
+    """Only the rows fired by the selector receive the exact shift."""
+    X = np.asarray(tabular_data, dtype=float)
+    selector = TopQuantileSelector("col", {"col": 0}, 0.8)
+    generator = FixedShiftGenerator()
+    Xt = generator.generate(X.copy(), shift_std=1.0, selector=selector)
+    fired = selector(X)["col"]
+    assert fired.any() and not fired.all()
+    np.testing.assert_allclose(Xt[~fired], X[~fired], atol=1e-12)
+    # fired rows moved by exactly one std per column
+    delta = Xt[fired] - X[fired]
+    expected = 1.0 * X.std(axis=0, ddof=0)
+    np.testing.assert_allclose(delta, np.broadcast_to(expected, delta.shape), atol=1e-8)
+
+
+def test_fixed_shift__deterministic_with_selector(tabular_data):
+    """FixedShiftGenerator with a selector stays reproducible."""
+    X = np.asarray(tabular_data, dtype=float)
+    generator = FixedShiftGenerator()
+    Xt1 = generator.generate(X.copy(), shift_std=1.0, selector=BernoulliSelector("rows", rate=0.5, rng=default_rng(1)))
+    Xt2 = generator.generate(X.copy(), shift_std=1.0, selector=BernoulliSelector("rows", rate=0.5, rng=default_rng(1)))
+    np.testing.assert_array_equal(Xt1, Xt2)
 
 
 def test_random_shift__preserves_shape_and_modifies_data(tabular_data):

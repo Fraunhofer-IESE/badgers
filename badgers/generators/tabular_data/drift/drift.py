@@ -30,7 +30,8 @@ class DriftGenerator(GeneratorMixin):
 
 class RandomShiftGenerator(DriftGenerator):
     r"""
-    Randomly shift (geometrical translation) values of each column independently of one another.
+    Randomly shift (geometrical translation) the rows fired by a selector,
+    independently per column.
     Data are first standardized (mean = 0, var = 1) and a random number is added to each column.
     The ith columns is simply translated: `$x_i \leftarrow x_i + \epsilon_i$`
     """
@@ -46,9 +47,15 @@ class RandomShiftGenerator(DriftGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, shift_std: Union[float, np.array, list] = 0.1):
+    def generate(
+        self,
+        X,
+        shift_std: Union[float, np.array, list] = 0.1,
+        *,
+        selector=None,
+    ):
         r"""
-        Randomly shift (geometrical translation) values of each column independently of one another.
+        Randomly shift (geometrical translation) the rows fired by the selector, independently per column.
         Data are first standardized (mean = 0, var = 1), and a random number drawn from a normal distribution
         with mean 0 and standard deviation 1. `shift_std` is then added to each column.
         The ith column is simply translated: `$x_i \leftarrow x_i + \epsilon_i$`, where $\epsilon_i \sim \mathcal{N}(0, \text{shift\_std})$.
@@ -60,6 +67,14 @@ class RandomShiftGenerator(DriftGenerator):
                           distribution is multiplied by ``shift_std`` (absolute value used as the
                           scale, the sign used as the shift direction). A negative entry shifts the
                           column in the negative direction.
+        :param selector: A selector deciding which rows are shifted. A preset from
+                         :mod:`badgers.core.selectors` (``AlwaysSelector``,
+                         ``BernoulliSelector``, ``ExactCountSelector``,
+                         ``TopQuantileSelector``, ``ClassSelector``, ...) or
+                         any callable accepting X and returning
+                         ``dict[str, array]`` whose masks OR to the shifted
+                         rows. ``None`` = every row is shifted (backward
+                         compatible).
         :return: The modified feature matrix `X'`.
         """
         # check that if shift_std is an array, it is of length == X.shape[1]
@@ -76,16 +91,17 @@ class RandomShiftGenerator(DriftGenerator):
         scale = np.broadcast_to(np.abs(shift_std), (X.shape[1],))
         sign = np.broadcast_to(np.sign(shift_std), (X.shape[1],))
         shift = self.random_generator.normal(loc=0, scale=scale, size=X.shape[1]) * sign
-        # add shift
-        Xt += shift
+        # add shift to the FIRED rows only (masks computed on the un-mutated input)
+        rows = fired_rows(X, selector)
+        Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
 
 
 class FixedShiftGenerator(DriftGenerator):
     r"""
-    Deterministically shift (geometrical translation) values of each column
-    independently of one another — the non-random counterpart of
+    Deterministically shift (geometrical translation) the rows fired by a
+    selector, independently per column — the non-random counterpart of
     :class:`RandomShiftGenerator`.
 
     Data are first standardized (mean = 0, var = 1), then each column is
@@ -99,9 +115,10 @@ class FixedShiftGenerator(DriftGenerator):
         super().__init__(random_generator=None)
 
     @preprocess_inputs
-    def generate(self, X, shift_std: Union[float, np.array, list] = 0.1):
+    def generate(self, X, shift_std: Union[float, np.array, list] = 0.1, *, selector=None):
         r"""
-        Deterministically shift each column by exactly ``shift_std``.
+        Deterministically shift the rows fired by the selector, by exactly
+        ``shift_std`` per column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
         :param shift_std: Shift applied to each column. A single float (applied to all columns)
@@ -109,6 +126,14 @@ class FixedShiftGenerator(DriftGenerator):
                           units of column standard deviation (data are standardized first):
                           a positive entry moves the column up, a negative entry moves it
                           down. The same input always produces the same output.
+        :param selector: A selector deciding which rows are shifted. A preset from
+                         :mod:`badgers.core.selectors` (``AlwaysSelector``,
+                         ``BernoulliSelector``, ``ExactCountSelector``,
+                         ``TopQuantileSelector``, ``ClassSelector``, ...) or
+                         any callable accepting X and returning
+                         ``dict[str, array]`` whose masks OR to the shifted
+                         rows. ``None`` = every row is shifted (backward
+                         compatible).
         :return: The modified feature matrix `X'`.
         """
         shift_std = np.asarray(shift_std, dtype=float)
@@ -121,8 +146,9 @@ class FixedShiftGenerator(DriftGenerator):
         Xt = scaler.transform(X)
         # exact shift per column: |shift_std| magnitude, sign(shift_std) direction
         shift = np.broadcast_to(shift_std, (X.shape[1],))
-        # add shift
-        Xt += shift
+        # add shift to the FIRED rows only (masks computed on the un-mutated input)
+        rows = fired_rows(X, selector)
+        Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
 
