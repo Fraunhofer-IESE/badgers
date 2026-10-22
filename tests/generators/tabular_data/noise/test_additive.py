@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import scipy.stats
 
+from badgers.core.selectors import BernoulliSelector, ClassSelector, TopQuantileSelector
 from badgers.generators.tabular_data.noise.noise import AdditiveNoiseGenerator
 
 
@@ -72,3 +73,87 @@ def test_generate__negative_noise_std_raises(gen):
     X = _simple_data(rng)
     with pytest.raises(ValueError, match="noise_std"):
         gen.generate(X, distribution=scipy.stats.norm(), noise_std=-0.1)
+
+
+def test_generate__selector_none_matches_whole_data_noise(gen):
+    """selector=None keeps the backward-compatible behavior: every row gets noise."""
+    rng = np.random.default_rng(0)
+    X = _simple_data(rng)
+    Xt = gen.generate(X, distribution=scipy.stats.norm(scale=0.5), selector=None)
+    assert Xt.shape == X.shape
+    assert np.std(Xt - X) == pytest.approx(0.5, rel=0.2)
+
+
+def test_generate__selector_restricts_noisy_rows(gen):
+    """Only the rows fired by the selector receive noise; others stay untouched."""
+    rng = np.random.default_rng(0)
+    X = _simple_data(rng)
+    selector = TopQuantileSelector("col", {"col": 0}, 0.8)
+    gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
+    Xt = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0), selector=selector)
+    fired = selector(X)["col"]
+    assert fired.any() and not fired.all()
+    np.testing.assert_array_equal(Xt[~fired], X[~fired])
+    assert not np.allclose(Xt[fired], X[fired])
+
+
+def test_generate__bernoulli_selector_reproducible_with_fresh_streams():
+    """A BernoulliSelector is reproducible when re-seeded per generate() call."""
+    rng = np.random.default_rng(0)
+    X = _simple_data(rng)
+    gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
+    Xt1 = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
+                        selector=BernoulliSelector("rows", rate=0.5, rng=np.random.default_rng(1)))
+    gen2.random_generator = np.random.default_rng(0)
+    Xt2 = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
+                        selector=BernoulliSelector("rows", rate=0.5, rng=np.random.default_rng(1)))
+    np.testing.assert_array_equal(Xt1, Xt2)
+
+
+def test_generate__class_selector_gates_noise_to_that_class(gen):
+    """A ClassSelector over the class column gives noise only to that class's rows."""
+    rng = np.random.default_rng(0)
+    X = _simple_data(rng)
+    y = rng.integers(0, 2, size=len(X))
+    Xc = np.column_stack([X, y])
+    column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
+    column_mapping["cls"] = Xc.shape[1] - 1
+    selector = ClassSelector("cls", column_mapping, {"cls": {1: 1.0}}, rng=np.random.default_rng(2))
+    gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
+    Xt = gen2.generate(Xc, distribution=scipy.stats.norm(scale=2.0), selector=selector)
+    target = Xc[:, -1] == 1
+    assert not np.allclose(Xt[target], Xc[target])
+    np.testing.assert_array_equal(Xt[~target], Xc[~target])
+
+
+def test_generate__selector_and_perturbation_nodes_combine(gen):
+    """Noise lands only where a fired row AND a perturbed column intersect."""
+    rng = np.random.default_rng(0)
+    X = _simple_data(rng)
+    selector = TopQuantileSelector("col", {"col": 0}, 0.8)
+    gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
+    Xt = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
+                       perturbation_nodes=[1], selector=selector)
+    fired = selector(X)["col"]
+    np.testing.assert_array_equal(Xt[:, 0], X[:, 0])
+    np.testing.assert_array_equal(Xt[:, 2], X[:, 2])
+    np.testing.assert_array_equal(Xt[~fired, 1], X[~fired, 1])
+    assert not np.allclose(Xt[fired, 1], X[fired, 1])
+
+
+def test_generate__masks_computed_on_unmutated_input(gen):
+    """The selector sees the original rows (compute-all-masks-first invariant)."""
+    seen = []
+
+    class Spy:
+        column_mapping = None
+
+        def __call__(self, X):
+            seen.append(np.array(X, copy=True))
+            return {"rows": np.ones(X.shape[0], dtype=bool)}
+
+    rng = np.random.default_rng(0)
+    X = _simple_data(rng)
+    gen.generate(X, distribution=scipy.stats.norm(scale=1.0), selector=Spy())
+    assert len(seen) == 1
+    np.testing.assert_array_equal(seen[0], X)

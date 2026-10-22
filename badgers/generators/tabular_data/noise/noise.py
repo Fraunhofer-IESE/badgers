@@ -112,7 +112,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
 class AdditiveNoiseGenerator(NoiseGenerator):
     """
     A generator that adds noise drawn from an arbitrary distribution to the
-    tabular data (in-place, shape and labels unchanged).
+    rows fired by a selector (shape unchanged).
 
     The distribution is specified as a *frozen* scipy distribution object
     (e.g. ``scipy.stats.laplace(scale=1)``, ``scipy.stats.t(df=3)``). What you
@@ -129,9 +129,10 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, distribution, noise_std=1.0, perturbation_nodes=None):
+    def generate(self, X, distribution, noise_std=1.0, perturbation_nodes=None, *, selector=None):
         """
-        Add noise drawn from an arbitrary distribution to the input data.
+        Add noise drawn from an arbitrary distribution to the rows fired by
+        the selector.
 
         :param X: Input features (pandas DataFrame or numpy array).
         :param distribution: A frozen scipy distribution object (e.g. ``scipy.stats.laplace()``)
@@ -139,6 +140,14 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         :param noise_std: Global multiplier applied to the drawn noise (default 1.0 = raw draw).
         :param perturbation_nodes: Optional list of column indices to perturb.
             If None, noise is added to all columns.
+        :param selector: A selector deciding which rows receive noise. A preset from
+                         :mod:`badgers.core.selectors` (``AlwaysSelector``,
+                         ``BernoulliSelector``, ``ExactCountSelector``,
+                         ``TopQuantileSelector``, ``ClassSelector``,
+                         ``ProportionalSelector``, ...) or any callable
+                         accepting X and returning ``dict[str, array]``
+                         whose masks OR to the fired rows. ``None`` = every
+                         row receives noise (backward compatible).
         :return: The noisy input features.
         """
         rvs = getattr(distribution, "rvs", None)
@@ -163,4 +172,7 @@ class AdditiveNoiseGenerator(NoiseGenerator):
             mask = np.zeros(X.shape[1], dtype=bool)
             mask[perturbation_nodes] = True
             noise[:, ~mask] = 0.0
+        # zero-out the noise on unfired rows (masks computed on the un-mutated input)
+        fired = fired_mask(X, selector)
+        noise[~fired] = 0.0
         return X + noise
