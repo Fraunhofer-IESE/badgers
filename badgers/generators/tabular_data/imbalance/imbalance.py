@@ -5,6 +5,7 @@ from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.selectors import fired_mask
 from badgers.core.utils import normalize_proba
 
 
@@ -137,12 +138,8 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         if selector is None:
             self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
             return X
-        masks = list(selector(X).values())
-        if len(masks) == 1:
-            fired = masks[0]
-        else:
-            # a row is dropped if fired in any class column
-            fired = np.logical_or.reduce(masks)
+        # a row is dropped if fired in any class column
+        fired = fired_mask(X, selector)
         Xt = X[~fired, :]
         self.imbalance_labels_ = fired
         return Xt

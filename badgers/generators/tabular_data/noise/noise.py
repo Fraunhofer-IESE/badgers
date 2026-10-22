@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.utils import resolve_class_column
+from badgers.core.selectors import fired_mask, resolve_class_column
 
 
 class NoiseGenerator(GeneratorMixin):
@@ -79,8 +79,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
                 "which rows receive noise (e.g. ClassSelector over the "
                 "class column): classes are columns of X with discrete values."
             )
-        masks = list(selector(X).values())
-        fired = masks[0] if len(masks) == 1 else np.logical_or.reduce(masks)
+        fired = fired_mask(X, selector)
         if not fired.any():
             return X
         # resolve the class column from the selector's column_mapping
