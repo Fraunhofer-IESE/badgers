@@ -89,7 +89,7 @@ class CausalNoiseGenerator(CausalGenerator):
 
         # Expand: each seed row -> n_copies copies (n_copies=1 keeps the shape).
         rows = np.repeat(X, n_copies, axis=0)
-        # Selector gating: masks evaluated on the ORIGINAL (un-expanded)
+        # Selector firing: masks evaluated on the ORIGINAL (un-expanded)
         # rows, then replicated to the expansion (each seed row's copies
         # either all fire or all stay clean). Quantile thresholds are
         # computed on the un-expanded input by construction.
@@ -130,7 +130,7 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
     Like :class:`CausalNoiseGenerator`, but the injected noise is drawn from
     a user-chosen distribution (a *frozen* scipy distribution object, e.g.
     ``scipy.stats.laplace(scale=1)``, ``scipy.stats.t(df=3)``) instead of
-    Gaussian white noise. Row gating is delegated to a ``selector``
+    Gaussian white noise.     Row firing is delegated to a ``selector``
     (``None`` = every row fires, no row expansion); the affected rows are
     noised in place (``rows = X + noise``) and their descendants are
     recomputed through the structural equations (Pearl surgery).

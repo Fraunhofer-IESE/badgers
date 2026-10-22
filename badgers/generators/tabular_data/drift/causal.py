@@ -90,8 +90,8 @@ class CausalDriftGenerator(CausalGenerator):
                 0, drift_scale[j] * col_stds[col]
             )
 
-        # Apply the shift to the perturbation nodes (gated by the selector:
-        # fire masks for ALL rows at once, thresholds on the un-mutated data).
+        # Apply the shift to the rows fired by the selector
+        # (fire masks for ALL rows at once, thresholds on the un-mutated data).
         fires = self._fire_masks(
             X, perturbation_nodes, selector=selector,
         )

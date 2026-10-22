@@ -2,7 +2,7 @@
 
 Owns the shared plumbing: DGP configuration (no generator-side ``fit`` —
 the DGP is fitted by its own ``fit``, explicitly by the caller or lazily
-inside ``generate()``), input/structure validation, and mechanism gating
+inside ``generate()``), input/structure validation, and the firing rule
 (which rows get the defect). Subclasses define the defect injection and
 propagation, and manage their OWN labels: each generator stores the
 per-row defect labels of its last generated output and exposes them
@@ -145,7 +145,7 @@ class CausalGenerator(GeneratorMixin):
             )
         return self.dgp.sample(self.random_generator, n_samples)
 
-    # -- Mechanism gating (Distinction 3) -----------------------------------
+    # -- Firing mechanism (Distinction 3) -----------------------------------
 
     def _fire_masks(self, rows, perturbation_nodes, selector=None):
         """Fire masks for ALL rows at once: dict {node: bool row-mask}.
@@ -156,8 +156,9 @@ class CausalGenerator(GeneratorMixin):
 
         Parameters
         ----------
-        rows : array to gate (the generator's working rows -- for the noise
-            generator these are the n_copies-EXPANDED rows).
+        rows : the rows whose firing the selector decides (the generator's
+            working rows -- for the noise generator these are the
+            n_copies-EXPANDED rows).
         perturbation_nodes : list of str, non-empty (pre-validated).
         selector : Selector or None, default None
             The row-selection rule. ``None`` = ``AlwaysSelector`` (all
@@ -167,7 +168,7 @@ class CausalGenerator(GeneratorMixin):
             any user callable with the same signature works.
 
         Note: masks are computed against ``rows`` BEFORE any mutation
-        (callers write NaNs/noise afterwards), which makes the gate
+        (callers write NaNs/noise afterwards), which makes the firing
         order-independent -- the "compute ALL masks first" invariant the
         legacy missingness path already documented.
         """

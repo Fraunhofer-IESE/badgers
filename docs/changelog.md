@@ -66,7 +66,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   restricts the noise to a column subset.
 - **`CausalAdditiveNoiseGenerator`** (new, causal): same swappable
   distribution at the perturbation nodes, with descendant recomputation
-  via the DGP (`dgp.intervene` — Pearl surgery). Row gating is delegated
+  via the DGP (`dgp.intervene` — Pearl surgery). Row firing is delegated
   to a `selector` (default: every row fires); strictly in-place (no
   `n_copies`).
 - **`GaussianNoiseGenerator` removed (breaking).** It is a strict special
@@ -104,7 +104,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   bullet below). Signature:
   `generate(X, perturbation_nodes=None, selector=None)`.
 - **String `mechanism` flags replaced by `selector` objects (breaking).**
-  The row-gating parameters of the causal defect generators
+  The row-firing parameters of the causal defect generators
   (`CausalDriftGenerator`, `CausalMissingnessGenerator`,
   `CausalNoiseGenerator`, `CausalAdditiveNoiseGenerator`) are now a single
   `selector=` parameter holding a callable from
@@ -165,7 +165,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   PROBABILITY that the deficit is applied — where boolean masks remain
   the degenerate (deterministic) case. A selector never draws randomness
   for these rates; realization belongs to the consuming generator (a
-  gating consumer fires Bernoulli-wise, a resampling consumer uses the
+  modifying consumer fires Bernoulli-wise, a resampling consumer uses the
   scores as selection weights). All existing presets return boolean
   masks, so nothing breaks; the new ``ProportionalSelector(variables,
   column_mapping)`` preset returns ``normalize_proba(X[:, col])`` (the
@@ -331,7 +331,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   old `0.1*col_std` fallback is gone).
 - **Causal defect family** (four generators sharing `CausalGenerator`, an
   explicit `fit(X, graph, column_mapping)` phase followed by `generate(...)`
-  with `selector=` row gating):
+  with `selector=` row firing):
   `CausalDriftGenerator` (single systematic shift, recomputed downstream),
   `CausalNoiseGenerator` (per-edge noise injection, `noise_std`),
   `CausalImbalanceGenerator` (quantile-range truncation (pure subset,
@@ -343,9 +343,9 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 - **`TopQuantileSelector`** preset (`badgers.core.selectors`): fires rows at
   or above the ``quantile`` of a column — self mode (own column) or driver
-  mode (a driver column, optionally broadcast to all gated variables).
+  mode (a driver column, optionally broadcast to all selected variables).
   Deterministic (no rng); thresholds computed on the called rows or on a
-  separate ``stats`` row set (for generators gating expanded rows against
+  separate ``stats`` row set (for generators firing expanded rows against
   the original columns' statistics). All intensity parameters are now
   CONSTRUCTOR arguments of the presets (``rate=`` for
   ``BernoulliSelector``/``ExactCountSelector``, ``quantile=`` for
@@ -405,7 +405,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 - **New "Understanding badgers" concepts notebook**
   (`tutorials/concepts/Badgers-Concepts.ipynb`): a step-by-step
   introduction — module structure, generator instantiation with an rng,
-  `generate()`, shape rules (appending / gating / subsampling), the
+  `generate()`, shape rules (appending / firing / subsampling), the
   in-place mutation contract ("pass `X.copy()`"), the X-only contract
   (target-like data as columns of `X`), selectors, DGP backends and
   pipelines.
@@ -419,7 +419,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   substantially shortened (the causal part no longer repeats the
   concepts notebook).
 
-## dev_0_0_14 (unreleased)
+## dev_0_0_14 (released)
 
 ### Added
 

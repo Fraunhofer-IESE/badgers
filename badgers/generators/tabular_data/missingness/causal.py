@@ -72,8 +72,9 @@ class CausalMissingnessGenerator(CausalGenerator):
         node_to_col = self.column_mapping
         n_samples = X.shape[0]
 
-        # Gate the defect by the selector: fire masks for ALL rows at once
-        # (vectorized; quantile thresholds computed on the un-mutated data).
+        # The selector decides the affected rows: fire masks for ALL rows
+        # at once (vectorized; quantile thresholds computed on the
+        # un-mutated data).
         fires = self._fire_masks(
             X, perturbation_nodes, selector=selector,
         )

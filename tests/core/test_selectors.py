@@ -285,7 +285,7 @@ class TestTopQuantileSelector:
         assert not np.array_equal(masks["a"], masks["b"])
 
     def test_driver_mode_single_str_broadcast(self):
-        # one driver gates ALL variables; the mask compares the DRIVER
+        # one driver: the mask compares the DRIVER
         # column's values against its own threshold.
         selector = TopQuantileSelector(
             ["b", "c"], self.MAPPING, quantile=0.8, drivers="a"
@@ -298,7 +298,7 @@ class TestTopQuantileSelector:
         np.testing.assert_array_equal(masks["c"], expected)
 
     def test_driver_mode_per_variable_list(self):
-        # driver a gates variable b; driver b gates variable c
+        # driver a fires variable b; driver b fires variable c
         selector = TopQuantileSelector(
             ["b", "c"], self.MAPPING, quantile=0.8, drivers=["a", "b"]
         )
