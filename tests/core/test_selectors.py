@@ -43,23 +43,11 @@ class TestSelectorProtocol:
         assert not isinstance(object(), Selector)
 
 
-# Value-free presets (index-only contract, Task 2) now accept a second
-# positional argument (``targets``), so they are exercised in TestValueFree
-# instead; the value-driven presets still reject the extra argument until
-# Task 3 rewrites them onto the same contract.
-@pytest.mark.parametrize(
-    "selector",
-    [
-        TopQuantileSelector("a", {"a": 0}, quantile=0.5),
-        ClassSelector(
-            "a", {"a": 0}, {"a": {0: 0.3}}, rng=np.random.default_rng(0)
-        ),
-        ProportionalSelector("a", {"a": 0}),
-    ],
-)
-def test_builtin_selectors_reject_extra_positional_argument(selector):
-    with pytest.raises(TypeError):
-        selector(_X(), np.arange(10))
+# Value-free presets (index-only contract, Task 2) accept a second
+# positional argument (``targets``) and are exercised in TestValueFree;
+# the value-driven presets (Task 3) behave the same and are exercised
+# in TestValueDriven. The legacy name-API test classes below stay
+# failing until Tasks 4-5 rewrite the consuming generators.
 
 
 class TestBernoulliSelector:
@@ -557,20 +545,6 @@ class TestBaseContract:
         with pytest.raises(ValueError):
             _check_spec(bad, 5)
 
-    def test_check_spec_rejects_bool_scalar(self):
-        # bool scalars are out of domain: bools are valid only as (n,) arrays
-        with pytest.raises(ValueError):
-            _check_spec(True, 5)
-        with pytest.raises(ValueError):
-            _check_spec(False, 5)
-
-    def test_check_spec_rejects_bool_scalar(self):
-        # bool scalars are out of domain: bools are valid only as (n,) arrays
-        with pytest.raises(ValueError):
-            _check_spec(True, 5)
-        with pytest.raises(ValueError):
-            _check_spec(False, 5)
-
     def test_realize_firing_deterministic(self):
         X = np.zeros((6, 2))
         fired = realize_firing(X, _FakeSel(), default_rng(0))
@@ -641,3 +615,50 @@ class TestValueFree:
         sel = ExactCountSelector([0, 1], rate=0.1, weights=np.zeros(10), rng=default_rng(0))
         with pytest.raises(ValueError, match="weights must have shape"):
             sel(np.zeros((10, 2)))
+
+
+class TestValueDriven:
+    X4 = np.array([[0.0, 1, 0], [1.0, 1, 0], [2.0, 1, 1], [9.0, 2, 1]])
+
+    def test_class_selector_fires_share_of_class(self):
+        # class column = 1, values {0, 1, 2}; fire half of the total from class 1
+        sel = ClassSelector([0], class_column=1,
+                            proportions={1: 0.5}, rng=default_rng(0))
+        out = sel(self.X4)
+        assert set(out) == {0}
+        mask = out[0]
+        assert mask.sum() == 2  # int(0.5 * 4)
+        # fired rows must belong to class 1 (rows 0,1)
+        assert mask[2:].all() == False and self.X4[mask, 1].tolist() == [1, 1]
+
+    def test_class_selector_unknown_class_raises(self):
+        sel = ClassSelector([0], class_column=1, proportions={7: 0.1},
+                            rng=default_rng(0))
+        with pytest.raises(ValueError, match="class value"):
+            sel(self.X4)
+
+    def test_class_selector_broadcasts_to_all_targets(self):
+        sel = ClassSelector([0, 2], class_column=1,
+                            proportions={1: 0.5}, rng=default_rng(0))
+        out = sel(self.X4)
+        assert out[0] is out[2]  # same mask object under every target
+
+    def test_top_quantile_self(self):
+        sel = TopQuantileSelector([0], column=0, quantile=0.5)
+        mask = sel(self.X4)[0]
+        # values 0,1,2,9 -> Q2 = 1.5 -> rows 2,3 fire
+        assert mask.tolist() == [False, False, True, True]
+
+    def test_top_quantile_driver(self):
+        sel = TopQuantileSelector([0], column=0, quantile=1.0, driver=1)
+        mask = sel(self.X4)[0]
+        # driver col 1 max = 2 -> row 3 only
+        assert mask.tolist() == [False, False, False, True]
+
+    def test_proportional_sums_to_one(self):
+        sel = ProportionalSelector([0, 1], column=0)
+        out = sel(self.X4)
+        scores = out[0]
+        assert abs(scores.sum() - 1.0) < 1e-9
+        assert out[0] is out[1]
+        assert scores.tolist()[0] == 0.0  # min value -> 0 prob

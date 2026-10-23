@@ -186,39 +186,3 @@ def resolve_class_column(selector, X: np.ndarray):
     if col is not None and 0 <= col < X.shape[1]:
         return col
     return None
-
-
-# --- LEGACY name-based helpers (TEMPORARY) ---------------------------------
-# Only ``value_driven.py`` still imports these; ``value_free.py`` was
-# rewritten onto the index-only contract (Task 2). Task 3 rewrites
-# value_driven.py and deletes these two functions from base.py then.
-# ---------------------------------------------------------------------------
-
-def _validate_variables(variables) -> tuple[str, ...]:
-    """Shared variable-name validation for all presets. (LEGACY)"""
-    if isinstance(variables, str):
-        variables = (variables,)
-    variables = tuple(variables)
-    if len(variables) == 0:
-        raise ValueError("variables must not be empty")
-    for name in variables:
-        if not isinstance(name, str):
-            raise ValueError(
-                f"variable names must be str, got "
-                f"{type(name).__name__} for {name!r}"
-            )
-    if len(set(variables)) != len(variables):
-        raise ValueError(
-            f"variable names must be unique, got {variables}"
-        )
-    return variables
-
-
-def _validate_column_mapping(variables, column_mapping: dict[str, int]) -> None:
-    """Shared check that every variable whose affected rows the selector
-    decides is a key of ``column_mapping``. (LEGACY)"""
-    for name in variables:
-        if name not in column_mapping:
-            raise ValueError(
-                f"variable {name!r} not in column_mapping"
-            )
