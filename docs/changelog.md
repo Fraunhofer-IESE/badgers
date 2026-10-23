@@ -187,13 +187,13 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 - **Selector scores may now be fractional (additive contract extension).**
   A selector's per-row value may be a float in ``[0, 1]`` — the
   PROBABILITY that the deficit is applied — where boolean masks remain
-  the degenerate (deterministic) case. A selector never draws randomness
-  for these rates; realization belongs to the consuming generator (a
-  modifying consumer fires Bernoulli-wise, a resampling consumer uses the
-  scores as selection weights). All existing presets return boolean
-  masks, so nothing breaks; the new ``ProportionalSelector([pos],
-  column=pos)`` preset returns ``normalize_proba(X[:, pos])`` (the
-  deficit probability proportional to a column's value).
+  the degenerate (deterministic) case. Realization belongs to the
+  consuming generator (a modifying consumer fires Bernoulli-wise, a
+  resampling consumer uses the scores as selection weights); a preset's
+  own rng only draws its spec (see the index-contract bullet above). The
+  ``ProportionalSelector([pos], column=pos)`` preset returns
+  ``normalize_proba(X[:, pos])`` (the deficit probability proportional to
+  a column's value).
 - **`RandomSamplingTargetsGenerator` takes a `selector` (breaking).** The
   `sampling_proba_func(y)` kwarg is removed; the generator now resamples
   rows weighted by ``1 - deficit_probability`` from a selector (noisy-OR
