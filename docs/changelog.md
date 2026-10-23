@@ -13,9 +13,10 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   ``ClassSelector``, ``ProportionalSelector``. Variable names and the
   selector-side ``column_mapping`` are gone; read columns (``class_column``,
   ``column``, ``driver``) are independent int positions. Value-free presets
-  return bool masks; value-driven presets return ``[0, 1]`` firing specs
-  (float scalar or ``(n,)`` array) that generators realize with the single
-  rule ``rng.random(n) < spec`` (``realize_firing``/``fired_mask``/
+  return firing decisions (bool masks; ``AlwaysSelector``'s constant
+  scalar ``1.0`` realizes to all-true); value-driven presets return ``[0, 1]``
+  firing specs (float scalar or ``(n,)`` array) that generators realize with
+  the single rule ``rng.random(n) < spec`` (``realize_firing``/``fired_mask``/
   ``fired_rows``). Direct generators no longer take ``column_mapping`` —
   ``AdditiveNoiseGenerator.generate(X, distribution, noise_std=1.0,
   *, selector=None)``. Causal generators keep ``perturbation_nodes``
