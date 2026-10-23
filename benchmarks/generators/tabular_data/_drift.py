@@ -10,7 +10,7 @@ from benchmarks.scenarios.tabular import (
 from badgers.core.selectors import ClassSelector
 from badgers.generators.tabular_data.drift import RandomShiftGenerator, RandomShiftClassesGenerator
 
-_CLASS_PROPORTIONS = {"cls": {c: 1.0 for c in range(5)}}
+_CLASS_PROPORTIONS = {c: 1.0 for c in range(5)}
 
 register(GeneratorBenchmark(
     generator_cls=RandomShiftGenerator,
@@ -25,7 +25,7 @@ register(GeneratorBenchmark(
     name="RandomShiftClasses",
     module_path="tabular_data.drift",
     default_params={
-        "selector": ClassSelector("cls", {"cls": 2}, _CLASS_PROPORTIONS, rng=default_rng(0)),
+        "selector": ClassSelector([0], class_column=2, proportions=_CLASS_PROPORTIONS, rng=default_rng(0)),
         "shift_std": 0.1,
     },
     scenarios=[SCENARIO_SMALL_BLOBS_CLASSES],
@@ -36,7 +36,7 @@ register(GeneratorBenchmark(
     name="RandomShiftClassesMedium",
     module_path="tabular_data.drift",
     default_params={
-        "selector": ClassSelector("cls", {f"f{i}": i for i in range(5)} | {"cls": 5}, _CLASS_PROPORTIONS, rng=default_rng(0)),
+        "selector": ClassSelector([0], class_column=5, proportions=_CLASS_PROPORTIONS, rng=default_rng(0)),
         "shift_std": 0.1,
     },
     scenarios=[SCENARIO_MEDIUM_BLOBS_CLASSES],
