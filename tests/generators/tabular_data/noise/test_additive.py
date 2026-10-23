@@ -48,11 +48,13 @@ def test_generate__noise_std_multiplier(gen):
     assert np.std(Xt1 - X) < 0.5
 
 
-def test_generate__perturbation_nodes_subset(gen):
+def test_generate__selector_scope_restricts_columns(gen):
+    """Only columns in the selector's scope receive noise."""
     rng = np.random.default_rng(0)
     X = _simple_data(rng)
+    selector = BernoulliSelector([1], rate=0.5, rng=np.random.default_rng(1))
     Xt = gen.generate(X, distribution=scipy.stats.norm(scale=0.3),
-                      perturbation_nodes=[1])
+                      selector=selector)
     # only column 1 changed
     assert np.allclose(Xt[:, 0], X[:, 0])
     assert np.allclose(Xt[:, 2], X[:, 2])
@@ -85,16 +87,21 @@ def test_generate__selector_none_matches_whole_data_noise(gen):
 
 
 def test_generate__selector_restricts_noisy_rows(gen):
-    """Only the rows fired by the selector receive noise; others stay untouched."""
+    """Only the columns and rows fired by the selector receive noise."""
     rng = np.random.default_rng(0)
     X = _simple_data(rng)
-    selector = TopQuantileSelector("col", {"col": 0}, 0.8)
+    selector = TopQuantileSelector([0, 1], 0, 0.8)
     gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
-    Xt = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0), selector=selector)
-    fired = selector(X)["col"]
-    assert fired.any() and not fired.all()
-    np.testing.assert_array_equal(Xt[~fired], X[~fired])
-    assert not np.allclose(Xt[fired], X[fired])
+    Xt = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
+                       selector=selector)
+    masks = selector(X)
+    # column 2 never perturbed
+    np.testing.assert_array_equal(Xt[:, 2], X[:, 2])
+    # columns 0 and 1: non-fired rows untouched
+    np.testing.assert_array_equal(Xt[~masks[0], 0], X[~masks[0], 0])
+    np.testing.assert_array_equal(Xt[~masks[1], 1], X[~masks[1], 1])
+    # fired rows are noisy
+    assert not np.allclose(Xt[masks[0], 0], X[masks[0], 0])
 
 
 def test_generate__bernoulli_selector_reproducible_with_fresh_streams():
@@ -103,10 +110,10 @@ def test_generate__bernoulli_selector_reproducible_with_fresh_streams():
     X = _simple_data(rng)
     gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
     Xt1 = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
-                        selector=BernoulliSelector("rows", rate=0.5, rng=np.random.default_rng(1)))
+                        selector=BernoulliSelector([0], rate=0.5, rng=np.random.default_rng(1)))
     gen2.random_generator = np.random.default_rng(0)
     Xt2 = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
-                        selector=BernoulliSelector("rows", rate=0.5, rng=np.random.default_rng(1)))
+                        selector=BernoulliSelector([0], rate=0.5, rng=np.random.default_rng(1)))
     np.testing.assert_array_equal(Xt1, Xt2)
 
 
@@ -116,25 +123,27 @@ def test_generate__class_selector_gates_noise_to_that_class(gen):
     X = _simple_data(rng)
     y = rng.integers(0, 2, size=len(X))
     Xc = np.column_stack([X, y])
-    column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
-    column_mapping["cls"] = Xc.shape[1] - 1
-    selector = ClassSelector("cls", column_mapping, {"cls": {1: 1.0}}, rng=np.random.default_rng(2))
+    # selector reads class values from column 3 once; the same mask is
+    # returned under every covered column (0, 1, 2)
+    selector = ClassSelector([0, 1, 2], class_column=3, proportions={1: 1.0},
+                             rng=np.random.default_rng(2))
     gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
-    Xt = gen2.generate(Xc, distribution=scipy.stats.norm(scale=2.0), selector=selector)
+    Xt = gen2.generate(Xc, distribution=scipy.stats.norm(scale=2.0),
+                       selector=selector)
     target = Xc[:, -1] == 1
-    assert not np.allclose(Xt[target], Xc[target])
+    assert not np.allclose(Xt[target, :3], Xc[target, :3])
     np.testing.assert_array_equal(Xt[~target], Xc[~target])
 
 
-def test_generate__selector_and_perturbation_nodes_combine(gen):
-    """Noise lands only where a fired row AND a perturbed column intersect."""
+def test_generate__selector_scope_and_firing_combine(gen):
+    """Noise lands only where a fired row AND a covered column intersect."""
     rng = np.random.default_rng(0)
     X = _simple_data(rng)
-    selector = TopQuantileSelector("col", {"col": 0}, 0.8)
+    selector = TopQuantileSelector([1], 1, 0.8)
     gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
     Xt = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
-                       perturbation_nodes=[1], selector=selector)
-    fired = selector(X)["col"]
+                       selector=selector)
+    fired = selector(X)[1]
     np.testing.assert_array_equal(Xt[:, 0], X[:, 0])
     np.testing.assert_array_equal(Xt[:, 2], X[:, 2])
     np.testing.assert_array_equal(Xt[~fired, 1], X[~fired, 1])
@@ -146,11 +155,9 @@ def test_generate__masks_computed_on_unmutated_input(gen):
     seen = []
 
     class Spy:
-        column_mapping = None
-
-        def __call__(self, X):
+        def __call__(self, X, targets=None):
             seen.append(np.array(X, copy=True))
-            return {"rows": np.ones(X.shape[0], dtype=bool)}
+            return {0: np.ones(X.shape[0], dtype=bool)}
 
     rng = np.random.default_rng(0)
     X = _simple_data(rng)

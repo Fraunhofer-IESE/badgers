@@ -84,8 +84,8 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
                          :class:`badgers.core.selectors.ClassSelector`)
                          deciding which rows are dropped. ``None`` =
                          no-op (all rows kept). The class variable is a
-                         column of ``X`` (resolved via the selector's
-                         ``column_mapping``).
+                         column of ``X`` (read from the selector's
+                         ``class_column``).
         :type selector: callable, optional
         :return: The sampled features (Xt).
         """
@@ -93,7 +93,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
             self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
             return X
         # a row is dropped if fired in any class column
-        fired = fired_mask(X, selector)
+        fired = fired_mask(X, selector, self.random_generator)
         Xt = X[~fired, :]
         self.imbalance_labels_ = fired
         return Xt
@@ -145,7 +145,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
 
         :param X: Input features, can be a pandas DataFrame or a numpy array.
         :param selector: A selector deciding which rows get the deficit.
-            E.g. ``ProportionalSelector("col", column_mapping)`` (deficit
+            E.g. ``ProportionalSelector([0], 0)`` (deficit
             probability proportional to a column), a ``BernoulliSelector``,
             or any callable accepting X and returning ``dict[str, array]``
             of per-row scores. Required (``None`` raises).

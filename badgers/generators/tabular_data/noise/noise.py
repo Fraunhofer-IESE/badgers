@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired_mask, resolve_class_column
+from badgers.core.selectors import fired_mask, realize_firing, resolve_class_column
 
 
 class NoiseGenerator(GeneratorMixin):
@@ -65,9 +65,9 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
                          :class:`badgers.core.selectors.ClassSelector` over
                          the class column (typical), or any selector whose
                          masks OR to the fired rows. The per-class lookup
-                         requires ``selector.column_mapping`` to resolve the
-                         class column position. Required (a per-class rule
-                         has no class-free default).
+                         reads the selector's ``class_column`` to resolve
+                         the class column position. Required (a per-class
+                         rule has no class-free default).
         :param noise_std_per_class: A dictionary mapping class values to the
             noise standard deviation for that class. Fired rows whose class
             value is absent from the dict receive no noise.
@@ -79,15 +79,15 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
                 "which rows receive noise (e.g. ClassSelector over the "
                 "class column): classes are columns of X with discrete values."
             )
-        fired = fired_mask(X, selector)
+        fired = fired_mask(X, selector, self.random_generator)
         if not fired.any():
             return X
-        # resolve the class column from the selector's column_mapping
+        # resolve the class column from the selector's class_column
         class_col = resolve_class_column(selector, X)
         if class_col is None:
             raise ValueError(
-                "a per-class noise lookup requires selector.column_mapping "
-                "to resolve the class column position"
+                "a per-class noise lookup requires the selector's "
+                "class_column to resolve the class column position"
             )
         # standardize X
         scaler = StandardScaler()
@@ -129,50 +129,56 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, distribution, noise_std=1.0, perturbation_nodes=None, *, selector=None):
+    def generate(self, X, distribution, noise_std=1.0, *, selector=None):
         """
-        Add noise drawn from an arbitrary distribution to the rows fired by
-        the selector.
+        Add noise drawn from an arbitrary distribution to the cells fired
+        by the selector.
+
+        The selector is the single source of truth: its returned dict
+        ``{column_position: spec}`` defines BOTH which columns receive
+        noise (the keys) and which rows within each column are affected
+        (the realized spec). Columns absent from the selector's output
+        are left untouched.
 
         :param X: Input features (pandas DataFrame or numpy array).
-        :param distribution: A frozen scipy distribution object (e.g. ``scipy.stats.laplace()``)
-            that exposes ``.rvs(size=..., random_state=...)``. Drawn samples are added as-is.
-        :param noise_std: Global multiplier applied to the drawn noise (default 1.0 = raw draw).
-        :param perturbation_nodes: Optional list of column indices to perturb.
-            If None, noise is added to all columns.
-        :param selector: A selector deciding which rows receive noise. A preset from
-                         :mod:`badgers.core.selectors` (``AlwaysSelector``,
-                         ``BernoulliSelector``, ``ExactCountSelector``,
-                         ``TopQuantileSelector``, ``ClassSelector``,
-                         ``ProportionalSelector``, ...) or any callable
-                         accepting X and returning ``dict[str, array]``
-                         whose masks OR to the fired rows. ``None`` = every
-                         row receives noise (backward compatible).
+        :param distribution: A frozen scipy distribution object (e.g.
+            ``scipy.stats.laplace(scale=1)``) that exposes
+            ``.rvs(size=..., random_state=...)``. Drawn samples are added
+            as-is.
+        :param noise_std: Global multiplier applied to the drawn noise
+            (default 1.0 = raw draw).
+        :param selector: A selector deciding which rows and columns
+            receive noise. ``None`` = every row in every column receives
+            noise (backward compatible).
         :return: The noisy input features.
         """
         rvs = getattr(distribution, "rvs", None)
         if not callable(rvs):
             raise TypeError(
-                "distribution must be a frozen scipy distribution object (e.g. "
-                "scipy.stats.laplace(scale=1)) exposing .rvs(size=..., random_state=...); "
+                "distribution must be a frozen scipy distribution object "
+                "(e.g. scipy.stats.laplace(scale=1)) exposing "
+                ".rvs(size=..., random_state=...); "
                 f"got {distribution!r}"
             )
         if noise_std < 0:
             raise ValueError(f"noise_std must be >= 0, got {noise_std}")
 
+        # Draw the full noise matrix (RNG consumed once regardless of masking)
         noise = rvs(size=X.shape, random_state=self.random_generator) * noise_std
-        if perturbation_nodes is not None:
-            perturbation_nodes = np.asarray(perturbation_nodes, dtype=int)
-            if perturbation_nodes.size and (
-                perturbation_nodes.min() < 0 or perturbation_nodes.max() >= X.shape[1]
-            ):
-                raise ValueError(
-                    f"perturbation_nodes out of range for X with {X.shape[1]} columns"
-                )
-            mask = np.zeros(X.shape[1], dtype=bool)
-            mask[perturbation_nodes] = True
-            noise[:, ~mask] = 0.0
-        # zero-out the noise on unfired rows (masks computed on the un-mutated input)
-        fired = fired_mask(X, selector)
-        noise[~fired] = 0.0
+
+        if selector is None:
+            # All rows, all columns (backward-compatible default)
+            return X + noise
+
+        # Realized firing per the selector's own column scope; cells not
+        # fired (or in columns the selector does not cover) get no noise.
+        # A bare user callable without a ``columns`` attribute covers
+        # every column of X.
+        fired = realize_firing(X, selector, self.random_generator)
+        covered = getattr(selector, "columns", None)
+        if covered is None:
+            covered = range(X.shape[1])
+        full = np.zeros(X.shape, dtype=bool)
+        full[:, list(covered)] = fired
+        noise[~full] = 0.0
         return X + noise

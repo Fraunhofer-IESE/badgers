@@ -15,7 +15,7 @@ def test_random_sampling_classes__drops_proportion_per_class(tabular_data_labele
     proportion_classes = {0: 0.5, 1: 0.2, 2: 0.1, 3: 0.1, 4: 0.1}
     rng = default_rng(0)
     selector = ClassSelector(
-        "cls", {"cls": Xc.shape[1] - 1}, {"cls": proportion_classes}, rng=rng
+        [0], class_column=Xc.shape[1] - 1, proportions=proportion_classes, rng=rng
     )
     generator = RandomSamplingClassesGenerator(random_generator=rng)
 
@@ -48,7 +48,7 @@ def test_random_sampling_classes__class_column_of_X(tabular_data_labeled):
     Xc = np.asarray(tabular_data_labeled)
     rng = default_rng(0)
     selector = ClassSelector(
-        "cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng
+        [0], class_column=Xc.shape[1] - 1, proportions={0: 0.5}, rng=rng
     )
     generator = RandomSamplingClassesGenerator(random_generator=rng)
 
@@ -66,8 +66,7 @@ def test_random_sampling_targets__continuous_selector_preserves_shape(
     """A fractional selector over a continuous column resamples n rows with
     replacement; every generated row comes from the input."""
     X = np.asarray(tabular_data)
-    mapping = {f"col{i}": i for i in range(X.shape[1])}
-    selector = ProportionalSelector("col0", mapping)
+    selector = ProportionalSelector([0], 0)
 
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
     Xt = generator.generate(X.copy(), selector=selector, replace=True)
@@ -83,7 +82,7 @@ def test_random_sampling_targets__continuous_selector_preserves_shape(
 def test_random_sampling_targets__resamples_with_replacement():
     """Low deficit probability rows are replicated more."""
     X = np.column_stack([np.arange(6.0), np.zeros(6)])
-    selector = ProportionalSelector("f0", {"f0": 0, "f1": 1})
+    selector = ProportionalSelector([0], 0)
 
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
     Xt = generator.generate(X, selector=selector, replace=True)
@@ -97,8 +96,7 @@ def test_random_sampling_targets__without_replacement_is_thinning(
 ):
     """replace=False yields distinct rows and honors requested output size."""
     X = np.asarray(tabular_data)
-    mapping = {name: i for i, name in enumerate(["f0", "f1", "cls"][:X.shape[1]])}
-    selector = ProportionalSelector("f0", mapping)
+    selector = ProportionalSelector([0], 0)
 
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
     Xt = generator.generate(
@@ -117,8 +115,8 @@ def test_random_sampling_targets__boolean_mask_selector_is_exact_drop():
     fired[keep_idx] = False
 
     class FixedMaskSelector:
-        def __call__(self, X):
-            return {"f0": fired}
+        def __call__(self, X, targets=None):
+            return {0: fired}
 
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
     Xt = generator.generate(
@@ -149,7 +147,7 @@ def test_random_sampling_targets__class_selector_is_exact_per_class_drop(
     Xc = np.asarray(tabular_data_labeled)
     rng = default_rng(0)
     selector = ClassSelector(
-        "cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng
+        [0], class_column=Xc.shape[1] - 1, proportions={0: 0.5}, rng=rng
     )
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
 
@@ -165,7 +163,7 @@ def test_random_sampling_targets__class_selector_is_exact_per_class_drop(
 def test_imbalance_labels__targets_generator_fractional_selector():
     """Fractional scores label rows not selected into the generated X."""
     X = np.column_stack([np.arange(6.0), np.zeros(6)])
-    selector = ProportionalSelector("f0", {"f0": 0, "f1": 1})
+    selector = ProportionalSelector([0], 0)
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
 
     Xt = generator.generate(X, selector=selector, replace=False, size=4)
@@ -182,7 +180,7 @@ def test_imbalance_labels__classes_generator_match_class_column(tabular_data_lab
     Xc = np.asarray(tabular_data_labeled)
     rng = default_rng(0)
     selector = ClassSelector(
-        "cls", {"cls": Xc.shape[1] - 1}, {"cls": {0: 0.5}}, rng=rng
+        [0], class_column=Xc.shape[1] - 1, proportions={0: 0.5}, rng=rng
     )
     generator = RandomSamplingClassesGenerator(random_generator=rng)
 
@@ -203,8 +201,8 @@ def test_imbalance_labels__classes_generator_tracks_most_recent_call():
         def __init__(self, mask):
             self.mask = mask
 
-        def __call__(self, X):
-            return {"feature": self.mask}
+        def __call__(self, X, targets=None):
+            return {0: self.mask}
 
     generator = RandomSamplingClassesGenerator(random_generator=default_rng(0))
 

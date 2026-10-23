@@ -92,7 +92,7 @@ class RandomShiftGenerator(DriftGenerator):
         sign = np.broadcast_to(np.sign(shift_std), (X.shape[1],))
         shift = self.random_generator.normal(loc=0, scale=scale, size=X.shape[1]) * sign
         # add shift to the FIRED rows only (masks computed on the un-mutated input)
-        rows = fired_rows(X, selector)
+        rows = fired_rows(X, selector, self.random_generator)
         Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
@@ -146,8 +146,12 @@ class FixedShiftGenerator(DriftGenerator):
         Xt = scaler.transform(X)
         # exact shift per column: |shift_std| magnitude, sign(shift_std) direction
         shift = np.broadcast_to(shift_std, (X.shape[1],))
-        # add shift to the FIRED rows only (masks computed on the un-mutated input)
-        rows = fired_rows(X, selector)
+        # add shift to the FIRED rows only (masks computed on the un-mutated input).
+        # Deterministic generator: realizing the selector's specs consumes an
+        # rng, but the shift itself draws nothing -- bind a fixed private
+        # stream so repeated calls return the same output.
+        rng = self.random_generator if self.random_generator is not None else default_rng(0)
+        rows = fired_rows(X, selector, rng)
         Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
@@ -184,9 +188,9 @@ class RandomShiftClassesGenerator(DriftGenerator):
                          :class:`badgers.core.selectors.ClassSelector` over
                          the class column (typical), or any selector whose
                          masks OR to the fired rows. The per-class lookup
-                         requires ``selector.column_mapping`` to resolve the
-                         class column position. Required (a per-class rule
-                         has no class-free default).
+                         reads the selector's ``class_column`` to resolve
+                         the class column position. Required (a per-class
+                         rule has no class-free default).
         :param shift_std: Standard deviation of the normal distribution from
                           which the shifts are drawn. Entries are SIGNED: the
                           magnitude (``abs``) is the scale of the draw and the
@@ -195,19 +199,17 @@ class RandomShiftClassesGenerator(DriftGenerator):
                           every class, one independent draw per class) or a dict
                           ``{class_value: float}``. Fired rows whose class value
                           is absent from the dict are not shifted.
-        :param variables: Columns to shift. Either a list of column positions
-                          (ints) or a list of variable names resolvable through
-                          ``selector.column_mapping``. Defaults to all columns
+        :param variables: Columns to shift, as a list of column positions
+                          (ints). Defaults to all columns
                           except the class column — the class column is
                           identification metadata and is never shifted by
                           default (shifting it would move rows away from
                           their class values).
-        :param class_column: The column holding the class values: either its
-                          position (int) or a variable name resolvable through
-                          ``selector.column_mapping``. The class column groups
+        :param class_column: The position (int) of the column holding the
+                          class values. The class column groups
                           the fired rows (one shift per class value) and is
                           never shifted itself. If omitted, it is recovered
-                          from the selector's ``column_mapping``; when neither
+                          from the selector's ``class_column``; when neither
                           is available, all fired rows are treated as one
                           class and every column may be shifted.
         :return: The modified feature matrix `X'`.
@@ -218,37 +220,32 @@ class RandomShiftClassesGenerator(DriftGenerator):
                 "which rows shift (e.g. ClassSelector over the class "
                 "column): classes are columns of X."
             )
-        fired = fired_mask(X, selector)
+        fired = fired_mask(X, selector, self.random_generator)
         if not fired.any():
             return X
         # resolve the class column: explicit parameter first, selector sniffing as fallback
         class_col = class_column
-        if class_col is not None and isinstance(class_col, str):
-            mapping = getattr(selector, "column_mapping", None)
-            pos = mapping.get(class_col) if mapping is not None else None
-            if pos is None or not (0 <= pos < X.shape[1]):
-                raise ValueError(f"cannot resolve class column {class_col!r} in X")
-            class_col = pos
-        elif class_col is None:
+        if class_col is None:
             class_col = resolve_class_column(selector, X)
-        elif not (0 <= class_col < X.shape[1]):
-            raise ValueError(f"class_column {class_col} is not a valid column position in X")
+        elif not (isinstance(class_col, (int, np.integer))
+                  and 0 <= class_col < X.shape[1]):
+            raise ValueError(
+                f"class_column {class_col!r} is not a valid column position in X")
         stds = shift_std if isinstance(shift_std, dict) else None
         if stds is not None and class_col is None:
             raise ValueError(
                 "a dict shift_std requires a class column: pass "
-                "class_column (int or name) or use a selector with "
-                "column_mapping to resolve the class column position"
+                "class_column (int position) or use a selector "
+                "exposing its class_column"
             )
         # resolve which columns are shifted
         if variables is not None:
-            mapping = getattr(selector, "column_mapping", None)
             cols = []
             for var in variables:
-                pos = mapping.get(var) if mapping is not None and isinstance(var, str) else var
-                if pos is None or not (0 <= pos < X.shape[1]):
+                if not (isinstance(var, (int, np.integer))
+                        and 0 <= var < X.shape[1]):
                     raise ValueError(f"cannot resolve shift column {var!r} in X")
-                cols.append(pos)
+                cols.append(var)
             cols = np.array(sorted(set(cols)), dtype=int)
         else:
             # all columns except the class column
@@ -310,16 +307,14 @@ class FixedShiftClassesGenerator(DriftGenerator):
                       per shifted column, same for every class), or a dict
                       ``{class_value: float or vector}`` — fired rows whose class value
                       is absent from the dict are not shifted.
-        :param variables: Columns to shift. Either a list of column positions (ints) or a
-                          list of variable names resolvable through
-                          ``selector.column_mapping``. Defaults to all columns except the
+        :param variables: Columns to shift, as a list of column positions (ints).
+                          Defaults to all columns except the
                           class column.
-        :param class_column: The column holding the class values: either its position
-                             (int) or a variable name resolvable through
-                             ``selector.column_mapping``. The class column groups the
+        :param class_column: The position (int) of the column holding the class values.
+                             The class column groups the
                              fired rows (one shift per class value) and is never shifted
                              itself. If omitted, it is recovered from the selector's
-                             ``column_mapping``; when neither is available, all fired
+                             ``class_column``; when neither is available, all fired
                              rows are treated as one class and every column may be
                              shifted.
         :return: The modified feature matrix `X'`.
@@ -330,37 +325,36 @@ class FixedShiftClassesGenerator(DriftGenerator):
                 "which rows shift (e.g. ClassSelector over the class "
                 "column): classes are columns of X."
             )
-        fired = fired_mask(X, selector)
+        # Deterministic generator: realizing the selector's specs consumes an
+        # rng, but the shift itself draws nothing -- bind a fixed private
+        # stream so repeated calls return the same output.
+        rng = self.random_generator if self.random_generator is not None else default_rng(0)
+        fired = fired_mask(X, selector, rng)
         if not fired.any():
             return X
         # resolve the class column: explicit parameter first, selector sniffing as fallback
         class_col = class_column
-        if class_col is not None and isinstance(class_col, str):
-            mapping = getattr(selector, "column_mapping", None)
-            pos = mapping.get(class_col) if mapping is not None else None
-            if pos is None or not (0 <= pos < X.shape[1]):
-                raise ValueError(f"cannot resolve class column {class_col!r} in X")
-            class_col = pos
-        elif class_col is None:
+        if class_col is None:
             class_col = resolve_class_column(selector, X)
-        elif not (0 <= class_col < X.shape[1]):
-            raise ValueError(f"class_column {class_col} is not a valid column position in X")
+        elif not (isinstance(class_col, (int, np.integer))
+                  and 0 <= class_col < X.shape[1]):
+            raise ValueError(
+                f"class_column {class_col!r} is not a valid column position in X")
         shifts = shift if isinstance(shift, dict) else None
         if shifts is not None and class_col is None:
             raise ValueError(
                 "a dict shift requires a class column: pass "
-                "class_column (int or name) or use a selector with "
-                "column_mapping to resolve the class column position"
+                "class_column (int position) or use a selector "
+                "exposing its class_column"
             )
         # resolve which columns are shifted
         if variables is not None:
-            mapping = getattr(selector, "column_mapping", None)
             cols = []
             for var in variables:
-                pos = mapping.get(var) if mapping is not None and isinstance(var, str) else var
-                if pos is None or not (0 <= pos < X.shape[1]):
+                if not (isinstance(var, (int, np.integer))
+                        and 0 <= var < X.shape[1]):
                     raise ValueError(f"cannot resolve shift column {var!r} in X")
-                cols.append(pos)
+                cols.append(var)
             cols = np.array(sorted(set(cols)), dtype=int)
         else:
             # all columns except the class column

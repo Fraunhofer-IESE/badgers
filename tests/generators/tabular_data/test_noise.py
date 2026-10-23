@@ -10,10 +10,12 @@ from badgers.generators.tabular_data.noise.noise import (
 
 def _selector(y_values, proportions=None, rng=None):
     Xc = np.column_stack([np.zeros(len(y_values)), np.asarray(y_values)])
-    column_mapping = {f"f{i}": i for i in range(Xc.shape[1])}
-    column_mapping["cls"] = Xc.shape[1] - 1
     props = proportions if proportions is not None else {c: 1.0 for c in np.unique(y_values)}
-    return ClassSelector("cls", column_mapping, {"cls": props}, rng=rng or default_rng(0)), Xc
+    return (
+        ClassSelector([0], class_column=Xc.shape[1] - 1, proportions=props,
+                      rng=rng or default_rng(0)),
+        Xc,
+    )
 
 
 def test_gaussian_noise_classes__preserves_shape(tabular_data_labeled):

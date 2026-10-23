@@ -47,20 +47,15 @@ class MissingValueGenerator(GeneratorMixin):
         self.random_generator = random_generator
         self.missing_values_indices_ = None
 
-    def _positional_names(self, X):
-        """Synthesized variable names for graph-less data:
-        ("x0", ..., "x{k-1}")."""
-        return tuple(f"x{i}" for i in range(X.shape[1]))
-
     def _write_missing(self, X, masks):
-        """Write NaNs from ``{name: bool-mask}``; populate
+        """Write NaNs from ``{column_position: bool-mask}``; populate
         ``missing_values_indices_``.
 
         Column-major order matches the legacy index list. The caller
         guarantees exactly one mask per column, in column order.
         """
         indices = []
-        for col, (name, mask) in enumerate(masks.items()):
+        for col, mask in masks.items():
             X[mask, col] = np.nan
             indices.extend(
                 zip(np.where(mask)[0].tolist(), [col] * int(mask.sum()))
@@ -115,9 +110,9 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         assert 0 <= percentage_missing <= 1
         # Route the row selection through the shared ExactCountSelector
         # preset (uniform draws, exact count per column) and write the
-        # NaNs from the returned {variable: bool-mask} dict.
+        # NaNs from the returned {column: bool-mask} dict.
         selector = ExactCountSelector(
-            self._positional_names(X), rate=percentage_missing,
+            list(range(X.shape[1])), rate=percentage_missing,
             rng=self.random_generator,
         )
         masks = selector(X)
@@ -167,7 +162,7 @@ class DummyMissingAtRandom(MissingValueGenerator):
         # draws happen inside the weights callable, BEFORE the row draws
         # -- exactly the legacy RNG call order.
         selector = ExactCountSelector(
-            self._positional_names(X), rate=percentage_missing,
+            list(range(X.shape[1])), rate=percentage_missing,
             weights=lambda X_: _mar_weights(X_, self.random_generator),
             rng=self.random_generator,
         )
@@ -215,7 +210,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         # preset. The self-coupling (probability of missing grows with the
         # own value) enters via per-row weights.
         selector = ExactCountSelector(
-            self._positional_names(X), rate=percentage_missing,
+            list(range(X.shape[1])), rate=percentage_missing,
             weights=lambda X_: _mnar_weights(X_),
             rng=self.random_generator,
         )
