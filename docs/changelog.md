@@ -6,6 +6,21 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ### Breaking changes
 
+- **Selectors work on column positions only (breaking).**
+  Every selector preset now takes integer column positions at construction
+  and returns a ``dict[int, spec]`` keyed by position: ``AlwaysSelector``,
+  ``BernoulliSelector``, ``ExactCountSelector``, ``TopQuantileSelector``,
+  ``ClassSelector``, ``ProportionalSelector``. Variable names and the
+  selector-side ``column_mapping`` are gone; read columns (``class_column``,
+  ``column``, ``driver``) are independent int positions. Value-free presets
+  return bool masks; value-driven presets return ``[0, 1]`` firing specs
+  (float scalar or ``(n,)`` array) that generators realize with the single
+  rule ``rng.random(n) < spec`` (``realize_firing``/``fired_mask``/
+  ``fired_rows``). Direct generators no longer take ``column_mapping`` —
+  ``AdditiveNoiseGenerator.generate(X, distribution, noise_std=1.0,
+  *, selector=None)``. Causal generators keep ``perturbation_nodes``
+  (graph node names) and the DGP's ``column_mapping``; only selector
+  constructions moved to positions.
 - **The `(X, y)` contract is removed; generators and selectors take `X` only (breaking).**
   Every generator's signature is `generate(X, **params)` and it returns exactly one
   generated object `Xt` — the old `y` parameter and the two-tuple return are gone
