@@ -93,6 +93,12 @@ def _validate_rate(rate: float, name: str) -> float:
 def _check_spec(spec, n_rows: int) -> None:
     """Validate a firing spec: scalar or (n_rows,) array, values in [0, 1]."""
     arr = np.asarray(spec)
+    if arr.ndim == 0 and arr.dtype == bool:
+        raise ValueError(
+            "spec must be a number or a 1-D array of length "
+            f"{n_rows}, not a bool; bools are only valid as "
+            "an (n,) array"
+        )
     if arr.ndim > 1 or (arr.ndim == 1 and arr.shape != (n_rows,)):
         raise ValueError(
             f"spec must be a scalar or a 1-D array of length {n_rows}, "
@@ -183,9 +189,9 @@ def resolve_class_column(selector, X: np.ndarray):
 
 
 # --- LEGACY name-based helpers (TEMPORARY) ---------------------------------
-# ``value_free.py`` and ``value_driven.py`` still import these until the
-# index-only rewrite reaches them (Tasks 2 and 3 of the selector-contract
-# plan). Delete these two functions there and then.
+# Only ``value_driven.py`` still imports these; ``value_free.py`` was
+# rewritten onto the index-only contract (Task 2). Task 3 rewrites
+# value_driven.py and deletes these two functions from base.py then.
 # ---------------------------------------------------------------------------
 
 def _validate_variables(variables) -> tuple[str, ...]:

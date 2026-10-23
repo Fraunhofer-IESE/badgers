@@ -43,12 +43,13 @@ class TestSelectorProtocol:
         assert not isinstance(object(), Selector)
 
 
+# Value-free presets (index-only contract, Task 2) now accept a second
+# positional argument (``targets``), so they are exercised in TestValueFree
+# instead; the value-driven presets still reject the extra argument until
+# Task 3 rewrites them onto the same contract.
 @pytest.mark.parametrize(
     "selector",
     [
-        AlwaysSelector("a"),
-        BernoulliSelector("a", rate=0.3, rng=np.random.default_rng(0)),
-        ExactCountSelector("a", rate=0.3, rng=np.random.default_rng(0)),
         TopQuantileSelector("a", {"a": 0}, quantile=0.5),
         ClassSelector(
             "a", {"a": 0}, {"a": {0: 0.3}}, rng=np.random.default_rng(0)
@@ -556,6 +557,20 @@ class TestBaseContract:
         with pytest.raises(ValueError):
             _check_spec(bad, 5)
 
+    def test_check_spec_rejects_bool_scalar(self):
+        # bool scalars are out of domain: bools are valid only as (n,) arrays
+        with pytest.raises(ValueError):
+            _check_spec(True, 5)
+        with pytest.raises(ValueError):
+            _check_spec(False, 5)
+
+    def test_check_spec_rejects_bool_scalar(self):
+        # bool scalars are out of domain: bools are valid only as (n,) arrays
+        with pytest.raises(ValueError):
+            _check_spec(True, 5)
+        with pytest.raises(ValueError):
+            _check_spec(False, 5)
+
     def test_realize_firing_deterministic(self):
         X = np.zeros((6, 2))
         fired = realize_firing(X, _FakeSel(), default_rng(0))
@@ -576,3 +591,53 @@ class TestBaseContract:
     def test_realize_firing_selector_none(self):
         fired = realize_firing(np.zeros((3, 2)), None, default_rng(0))
         assert fired.shape == (3, 2) and fired.all()
+
+
+class TestValueFree:
+    def test_always_uniform_spec_per_target(self):
+        sel = AlwaysSelector([0, 2])
+        out = sel(np.zeros((4, 3)))
+        assert set(out) == {0, 2}
+        assert all(v == 1.0 for v in out.values())
+
+    def test_always_targets_subset(self):
+        sel = AlwaysSelector([0, 1, 2])
+        assert set(sel(np.zeros((2, 3)), targets=[1])) == {1}
+
+    def test_always_out_of_scope_raises(self):
+        with pytest.raises(ValueError, match="outside the selector"):
+            AlwaysSelector([0])(np.zeros((2, 3)), targets=[2])
+
+    def test_bernoulli_shape_and_rate(self):
+        sel = BernoulliSelector([0, 1], rate=0.5, rng=default_rng(0))
+        out = sel(np.zeros((1000, 2)))
+        for mask in out.values():
+            assert mask.shape == (1000,) and mask.dtype == bool
+        assert 0.4 < out[0].mean() < 0.6
+
+    def test_bernoulli_independent_per_column(self):
+        sel = BernoulliSelector([0, 1], rate=0.5, rng=default_rng(1))
+        out = sel(np.zeros((2000, 2)))
+        assert out[0] is not out[1]
+        assert (out[0] != out[1]).mean() > 0.2  # independent draws disagree
+
+    def test_bernoulli_no_rng_raises(self):
+        with pytest.raises(ValueError, match="no random generator"):
+            BernoulliSelector([0], rate=0.5)(np.zeros((3, 1)))
+
+    def test_exact_count_exact_per_column(self):
+        sel = ExactCountSelector([0, 1, 2], rate=0.25, rng=default_rng(0))
+        out = sel(np.zeros((20, 3)))
+        assert [m.sum() for m in out.values()] == [5, 5, 5]
+
+    def test_exact_count_weights(self):
+        n, k = 10, 2
+        w = np.zeros((n, k)); w[0] = [1.0, 0.0]; w[1] = [0.0, 1.0]
+        sel = ExactCountSelector([0, 1], rate=0.1, weights=w, rng=default_rng(0))
+        out = sel(np.zeros((n, k)))
+        assert out[0][0] and out[1][1]
+
+    def test_exact_count_bad_weights_shape(self):
+        sel = ExactCountSelector([0, 1], rate=0.1, weights=np.zeros(10), rng=default_rng(0))
+        with pytest.raises(ValueError, match="weights must have shape"):
+            sel(np.zeros((10, 2)))
