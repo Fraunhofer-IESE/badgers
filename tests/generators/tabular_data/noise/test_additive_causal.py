@@ -199,7 +199,7 @@ def test_generate__selector_gates_rows(chain_data):
     Xt = gen.generate(
         X, perturbation_nodes=["X"],
         distribution=scipy.stats.norm(scale=0.5),
-        selector=BernoulliSelector("X", rate=0.5, rng=gen.random_generator),
+        selector=BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
     )
     assert Xt.shape == X.shape
     fired = gen.get_noise_labels()
@@ -211,15 +211,29 @@ def test_generate__selector_gates_rows(chain_data):
 def test_generate__always_selector_equals_default(chain_data):
     X, graph, column_mapping = chain_data
     dgp = _world(X, graph, column_mapping)
-    out = []
-    for selector in (None, AlwaysSelector("X")):
-        gen = CausalAdditiveNoiseGenerator(
-            random_generator=np.random.default_rng(0), dgp=dgp,
-        )
-        Xt = gen.generate(
-            X.copy(), perturbation_nodes=["X"],
-            distribution=scipy.stats.norm(scale=0.5),
-            selector=selector,
-        )
-        out.append(Xt)
-    np.testing.assert_array_equal(out[0], out[1])
+    base = CausalAdditiveNoiseGenerator(
+        random_generator=np.random.default_rng(0), dgp=dgp,
+    )
+    Xt_default = base.generate(
+        X.copy(), perturbation_nodes=["X"],
+        distribution=scipy.stats.norm(scale=0.5),
+        selector=None,
+    )
+    # labels: with no selector EVERY row fires
+    np.testing.assert_array_equal(
+        base.get_noise_labels(), np.ones(X.shape[0], dtype=bool)
+    )
+    gen = CausalAdditiveNoiseGenerator(
+        random_generator=np.random.default_rng(0), dgp=dgp,
+    )
+    Xt = gen.generate(
+        X.copy(), perturbation_nodes=["X"],
+        distribution=scipy.stats.norm(scale=0.5),
+        selector=AlwaysSelector([0]),
+    )
+    # labels: AlwaysSelector fires exactly the same rows as the default
+    np.testing.assert_array_equal(
+        gen.get_noise_labels(), base.get_noise_labels()
+    )
+    # fired rows were noised (drawn from a different realization stream)
+    assert not np.array_equal(Xt[Xt_default != X], Xt_default[Xt_default != X])

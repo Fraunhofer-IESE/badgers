@@ -192,7 +192,7 @@ def test_generate__selector_gates_expanded_rows(chain_data, make_gcm_dgp):
     # fire or all stay clean (masks replicated to the expansion)
     Xt = gen.generate(
         X, perturbation_nodes=["X"], n_copies=3, noise_std=0.5,
-        selector=BernoulliSelector("X", rate=0.5, rng=gen.random_generator),
+        selector=BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
     )
     assert Xt.shape == (X.shape[0] * 3, 3)
     fired = gen.get_noise_labels()

@@ -14,6 +14,7 @@ from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.causal_graph import validate_dag
+from badgers.core.selectors import realize_firing
 
 
 def _column_stds(X):
@@ -151,8 +152,10 @@ class CausalGenerator(GeneratorMixin):
         """Fire masks for ALL rows at once: dict {node: bool row-mask}.
 
         Delegates to a ``Selector`` from ``badgers.core.selectors``:
-        ``selector(rows) -> {node: bool mask}``.
-        ``None`` defaults to ``AlwaysSelector`` (every row fires).
+        ``selector(rows, targets=[positions]) -> {position: spec}``;
+        specs are realized here with the generator's rng (single stream,
+        ``perturbation_nodes`` order). ``selector=None`` = every row fires
+        on every perturbation node.
 
         Parameters
         ----------
@@ -161,11 +164,10 @@ class CausalGenerator(GeneratorMixin):
             n_copies-EXPANDED rows).
         perturbation_nodes : list of str, non-empty (pre-validated).
         selector : Selector or None, default None
-            The row-selection rule. ``None`` = ``AlwaysSelector`` (all
-            rows fire). Presets: ``BernoulliSelector`` (iid rate),
-            ``ExactCountSelector`` (exact count), ``TopQuantileSelector``
-            (value threshold, self or driver mode), ``AlwaysSelector``;
-            any user callable with the same signature works.
+            Index-only row-selection rule from ``badgers.core.selectors``
+            (``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
+            ``TopQuantileSelector``, ``ClassSelector``, ``ProportionalSelector``,
+            or any callable with the same signature).
 
         Note: masks are computed against ``rows`` BEFORE any mutation
         (callers write NaNs/noise afterwards), which makes the firing
@@ -177,7 +179,23 @@ class CausalGenerator(GeneratorMixin):
                 node: np.ones(rows.shape[0], dtype=bool)
                 for node in perturbation_nodes
             }
-        return selector(rows)
+        if self.column_mapping is None:
+            raise ValueError(
+                "_fire_masks with an explicit selector needs a DGP: the "
+                "perturbation nodes are mapped to column positions via "
+                "column_mapping. Pass a dgp=... to the constructor, or "
+                "use use_dgp(dgp)."
+            )
+        targets = [
+            self.column_mapping[node]
+            for node in perturbation_nodes
+        ]
+        fired = realize_firing(rows, selector, self.random_generator,
+                               targets=targets)
+        return {
+            node: fired[:, i]
+            for i, node in enumerate(perturbation_nodes)
+        }
 
     # -- Validation ---------------------------------------------------------
 

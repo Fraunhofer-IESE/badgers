@@ -86,12 +86,12 @@ def test_generate__explicit_selector_drops_fired_rows(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = _fitted_generator(X, graph, column_mapping, make_gcm_dgp)
     selector = TopQuantileSelector(
-        variables="X", column_mapping=column_mapping, quantile=0.8
+        columns=[0], column=0, quantile=0.8
     )
 
     Xt = gen.generate(X, selector=selector)
 
-    fired = selector(X)["X"]
+    fired = np.asarray(selector(X)[0], dtype=bool)
     np.testing.assert_array_equal(Xt, X[~fired])
     assert Xt.shape[0] < X.shape[0]
     labels = gen.get_imbalance_labels()
@@ -106,12 +106,12 @@ def test_generate__explicit_selector_ignores_quantile_params(
     X, graph, column_mapping = chain_data
     gen = _fitted_generator(X, graph, column_mapping, make_gcm_dgp)
     selector = TopQuantileSelector(
-        variables="Y", column_mapping=column_mapping, quantile=0.7
+        columns=[1], column=1, quantile=0.7
     )
 
     Xt = gen.generate(
         X, selector=selector, quantile_range=(0.9, 0.1)
     )
 
-    fired = selector(X)["Y"]
+    fired = np.asarray(selector(X)[1], dtype=bool)
     np.testing.assert_array_equal(Xt, X[~fired])
