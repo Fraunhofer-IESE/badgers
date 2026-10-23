@@ -38,8 +38,9 @@ class TopQuantileSelector:
     columns : int or sequence of int
         Column positions this selector covers.
     column : int
-        (Deprecated position, kept for reading) the column the threshold
-        is compared against. In self mode ``column == driver``.
+        Required read column; unused when ``driver`` is set. In self
+        mode (``driver=None``) the threshold is compared against this
+        column (``column == driver``).
     quantile : float, in [0, 1]
         The quantile forming the threshold (``>=`` comparison).
     driver : int or None, default=None

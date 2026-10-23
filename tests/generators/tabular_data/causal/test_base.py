@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from badgers.core.dgp import DGPMixin
-from badgers.core.selectors import AlwaysSelector, BernoulliSelector
+from badgers.core.selectors import AlwaysSelector
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 

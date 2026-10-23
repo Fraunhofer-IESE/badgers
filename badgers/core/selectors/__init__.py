@@ -5,17 +5,21 @@ A SELECTOR decides which rows of the input get a data quality deficit:
     Selector = Callable[[X, targets], dict[int, spec]]
 
 - keys   = column positions (targets: the columns the mask applies to)
-- values = per-row boolean masks or float SCORES (or a single scalar
-  rate applied to the whole column), ``len(spec) == X.shape[0]``
+- values = per-row boolean masks or float SCORES -- a ``(n,)`` array
+  or, for Always-like constant levels, a scalar applied to the whole
+  column
 - polarity: ``True``/``1.0`` = ``R_X = 1`` = deficit applied;
   ``False``/``0.0`` = record as-is
 
 A spec is a scalar or ``(n,)`` array of values in ``[0, 1]``: values
 restricted to ``{0, 1}`` are DECISIONS, anything else is a PROBABILITY
-(the chance the deficit is applied to that row). A selector itself never
-draws randomness for these rates -- realization belongs to the consuming
-generator, which binds a single rng stream and realizes every spec with
-the single rule ``rng.random(n) < spec``. Being in ``core``, the package
+(the chance the deficit is applied to that row). Two rng streams
+cooperate: the PRESET's own rng drives the spec draw (the decision or
+probability computation, the stochastic row draws, the row weights),
+while the CONSUMER's rng drives the realization -- every spec is
+realized with the single rule ``rng.random(n) < spec``. ``selector=None``
+means no selector draw at all (the consumer decides). Being in ``core``,
+the package
 is modality-agnostic: time-series / graph / text generators can reuse
 the same contract with masks over their own axes.
 

@@ -2,8 +2,13 @@
 
 Because the rule is value-blind, no read column is needed at
 construction; the presets take ``columns`` (the column positions they
-cover) and the stochastic presets bind a single rng stream (the
-consuming generator binds its own generator here).
+cover). Two rng streams: the preset's own rng draws the mask (bind it
+at construction with ``rng=``; a stochastic preset without one raises),
+while the consuming generator realizes the returned masks with its own
+rng (``rng.random(n) < spec``). Some consumers instead hand their own
+rng to the preset at construction (e.g. the missingness generators
+build ``ExactCountSelector(..., rng=...)`` from their stream) -- the
+preset's draw is then the consumer's stream.
 """
 
 from collections.abc import Callable, Sequence

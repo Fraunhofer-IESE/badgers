@@ -26,11 +26,13 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   Every generator's signature is `generate(X, **params)` and it returns exactly one
   generated object `Xt` — the old `y` parameter and the two-tuple return are gone
   (a hard break, no deprecation shims). Every selector is called as `selector(X)` and
-  returns the per-variable mask/score mapping. `Pipeline.generate(X, params=None)`
+  returns the per-column ``dict[int, spec]`` mapping (positions keyed; bool masks
+  from value-free presets, ``[0, 1]`` firing specs from value-driven presets).
+  `Pipeline.generate(X, params=None)`
   threads each single-output step into the next. The `preprocess_inputs` decorators
   wrap `generate(self, X, **kwargs)`. Benchmark scenario factories return one `X`.
   Target-like data lives inside `X`: dedicated columns for tabular and time-series data
-  (class columns resolved via the selector's `column_mapping`), node/edge attributes for
+  (class columns read via the selector's `class_column` int position), node/edge attributes for
   graphs, and modality-native values for text. Deficit labels remain available through
   the generators' own getters (`get_drift_labels()`, `get_missing_labels()`,
   `get_imbalance_labels()`, `get_noise_labels()`, `get_outliers_labels()`).
@@ -127,15 +129,19 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `badgers.core.selectors`; `None` defaults to "every row fires"
   (`AlwaysSelector` semantics). The `mechanism`/`mechanism_cause`/
   `mechanism_rate` strings and the `_fire_masks` string dispatcher are
-  removed. Migration:
-  - `mechanism="always"` → omit `selector` (or `AlwaysSelector(nodes)`).
+  removed. Migration (`pos...` = the perturbation nodes' column
+  positions from the DGP's `column_mapping`):
+  - `mechanism="always"` → omit `selector` (or `AlwaysSelector([pos...])`).
   - `mechanism="random", mechanism_rate=r` →
-    `selector=BernoulliSelector(nodes, rate=r, rng=gen.random_generator)`.
+    `selector=BernoulliSelector([pos...], rate=r,
+    rng=gen.random_generator)`.
   - `mechanism="self", mechanism_rate=r` →
-    `selector=TopQuantileSelector(nodes, column_mapping, quantile=1-r)`.
+    `selector=TopQuantileSelector([pos...], column=pos, quantile=1-r)`
+    (value-driven presets read the one `pos` and broadcast it).
   - `mechanism="observed", mechanism_cause=c, mechanism_rate=r` →
-    `selector=TopQuantileSelector(nodes, column_mapping, quantile=1-r,
-    drivers=c)`.
+    `selector=TopQuantileSelector([pos...], column=pos, quantile=1-r,
+    driver=pos_c)` with `pos_c` the cause column's position from the
+    DGP's `column_mapping`.
   Intensity lives on the selector object: `rate` and `quantile` are now
   CONSTRUCTOR arguments of `BernoulliSelector`/`ExactCountSelector`/
   `TopQuantileSelector` (previously `rate` was a `__call__` kwarg and
@@ -143,20 +149,22 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   new selector. `AlwaysSelector` was added (the all-rows preset).
 - **`RandomSamplingClassesGenerator` takes a `selector` (breaking).** The
   `proportion_classes` call kwarg is removed; pass instead
-  `selector=ClassSelector("cls", column_mapping, proportions, rng=...)` from
-  `badgers.core.selectors`, where `proportions` maps each class column to
-  `{class_value: proportion}`. Class columns are columns of `X`:
-  selection reads only `X` (resolved via the selector's
-  `column_mapping`). The selector's fire mask is the standard
+  `selector=ClassSelector([pos], class_column=pos, proportions={...},
+  rng=...)` from `badgers.core.selectors`, with `pos` the class column's
+  int position in `X` and `proportions` = `{class_value: proportion}`.
+  Class columns are columns of `X`:
+  selection reads only `X` (the class column is the selector's
+  `class_column` int position). The selector's fire mask is the standard
   contract (True = deficit); the generator's deficit is DROPPING the fired
   rows (subsampling), so the output is smaller than the input. Classes
-  absent from the mapping are kept as-is; proportions are shares of the
+  absent from `proportions` are kept as-is; proportions are shares of the
   total row count, clipped to the rows available in each class. The class
-  variable must be a column of `X` resolved via
-  `column_mapping`. `selector=None` is a
+  variable must be a column of `X`, given as the selector's
+  `class_column` int position. `selector=None` is a
   no-op. Migration: `generate(X, proportion_classes={0: 0.5, ...})` →
-  `generate(np.column_stack([X, y]), selector=ClassSelector("cls",
-  {"cls": n_features}, {"cls": {0: 0.5, ...}}, rng=rng))`. Note the new
+  `generate(np.column_stack([X, y]), selector=ClassSelector([pos],
+  class_column=pos, proportions={0: 0.5, ...}, rng=rng))` with `pos`
+  the position of the stacked target column. Note the new
   semantics sample WITHOUT replacement (the old
   implementation duplicated rows when a proportion exceeded the class
   size).
@@ -183,8 +191,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   for these rates; realization belongs to the consuming generator (a
   modifying consumer fires Bernoulli-wise, a resampling consumer uses the
   scores as selection weights). All existing presets return boolean
-  masks, so nothing breaks; the new ``ProportionalSelector(variables,
-  column_mapping)`` preset returns ``normalize_proba(X[:, col])`` (the
+  masks, so nothing breaks; the new ``ProportionalSelector([pos],
+  column=pos)`` preset returns ``normalize_proba(X[:, pos])`` (the
   deficit probability proportional to a column's value).
 - **`RandomSamplingTargetsGenerator` takes a `selector` (breaking).** The
   `sampling_proba_func(y)` kwarg is removed; the generator now resamples
@@ -196,20 +204,20 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `replace=True` (default) may duplicate rows (importance resampling),
   `replace=False` gives a weighted thinning, `size` controls the output
   row count (default: input row count). Selection reads only `X`
-  (columns of `X` resolved via the selector's `column_mapping`).
+  (per-column specs keyed by the columns' int positions).
   Migration: the old default
   (sample ∝ target values) becomes
-  `ProportionalSelector("col", {"col": idx})` over whichever `X` column
+  `ProportionalSelector(idx, column=idx)` over whichever `X` column
   holds the signal (e.g. the stacked target column).
 - **`RandomSamplingFeaturesGenerator` removed (breaking).** It was the
   free-probability twin of the resampler; its value-weighted resample is
   now `RandomSamplingTargetsGenerator(selector=ProportionalSelector(
-  "col", column_mapping))`, and its per-class behavior is the same
+  idx, column=idx))`, and its per-class behavior is the same
   generator with a boolean selector (`ClassSelector` over the class
   column).
 - **`RandomShiftClassesGenerator` takes a `selector` (breaking).** The
-  class variable is read from a column of `X` (resolved via the
-  selector's `column_mapping`). Signature:
+  class variable is read from a column of `X` (the selector's
+  `class_column` int position). Signature:
   `generate(X, *, selector=None, shift_std=0.1)`. The selector is
   REQUIRED (`selector=None` raises) — a per-class drift has no class-free
   default; fire masks are OR-ed. `shift_std` is now a float (one
@@ -220,8 +228,9 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   drift). Class values absent from a dict are skipped. Migration:
   `generate(X, shift_std=np.array([2., 2., 2., 2.]))` →
   `generate(np.column_stack([X, y]),
-  selector=ClassSelector("cls", {"cls": n_features},
-  {"cls": {c: 1.0 for c in classes}}, rng=rng), shift_std=2.0)`.
+  selector=ClassSelector([pos], class_column=pos,
+  proportions={c: 1.0 for c in classes}, rng=rng), shift_std=2.0)`
+  with `pos` the position of the stacked target column.
 - **Drift generators: signed per-column ``shift_std`` and class-column
   protection (breaking, ``RandomShiftGenerator``/
   ``RandomShiftClassesGenerator``).** ``shift_std`` entries are now
@@ -231,7 +240,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   is identification metadata and is NEVER shifted by default (shifting
   it would move rows away from their class values); new parameters
   ``variables`` (columns to shift) and ``class_column`` (explicit class
-  column position/name) allow shifting an explicit subset and/or a
+  column position) allow shifting an explicit subset and/or a
   different class column. A dict ``shift_std={class_value: std}`` now
   requires a resolvable class column (raises otherwise).
 - **Deterministic drift generators (new):** ``FixedShiftGenerator`` and
@@ -242,9 +251,10 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   the same input return the same output. Both are exported from
   ``badgers.generators.tabular_data.drift``.
 - **`GaussianNoiseClassesGenerator` takes a `selector` (breaking).** Same
-  contract as above: classes are a column of `X` resolved via the
-  selector's `column_mapping` (`selector=None` raises; a per-class lookup
-  requires `selector.column_mapping` to resolve the class column). The
+  contract as above: classes are a column of `X`, given as the
+  selector's `class_column` int position (`selector=None` raises; a
+  per-class lookup requires a selector exposing `class_column` to
+  resolve the class column). The
   class column itself is never noised — the old implementation rebuilt
   the output's last column as class labels, silently corrupting it (bug
   fixed). Signature: `generate(X, *, selector=None,
@@ -294,14 +304,16 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `Normal`, `StudentT`, `Laplace` (additive) and `Bernoulli`, `Poisson`,
   `Binomial`, `Categorical` (numeric-encoded discrete).
 - **`ClassSelector` preset** (`badgers.core.selectors`): per-class
-  fixed-count sampling on a discrete column — `ClassSelector(variables,
-  column_mapping, proportions, rng=...)` with `proportions` mapping each
-  class column to `{class_value: proportion}`. Discovers the distinct
+  fixed-count sampling on a discrete column — `ClassSelector([pos],
+  class_column=pos, proportions={...}, rng=...)` with `pos` the class
+  column's int position and `proportions` = `{class_value: proportion}`.
+  Discovers the distinct
   values from the data (no manual class enumeration), raises
   `ValueError` on class values absent from the column (typo protection),
   and fires exactly `min(int(prop * n_rows), n_rows_in_class)` rows per
   listed class (partial mappings are legitimate: unlisted classes are
-  kept). Class columns are columns of `X` resolved via `column_mapping`
+  kept). The class column is a column of `X`, given as the
+  `class_column` int position
   (selection reads only `X`). First
   subsampling consumer: `RandomSamplingClassesGenerator`.
 

@@ -147,8 +147,9 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
         :param selector: A selector deciding which rows get the deficit.
             E.g. ``ProportionalSelector([0], 0)`` (deficit
             probability proportional to a column), a ``BernoulliSelector``,
-            or any callable accepting X and returning ``dict[str, array]``
-            of per-row scores. Required (``None`` raises).
+            or any callable accepting X and returning ``dict[int, spec]``
+            (keys are column positions; the per-row specs are the deficit
+            scores). Required (``None`` raises).
         :param replace: Whether to sample with replacement (default True:
             rows may be duplicated). ``False`` gives a weighted thinning.
         :param size: Number of rows to draw (default: the input row count).

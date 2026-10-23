@@ -72,9 +72,12 @@ class RandomShiftGenerator(DriftGenerator):
                          ``BernoulliSelector``, ``ExactCountSelector``,
                          ``TopQuantileSelector``, ``ClassSelector``, ...) or
                          any callable accepting X and returning
-                         ``dict[str, array]`` whose masks OR to the shifted
-                         rows. ``None`` = every row is shifted (backward
-                         compatible).
+                         ``dict[int, spec]`` (keys are column positions;
+                         value-free presets return bool masks --
+                         ``AlwaysSelector`` the scalar ``1.0`` -- value-driven
+                         presets ``[0, 1]`` firing specs as ``(n,)`` arrays),
+                         realized internally via ``fired_rows``. ``None`` =
+                         every row is shifted (backward compatible).
         :return: The modified feature matrix `X'`.
         """
         # check that if shift_std is an array, it is of length == X.shape[1]
@@ -131,9 +134,12 @@ class FixedShiftGenerator(DriftGenerator):
                          ``BernoulliSelector``, ``ExactCountSelector``,
                          ``TopQuantileSelector``, ``ClassSelector``, ...) or
                          any callable accepting X and returning
-                         ``dict[str, array]`` whose masks OR to the shifted
-                         rows. ``None`` = every row is shifted (backward
-                         compatible).
+                         ``dict[int, spec]`` (keys are column positions;
+                         value-free presets return bool masks --
+                         ``AlwaysSelector`` the scalar ``1.0`` -- value-driven
+                         presets ``[0, 1]`` firing specs as ``(n,)`` arrays),
+                         realized internally via ``fired_rows``. ``None`` =
+                         every row is shifted (backward compatible).
         :return: The modified feature matrix `X'`.
         """
         shift_std = np.asarray(shift_std, dtype=float)

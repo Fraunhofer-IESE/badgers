@@ -7,6 +7,8 @@ int positions into the array passed at call time; the presets return
 layer.
 """
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from numpy.random import default_rng
@@ -25,7 +27,9 @@ from badgers.core.selectors.base import (
     _resolve_targets,
     _validate_columns,
     fired_mask,
+    fired_rows,
     realize_firing,
+    resolve_class_column,
 )
 
 
@@ -504,6 +508,7 @@ class TestProportionalSelector:
         selector = ProportionalSelector(0, column=0)
         scores = selector(X)[0]
         assert scores.shape == (5,)
+        np.testing.assert_allclose(scores, np.full(5, 1.0 / 5))
         assert scores.sum() == pytest.approx(1.0)
         assert not (scores < 0).any() and not (scores > 1).any()
 
@@ -605,6 +610,36 @@ class TestBaseContract:
     def test_realize_firing_selector_none(self):
         fired = realize_firing(np.zeros((3, 2)), None, default_rng(0))
         assert fired.shape == (3, 2) and fired.all()
+
+    def test_resolve_class_column_prefers_class_column(self):
+        X = np.zeros((4, 3))
+        assert resolve_class_column(SimpleNamespace(class_column=2), X) == 2
+
+    def test_resolve_class_column_falls_back_to_column(self):
+        X = np.zeros((4, 3))
+        assert resolve_class_column(SimpleNamespace(column=1), X) == 1
+
+    def test_resolve_class_column_none_without_attribute(self):
+        X = np.zeros((4, 3))
+        assert resolve_class_column(SimpleNamespace(), X) is None
+
+    def test_resolve_class_column_none_when_out_of_range(self):
+        X = np.zeros((4, 3))
+        assert resolve_class_column(SimpleNamespace(class_column=9), X) is None
+
+    def test_fired_rows_are_the_fired_row_indices(self):
+        X = np.zeros((4, 2))
+        rows = fired_rows(X, lambda X, targets=None: {0: 1.0}, default_rng(0))
+        assert np.issubdtype(rows.dtype, np.integer)
+        assert rows.tolist() == [0, 1, 2, 3]
+        sel = lambda X, targets=None: {0: np.array([True, False, True, False])}  # noqa: E731
+        rows = fired_rows(X, sel, default_rng(0))
+        assert rows.tolist() == [0, 2]
+
+    def test_realize_firing_rejects_unknown_keys(self):
+        sel = lambda X, targets=None: {0: 1.0, 7: 1.0}  # noqa: E731
+        with pytest.raises(ValueError, match="not in targets"):
+            realize_firing(np.zeros((4, 2)), sel, default_rng(0))
 
 
 class TestValueFree:

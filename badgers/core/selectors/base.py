@@ -178,7 +178,7 @@ def resolve_class_column(selector, X: np.ndarray):
 
     Value-driven presets expose a ``class_column`` (or ``column``)
     attribute holding the read column position. Returns ``None`` when the
-    selector has no such attribute and the value is out of range.
+    selector has no such attribute or the value is out of range.
     """
     col = getattr(selector, "class_column", None)
     if col is None:

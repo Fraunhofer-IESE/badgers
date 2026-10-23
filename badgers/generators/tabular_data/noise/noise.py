@@ -85,9 +85,21 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         # resolve the class column from the selector's class_column
         class_col = resolve_class_column(selector, X)
         if class_col is None:
+            # distinguish the two "None" causes: no class_column/column
+            # attribute at all, or an out-of-range position (silent None
+            # from resolve_class_column)
+            col = getattr(selector, "class_column", None)
+            if col is None:
+                col = getattr(selector, "column", None)
+            if col is None:
+                raise ValueError(
+                    "a per-class noise lookup requires a selector exposing "
+                    "class_column (e.g. ClassSelector) to resolve the "
+                    "class column position"
+                )
             raise ValueError(
-                "a per-class noise lookup requires the selector's "
-                "class_column to resolve the class column position"
+                f"the selector's class_column {col} is not a valid column "
+                f"position in X with {X.shape[1]} columns"
             )
         # standardize X
         scaler = StandardScaler()
@@ -148,8 +160,12 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         :param noise_std: Global multiplier applied to the drawn noise
             (default 1.0 = raw draw).
         :param selector: A selector deciding which rows and columns
-            receive noise. ``None`` = every row in every column receives
-            noise (backward compatible).
+            receive noise. A preset from :mod:`badgers.core.selectors`
+            (``AlwaysSelector``, ``BernoulliSelector``,
+            ``ExactCountSelector``, ``TopQuantileSelector``,
+            ``ClassSelector``, ``ProportionalSelector``, or any callable
+            returning ``dict[int, spec]``). ``None`` = every row in every
+            column receives noise (backward compatible).
         :return: The noisy input features.
         """
         rvs = getattr(distribution, "rvs", None)
@@ -177,6 +193,7 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         fired = realize_firing(X, selector, self.random_generator)
         covered = getattr(selector, "columns", None)
         if covered is None:
+            # same default as _resolve_targets in badgers/core/selectors/base.py -- keep in sync
             covered = range(X.shape[1])
         full = np.zeros(X.shape, dtype=bool)
         full[:, list(covered)] = fired

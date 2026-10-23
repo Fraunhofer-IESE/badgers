@@ -30,7 +30,7 @@ class CausalMissingnessGenerator(CausalGenerator):
     selector : Selector or None, default=None
         Row-selection rule from ``badgers.core.selectors``
         (``BernoulliSelector`` = MCAR, ``TopQuantileSelector`` with
-        drivers = MAR, self mode = MNAR, ``ExactCountSelector``,
+        ``driver`` = MAR, self mode = MNAR, ``ExactCountSelector``,
         ``AlwaysSelector``, or any callable with the same signature).
         ``None`` = every row fires.
     """

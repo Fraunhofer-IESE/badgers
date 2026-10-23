@@ -159,9 +159,9 @@ class CausalGenerator(GeneratorMixin):
 
         Parameters
         ----------
-        rows : the rows whose firing the selector decides (the generator's
-            working rows -- for the noise generator these are the
-            n_copies-EXPANDED rows).
+        rows : the raw input rows whose firing the selector decides
+            (masks are realized on the un-expanded input; only
+            noise/causal.py expands rows afterwards).
         perturbation_nodes : list of str, non-empty (pre-validated).
         selector : Selector or None, default None
             Index-only row-selection rule from ``badgers.core.selectors``
