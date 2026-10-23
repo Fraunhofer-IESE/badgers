@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from numpy.random import default_rng
 
 from badgers.core.selectors import (
     Selector,
@@ -11,6 +12,13 @@ from badgers.core.selectors import (
     TopQuantileSelector,
     ClassSelector,
     ProportionalSelector,
+)
+from badgers.core.selectors.base import (
+    _check_spec,
+    _resolve_targets,
+    _validate_columns,
+    fired_mask,
+    realize_firing,
 )
 
 
@@ -500,3 +508,71 @@ def minmax_normalize(values):
     span = values.max() - values.min()
     unit = (values - values.min()) / span if span > 0 else np.ones_like(values)
     return unit / unit.sum()
+
+
+class _FakeSel:
+    columns = (0, 1)
+
+    def __call__(self, X, targets=None):
+        targets = _resolve_targets(self, X, targets)
+        return {c: 1.0 for c in targets}
+
+
+class TestBaseContract:
+    def test_validate_columns_ints(self):
+        assert _validate_columns([2, 0]) == (2, 0)
+        assert _validate_columns(3) == (3,)
+
+    @pytest.mark.parametrize("bad", [[-1], [0, 0], [], ["a"]])
+    def test_validate_columns_rejects(self, bad):
+        with pytest.raises(ValueError):
+            _validate_columns(bad)
+
+    def test_resolve_targets_defaults_to_own_columns(self):
+        X = np.zeros((4, 3))
+        assert _resolve_targets(_FakeSel(), X, None) == (0, 1)
+
+    def test_resolve_targets_subset_ok(self):
+        X = np.zeros((4, 3))
+        assert _resolve_targets(_FakeSel(), X, [1]) == (1,)
+
+    def test_resolve_targets_out_of_own_scope_raises(self):
+        X = np.zeros((4, 3))
+        with pytest.raises(ValueError, match="outside the selector"):
+            _resolve_targets(_FakeSel(), X, [2])
+
+    def test_resolve_targets_out_of_range_raises(self):
+        X = np.zeros((4, 3))
+        with pytest.raises(ValueError, match="out of range"):
+            _resolve_targets(_FakeSel(), X, [7])
+
+    def test_check_spec_accepts_scalar_and_array(self):
+        _check_spec(0.3, 5)
+        _check_spec(np.zeros(5, dtype=bool), 5)
+        _check_spec(np.array([0.0, 1.0, 0.5, 1.0, 0.0]), 5)
+
+    @pytest.mark.parametrize("bad", [2.0, -0.1, np.zeros(3), np.zeros((5, 1))])
+    def test_check_spec_rejects(self, bad):
+        with pytest.raises(ValueError):
+            _check_spec(bad, 5)
+
+    def test_realize_firing_deterministic(self):
+        X = np.zeros((6, 2))
+        fired = realize_firing(X, _FakeSel(), default_rng(0))
+        assert fired.shape == (6, 2)
+        assert fired.all()  # spec 1.0 -> rng < 1 always
+
+    def test_realize_firing_probabilities(self):
+        sel = lambda X, targets=None: {0: 0.0, 1: 0.25}  # noqa: E731
+        fired = realize_firing(np.zeros((1000, 2)), sel, default_rng(0))
+        assert not fired[:, 0].any()
+        assert 0.2 < fired[:, 1].mean() < 0.3
+
+    def test_fired_mask_is_row_or(self):
+        sel = lambda X, targets=None: {0: 0.0, 1: 1.0}  # noqa: E731
+        fired = fired_mask(np.zeros((4, 2)), sel, default_rng(0))
+        assert fired.tolist() == [True, True, True, True]
+
+    def test_realize_firing_selector_none(self):
+        fired = realize_firing(np.zeros((3, 2)), None, default_rng(0))
+        assert fired.shape == (3, 2) and fired.all()
