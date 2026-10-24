@@ -80,6 +80,7 @@ class CausalDriftGenerator(CausalGenerator):
             raise ValueError(
                 "selector is required: it owns the intervention targets"
             )
+        self._require_dgp(X)
         self._validate_structure(X)
         targets = list(_resolve_targets(selector, X, None))
         shift = _param_by_target(shift_amount, "shift_amount", targets)

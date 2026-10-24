@@ -146,6 +146,26 @@ def test_generate__drift_closed_form_exact(make_gcm_dgp):
     )
 
 
+def test_generate__unfitted_dgp_is_fitted_lazily(chain_data, make_gcm_dgp):
+    # Regression: an UNFITTED dgp must be fitted lazily inside generate()
+    # (_require_dgp) instead of sailing past validation and crashing inside
+    # intervene(). The lazy fit runs on the generate-time data, so the
+    # drift is the same deterministic shift as with an explicitly fitted
+    # DGP.
+    X, graph, column_mapping = chain_data
+    gen = CausalDriftGenerator(
+        random_generator=np.random.default_rng(0),
+        dgp=make_gcm_dgp(graph, column_mapping),
+    )
+    assert not gen.dgp.is_fitted()
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    Xt = gen.generate(X, selector=AlwaysSelector([0]), shift_amount=1.0)
+    assert gen.dgp.is_fitted()
+    # the perturbation column moved deterministically by 1 * column std
+    shift = abs(Xt[0, 0] - X_orig[0, 0])
+    np.testing.assert_allclose(shift, 1.0 * np.std(X_orig[:, 0]), rtol=1e-8)
+
+
 def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalDriftGenerator()
