@@ -16,9 +16,7 @@ import numpy as np
 
 __all__ = [
     "Selector",
-    "realize_firing",
-    "fired_mask",
-    "fired_rows",
+    "fired",
     "resolve_class_column",
 ]
 
@@ -123,54 +121,37 @@ def _mask_from_indices(n_rows: int, idx: np.ndarray) -> np.ndarray:
     return mask
 
 
-def realize_firing(X: np.ndarray, selector, rng,
-                   targets: Sequence[int] | None = None) -> np.ndarray:
+def fired(X, selector, rng):
     """Realized firing field: bool array ``(n_rows, len(targets))``.
 
-    Column *i* corresponds to ``targets[i]``. ``selector=None`` = every
-    row in every column fires (the backward-compatible default of
-    consuming generators). Specs are realized in target order with the
-    single rule ``rng.random(n) < spec``; columns absent from the
-    selector's output stay all-False (the selector decided nothing
-    fires there). Masks are computed against the UN-mutated input.
+    Column *i* corresponds to the selector's *i*-th target (its own
+    ``columns`` when it declares a scope, else every column). Narrow on
+    purpose: the caller decides how to write the field back into full
+    coordinates.
+
+    ``selector=None`` returns every column all-True WITHOUT consuming rng
+    draws — the backward-compatible default of consuming generators.
+
+    Single realization rule (shared with every consumer):
+    ``rng.random(n) < spec``; the mask is decided against the UN-mutated
+    input.
     """
     n_rows, n_cols = X.shape
     if selector is None:
-        if targets is None:
-            targets = tuple(range(n_cols))
-        else:
-            targets = _validate_columns(targets)
-            if any(c >= n_cols for c in targets):
-                raise ValueError(
-                    f"targets {targets} out of range for X with {n_cols} columns")
-        return np.ones((n_rows, len(targets)), dtype=bool)
-    targets = _resolve_targets(selector, X, targets)
+        return np.ones((n_rows, n_cols), dtype=bool)
+    targets = _resolve_targets(selector, X, None)
     out = selector(X, targets=list(targets))
     unknown = [c for c in out if c not in targets]
     if unknown:
         raise ValueError(
             f"selector returned keys {unknown} not in targets {targets}")
-    fired = np.zeros((n_rows, len(targets)), dtype=bool)
+    field = np.zeros((n_rows, len(targets)), dtype=bool)
     for i, col in enumerate(targets):
         if col in out:
             spec = out[col]
             _check_spec(spec, n_rows)
-            fired[:, i] = rng.random(n_rows) < np.broadcast_to(spec, (n_rows,))
-    return fired
-
-
-def fired_mask(X: np.ndarray, selector, rng) -> np.ndarray:
-    """Per-row firing mask: a row fires if ANY column fires.
-
-    Row-level deficits (whole-row shift/drop/noise) use this; cell-level
-    deficits use :func:`realize_firing` directly.
-    """
-    return realize_firing(X, selector, rng).any(axis=1)
-
-
-def fired_rows(X: np.ndarray, selector, rng) -> np.ndarray:
-    """Row positions affected by a selector: :func:`fired_mask`, flattened."""
-    return np.flatnonzero(fired_mask(X, selector, rng))
+            field[:, i] = rng.random(n_rows) < np.broadcast_to(spec, (n_rows,))
+    return field
 
 
 def resolve_class_column(selector, X: np.ndarray):

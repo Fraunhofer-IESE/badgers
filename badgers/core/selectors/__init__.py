@@ -44,21 +44,13 @@ presets, split along the one constructor-contract difference they have
 positions).
 """
 
-from .base import (
-    Selector,
-    fired_mask,
-    fired_rows,
-    realize_firing,
-    resolve_class_column,
-)
+from .base import Selector, fired, resolve_class_column
 from .value_driven import ClassSelector, ProportionalSelector, TopQuantileSelector
 from .value_free import AlwaysSelector, BernoulliSelector, ExactCountSelector
 
 __all__ = [
     "Selector",
-    "realize_firing",
-    "fired_mask",
-    "fired_rows",
+    "fired",
     "resolve_class_column",
     "AlwaysSelector",
     "BernoulliSelector",

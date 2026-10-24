@@ -26,9 +26,7 @@ from badgers.core.selectors.base import (
     _check_spec,
     _resolve_targets,
     _validate_columns,
-    fired_mask,
-    fired_rows,
-    realize_firing,
+    fired,
     resolve_class_column,
 )
 
@@ -590,26 +588,39 @@ class TestBaseContract:
         with pytest.raises(ValueError):
             _check_spec(bad, 5)
 
-    def test_realize_firing_deterministic(self):
+    def test_fired_deterministic(self):
         X = np.zeros((6, 2))
-        fired = realize_firing(X, _FakeSel(), default_rng(0))
-        assert fired.shape == (6, 2)
-        assert fired.all()  # spec 1.0 -> rng < 1 always
+        field = fired(X, _FakeSel(), default_rng(0))
+        assert field.shape == (6, 2)
+        assert field.all()  # spec 1.0 -> rng.random() < 1 always
 
-    def test_realize_firing_probabilities(self):
+    def test_fired_probabilities(self):
         sel = lambda X, targets=None: {0: 0.0, 1: 0.25}  # noqa: E731
-        fired = realize_firing(np.zeros((1000, 2)), sel, default_rng(0))
-        assert not fired[:, 0].any()
-        assert 0.2 < fired[:, 1].mean() < 0.3
+        field = fired(np.zeros((1000, 2)), sel, default_rng(0))
+        assert not field[:, 0].any()
+        assert 0.2 < field[:, 1].mean() < 0.3
 
-    def test_fired_mask_is_row_or(self):
+    def test_fired_row_or_is_inline(self):
+        # former fired_mask: the row-level union is expressed at the call site
         sel = lambda X, targets=None: {0: 0.0, 1: 1.0}  # noqa: E731
-        fired = fired_mask(np.zeros((4, 2)), sel, default_rng(0))
-        assert fired.tolist() == [True, True, True, True]
+        rows = fired(np.zeros((4, 2)), sel, default_rng(0)).any(axis=1)
+        assert rows.tolist() == [True, True, True, True]
 
-    def test_realize_firing_selector_none(self):
-        fired = realize_firing(np.zeros((3, 2)), None, default_rng(0))
-        assert fired.shape == (3, 2) and fired.all()
+    def test_fired_selector_none_all_true_without_rng_draws(self):
+        rng = default_rng(0)
+        field = fired(np.zeros((3, 2)), None, rng)
+        assert field.shape == (3, 2)
+        assert field.all()
+        # selector=None consumes NO rng draws: the next draws match a fresh generator
+        np.testing.assert_array_equal(rng.random(5), default_rng(0).random(5))
+
+    def test_fired_narrow_field_only_covers_selector_scope(self):
+        X = np.zeros((4, 3))
+        field = fired(X, lambda X, targets=None: {1: 1.0}, default_rng(0))
+        assert field.shape == (4, 3)
+        assert field[:, 1].all()
+        assert not field[:, 0].any()
+        assert not field[:, 2].any()
 
     def test_resolve_class_column_prefers_class_column(self):
         X = np.zeros((4, 3))
@@ -627,19 +638,10 @@ class TestBaseContract:
         X = np.zeros((4, 3))
         assert resolve_class_column(SimpleNamespace(class_column=9), X) is None
 
-    def test_fired_rows_are_the_fired_row_indices(self):
-        X = np.zeros((4, 2))
-        rows = fired_rows(X, lambda X, targets=None: {0: 1.0}, default_rng(0))
-        assert np.issubdtype(rows.dtype, np.integer)
-        assert rows.tolist() == [0, 1, 2, 3]
-        sel = lambda X, targets=None: {0: np.array([True, False, True, False])}  # noqa: E731
-        rows = fired_rows(X, sel, default_rng(0))
-        assert rows.tolist() == [0, 2]
-
-    def test_realize_firing_rejects_unknown_keys(self):
+    def test_fired_rejects_unknown_keys(self):
         sel = lambda X, targets=None: {0: 1.0, 7: 1.0}  # noqa: E731
         with pytest.raises(ValueError, match="not in targets"):
-            realize_firing(np.zeros((4, 2)), sel, default_rng(0))
+            fired(np.zeros((4, 2)), sel, default_rng(0))
 
 
 class TestValueFree:
