@@ -26,6 +26,7 @@ from .base import (
 __all__ = [
     "AlwaysSelector",
     "BernoulliSelector",
+    "CountSelector",
     "ExactCountSelector",
 ]
 
@@ -156,3 +157,56 @@ class ExactCountSelector:
     def __repr__(self) -> str:
         return (f"ExactCountSelector(columns={self.columns!r}, "
                 f"rate={self.rate!r})")
+
+
+class CountSelector:
+    """Selector: exactly ``count`` distinct rows, one shared mask.
+
+    The exact-count ROW preset: draws ``count`` row positions without
+    replacement (uniform) and returns the same boolean mask under every
+    target column — the requested count is exact at ROW level. This is
+    the machinery behind the outliers generators' default count: an
+    explicit count is a request, and a request that overflows the data
+    raises.
+
+    Parameters
+    ----------
+    columns : int or sequence of int
+        Column positions this selector covers.
+    count : int
+        Number of rows to fire; must be an int >= 0 and <= the number
+        of rows of the ``X`` passed at call time.
+    rng : numpy.random.Generator or None, default=None
+        Random generator used for the row draws.
+    """
+
+    def __init__(self, columns: int | Sequence[int], count: int,
+                 rng: np.random.Generator | None = None):
+        self.columns = _validate_columns(columns)
+        if not isinstance(count, (int, np.integer)) or isinstance(count, bool):
+            raise ValueError(f"count must be an int, got {count!r}")
+        if count < 0:
+            raise ValueError(f"count must be >= 0, got {count}")
+        self.count = int(count)
+        self.rng = rng
+
+    def __call__(self, X: np.ndarray, targets=None):
+        _require_rng(self)
+        targets = _resolve_targets(self, X, targets)
+        n_rows = X.shape[0]
+        if self.count > n_rows:
+            raise ValueError(
+                f"count {self.count} exceeds the number of rows of X "
+                f"({n_rows}): an exact count cannot select more distinct "
+                "rows than exist")
+        if self.count == 0:
+            empty = np.zeros(n_rows, dtype=bool)
+            return {col: empty for col in targets}
+        # Sampling without replacement: sequential by nature.
+        idx = self.rng.choice(n_rows, size=self.count, replace=False)
+        mask = _mask_from_indices(n_rows, idx)
+        return {col: mask for col in targets}
+
+    def __repr__(self) -> str:
+        return (f"CountSelector(columns={self.columns!r}, "
+                f"count={self.count!r})")

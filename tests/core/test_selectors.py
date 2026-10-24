@@ -17,6 +17,7 @@ from badgers.core.selectors import (
     Selector,
     AlwaysSelector,
     BernoulliSelector,
+    CountSelector,
     ExactCountSelector,
     TopQuantileSelector,
     ClassSelector,
@@ -255,6 +256,63 @@ class TestExactCountSelector:
     def test_repr_is_informative(self):
         text = repr(ExactCountSelector(3, rate=0.3))
         assert "ExactCountSelector" in text and "(3,)" in text
+
+
+class TestCountSelector:
+    def test_exact_count_shared_mask(self):
+        X = _X(10, 2)
+        masks = CountSelector([0, 1], count=4, rng=default_rng(0))(X)
+        assert set(masks) == {0, 1}
+        m0, m1 = masks[0], masks[1]
+        assert m0.dtype == bool
+        assert m0.sum() == 4
+        np.testing.assert_array_equal(m0, m1)  # one shared row mask
+
+    def test_rows_are_distinct(self):
+        masks = CountSelector(0, count=5, rng=default_rng(1))(_X(10, 1))
+        assert masks[0].sum() == 5  # without replacement
+
+    def test_count_equal_to_rows_is_a_permutation(self):
+        masks = CountSelector([0], count=10, rng=default_rng(0))(_X(10, 1))
+        assert masks[0].all()
+
+    def test_count_zero_all_false(self):
+        masks = CountSelector([0, 1], count=0, rng=default_rng(0))(_X(10, 2))
+        assert not masks[0].any()
+        assert not masks[1].any()
+
+    def test_count_exceeding_rows_raises(self):
+        with pytest.raises(ValueError, match="exceeds the number of rows"):
+            CountSelector([0], count=11, rng=default_rng(0))(_X(10, 1))
+
+    def test_negative_count_raises(self):
+        with pytest.raises(ValueError, match="count must be >= 0"):
+            CountSelector([0], count=-1, rng=default_rng(0))
+
+    def test_non_int_count_raises(self):
+        with pytest.raises(ValueError, match="count must be an int"):
+            CountSelector([0], count=2.5, rng=default_rng(0))
+        with pytest.raises(ValueError, match="count must be an int"):
+            CountSelector([0], count=True, rng=default_rng(0))
+
+    def test_missing_rng_raises(self):
+        with pytest.raises(ValueError, match="no random generator bound"):
+            CountSelector([0], count=3)(_X(10, 1))
+
+    def test_same_seed_same_mask(self):
+        m1 = CountSelector([0], count=4, rng=default_rng(7))(_X(10, 1))[0]
+        m2 = CountSelector([0], count=4, rng=default_rng(7))(_X(10, 1))[0]
+        np.testing.assert_array_equal(m1, m2)
+
+    def test_call_time_targets_subset(self):
+        X = _X(10, 2)
+        masks = CountSelector([0, 1], count=3, rng=default_rng(0))(X, targets=[1])
+        assert set(masks) == {1}
+        assert masks[1].sum() == 3
+
+    def test_satisfies_protocol(self):
+        assert isinstance(
+            CountSelector([0], count=3, rng=default_rng(0)), Selector)
 
 
 class TestTopQuantileSelector:
