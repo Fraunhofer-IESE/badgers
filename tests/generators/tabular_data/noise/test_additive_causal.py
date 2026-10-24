@@ -7,7 +7,6 @@ import scipy.stats
 from badgers.core.selectors import (
     AlwaysSelector,
     BernoulliSelector,
-    TopQuantileSelector,
 )
 from badgers.generators.tabular_data.noise.causal import CausalAdditiveNoiseGenerator
 
@@ -27,7 +26,7 @@ def test_generate__shape_and_labels(chain_data):
         dgp=_world(X, graph, column_mapping),
     )
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, AlwaysSelector([0]),
         distribution=scipy.stats.laplace(scale=0.5),
     )
     # strictly in-place
@@ -46,7 +45,7 @@ def test_generate__inplace_returns_only_rows(chain_data):
         dgp=_world(X, graph, column_mapping),
     )
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, AlwaysSelector([0]),
         distribution=scipy.stats.norm(scale=0.1),
     )
     assert Xt.shape == X.shape
@@ -60,7 +59,7 @@ def test_generate__x_changes(chain_data):
         dgp=_world(X, graph, column_mapping),
     )
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, AlwaysSelector([0]),
         distribution=scipy.stats.laplace(scale=0.5),
     )
     assert not np.allclose(Xt[:, 0], X[:, 0])
@@ -76,7 +75,7 @@ def test_generate__zero_noise_descendants_untouched(chain_data):
         dgp=_world(X, graph, column_mapping),
     )
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, AlwaysSelector([0]),
         distribution=scipy.stats.norm(), noise_std=0.0,
     )
     # zero injected noise: the perturbed root column is unchanged, but its
@@ -95,7 +94,7 @@ def test_generate__propagation(chain_data):
         dgp=_world(X, graph, column_mapping),
     )
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, AlwaysSelector([0]),
         distribution=scipy.stats.laplace(scale=0.5),
     )
     # X changed (injected noise)
@@ -113,7 +112,7 @@ def test_generate__no_dgp_raises(chain_data):
     gen = CausalAdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(
-            X, perturbation_nodes=["X"],
+            X, AlwaysSelector([0]),
             distribution=scipy.stats.norm(scale=0.1),
         )
 
@@ -129,7 +128,7 @@ def test_generate__no_structure_raises(chain_data):
     gen.column_mapping = None
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(
-            X, perturbation_nodes=["X"],
+            X, AlwaysSelector([0]),
             distribution=scipy.stats.norm(scale=0.1),
         )
 
@@ -142,7 +141,7 @@ def test_generate__invalid_distribution_raises(chain_data):
     )
     with pytest.raises(TypeError, match="frozen scipy"):
         gen.generate(
-            X, perturbation_nodes=["X"],
+            X, AlwaysSelector([0]),
             distribution="normal",
         )
 
@@ -155,7 +154,7 @@ def test_generate__negative_noise_std_raises(chain_data):
     )
     with pytest.raises(ValueError, match="noise_std"):
         gen.generate(
-            X, perturbation_nodes=["X"],
+            X, AlwaysSelector([0]),
             distribution=scipy.stats.norm(), noise_std=-1.0,
         )
 
@@ -166,9 +165,9 @@ def test_generate__invalid_perturbation_node_raises(chain_data):
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    with pytest.raises(ValueError, match="not found"):
+    with pytest.raises(ValueError, match="out of range"):
         gen.generate(
-            X, perturbation_nodes=["W"],
+            X, AlwaysSelector([3]),
             distribution=scipy.stats.norm(),
         )
 
@@ -182,7 +181,7 @@ def test_generate__lazy_fit(chain_data, make_gcm_dgp):
     )
     assert not dgp.is_fitted()
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, AlwaysSelector([0]),
         distribution=scipy.stats.norm(scale=0.1),
     )
     assert dgp.is_fitted()
@@ -197,9 +196,8 @@ def test_generate__selector_gates_rows(chain_data):
     )
     # Bernoulli selector: only ~half the rows fire
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
         distribution=scipy.stats.norm(scale=0.5),
-        selector=BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
     )
     assert Xt.shape == X.shape
     fired = gen.get_noise_labels()
@@ -208,32 +206,29 @@ def test_generate__selector_gates_rows(chain_data):
     assert np.array_equal(Xt[~fired], X[~fired])
 
 
-def test_generate__always_selector_equals_default(chain_data):
+def test_generate__always_selector_reproducible(chain_data):
     X, graph, column_mapping = chain_data
     dgp = _world(X, graph, column_mapping)
     base = CausalAdditiveNoiseGenerator(
         random_generator=np.random.default_rng(0), dgp=dgp,
     )
-    Xt_default = base.generate(
-        X.copy(), perturbation_nodes=["X"],
+    Xt_first = base.generate(
+        X.copy(), AlwaysSelector([0]),
         distribution=scipy.stats.norm(scale=0.5),
-        selector=None,
     )
-    # labels: with no selector EVERY row fires
+    # labels: AlwaysSelector fires EVERY row
     np.testing.assert_array_equal(
         base.get_noise_labels(), np.ones(X.shape[0], dtype=bool)
     )
+    # a second run with the same rng seed is bit-identical
     gen = CausalAdditiveNoiseGenerator(
         random_generator=np.random.default_rng(0), dgp=dgp,
     )
     Xt = gen.generate(
-        X.copy(), perturbation_nodes=["X"],
+        X.copy(), AlwaysSelector([0]),
         distribution=scipy.stats.norm(scale=0.5),
-        selector=AlwaysSelector([0]),
     )
-    # labels: AlwaysSelector fires exactly the same rows as the default
     np.testing.assert_array_equal(
         gen.get_noise_labels(), base.get_noise_labels()
     )
-    # fired rows were noised (drawn from a different realization stream)
-    assert not np.array_equal(Xt[Xt_default != X], Xt_default[Xt_default != X])
+    np.testing.assert_array_equal(Xt, Xt_first)
