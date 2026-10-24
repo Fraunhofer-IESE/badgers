@@ -7,6 +7,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
+from badgers.core.selectors import AlwaysSelector
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
     ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
@@ -325,7 +326,7 @@ def test_causal_outlier_propagation__labels_without_y_output(make_gcm_dgp):
     with pytest.raises(RuntimeError):
         generator.get_outliers_labels()
 
-    Xt = generator.generate(X, perturbation_nodes=["a"], n_outliers=7)
+    Xt = generator.generate(X, AlwaysSelector([column_mapping["a"]]), n_outliers=7)
 
     labels = generator.get_outliers_labels()
     assert labels.dtype == bool
