@@ -3,6 +3,7 @@ from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.sampling import ZScoreSampler
 from badgers.core.utils import random_sign, random_spherical_coordinate, random_spherical_coordinates
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
@@ -94,41 +95,26 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         r"""
         Randomly generates outliers as data points with a z-score > 3.
 
-        The process involves the following steps:
-        1. Standardize the input data so that it has a mean of 0 and a variance of 1.
-        2. Generate outliers by:
-           - choosing a random sign for each outlier.
-           - for each dimension of the data, set the value to be 3 plus a random number drawn from an exponential distribution
-            (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
-        3. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
+        Outlier values are produced by
+        :class:`badgers.core.sampling.ZScoreSampler` directly on the
+        original scale: each column independently gets a random sign and a
+        distance of ``3 + exponential(scale)`` standard deviations from the
+        column mean.
 
         :param X: the input features (pandas DataFrame or numpy array).
         :param n_outliers: The number of outliers to generate.
-        :param scale: float or array_like of floats (the scale parameter from https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
+        :param scale: float (the scale parameter from
+                    https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
                     The scale parameter, :math:`\beta = 1/\lambda`. Must be
-                    non-negative.
+                    positive.
         :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
         assert scale > 0
 
-        # standardize X
-        scaler = StandardScaler()
-
-        # fit, transform
-        scaler.fit(X)
-        Xt = scaler.transform(X)
-
-        # generate outliers (vectorized: all samples at once)
-        signs = random_sign(self.random_generator, size=(n_outliers, Xt.shape[1]))
-        exponentials = self.random_generator.exponential(scale=scale, size=(n_outliers, Xt.shape[1]))
-        outliers = signs * (3.0 + exponentials)
-
-        # in case we only have 1 outlier, reshape the array to match sklearn convention
-        if outliers.shape[0] == 1:
-            outliers = outliers.reshape(1, -1)
-
-        outliers = scaler.inverse_transform(outliers)
+        outliers = ZScoreSampler(scale=scale).sample(
+            self.random_generator, X, columns=list(range(X.shape[1])), n_samples=n_outliers
+        )
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])

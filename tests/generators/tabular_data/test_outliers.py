@@ -8,6 +8,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from badgers.core.selectors import AlwaysSelector
+from badgers.core.utils import random_sign
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
     ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
@@ -135,6 +136,27 @@ def test_zscore__scale_effect_on_zscore_magnitude():
     z_large = np.abs(outliers_large)
 
     assert z_large.mean() > z_small.mean()
+
+
+def test_zscore__delegates_to_sampler_math():
+    """Outlier rows equal the original inline formula (standardize → z → inverse)."""
+    rng = default_rng(42)
+    X = rng.normal(size=(50, 4))
+    n_outliers, scale = 10, 1.0
+
+    generator = ZScoreSamplingGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), n_outliers=n_outliers, scale=scale)
+
+    ref_rng = default_rng(0)
+    scaler = StandardScaler().fit(X)
+    signs = random_sign(ref_rng, size=(n_outliers, X.shape[1]))
+    exponentials = ref_rng.exponential(scale=scale, size=(n_outliers, X.shape[1]))
+    outliers_ref = scaler.inverse_transform(signs * (3.0 + exponentials))
+
+    # sampler computes mean/std with numpy's two-pass algorithm while the old
+    # inline math used sklearn's sum-based mean/var: identical up to fp ordering
+    # (1 ULP observed), so pin to atol=1e-12 rather than bit equality
+    np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
 
 def test_histogram__2d_raises_not_implemented():
