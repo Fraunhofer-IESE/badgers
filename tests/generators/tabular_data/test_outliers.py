@@ -7,8 +7,10 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-from badgers.core.selectors import AlwaysSelector, CountSelector
+from badgers.core.sampling import ZScoreSampler
+from badgers.core.selectors import AlwaysSelector, CountSelector, fired
 from badgers.core.utils import random_spherical_coordinates, random_sign
+from badgers.generators.tabular_data.outliers._firing import iter_firing_groups
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
     ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
@@ -118,7 +120,7 @@ def test_outliers__scores_worse_than_original():
 def test_zscore__scale_effect_on_zscore_magnitude():
     """Larger scale should, on average, yield larger z-scores."""
     rng = default_rng(0)
-    X = pd.DataFrame(rng.normal(size=(100, 10)), columns=[f"col{i}" for i in range(10)])
+    X = pd.DataFrame(rng.normal(size=(300, 10)), columns=[f"col{i}" for i in range(10)])
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
@@ -139,7 +141,12 @@ def test_zscore__scale_effect_on_zscore_magnitude():
 
 
 def test_zscore__delegates_to_sampler_math():
-    """Outlier rows equal the original inline formula (standardize → z → inverse)."""
+    """Outlier rows equal the selector-flow replay on the same stream.
+
+    Pins the draw order of the new flow: CountSelector row draw, then
+    fired()'s realization draws, then the sampler's signs + exponentials.
+    The sampler MATH exactness itself is pinned in tests/core/test_sampling.py.
+    """
     rng = default_rng(42)
     X = rng.normal(size=(50, 4))
     n_outliers, scale = 10, 1.0
@@ -148,15 +155,56 @@ def test_zscore__delegates_to_sampler_math():
     Xt = generator.generate(X.copy(), n_outliers=n_outliers, scale=scale)
 
     ref_rng = default_rng(0)
-    scaler = StandardScaler().fit(X)
-    signs = random_sign(ref_rng, size=(n_outliers, X.shape[1]))
-    exponentials = ref_rng.exponential(scale=scale, size=(n_outliers, X.shape[1]))
-    outliers_ref = scaler.inverse_transform(signs * (3.0 + exponentials))
-
-    # sampler computes mean/std with numpy's two-pass algorithm while the old
-    # inline math used sklearn's sum-based mean/var: identical up to fp ordering
-    # (1 ULP observed), so pin to atol=1e-12 rather than bit equality
+    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
+    ref_field = fired(X, ref_selector, ref_rng)
+    ref_targets = list(range(X.shape[1]))
+    ref_seeds = np.flatnonzero(ref_field.any(axis=1))
+    outliers_ref = X[ref_seeds].astype(np.float64)
+    for group_rows, fired_cols in iter_firing_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, fired_cols)] = ZScoreSampler(scale=scale).sample(
+            ref_rng, X, fired_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
+
+
+def test_zscore__selector_partial_fire_keeps_seed_values():
+    """A column not fired keeps the seed row's own value (oracle)."""
+    rng = default_rng(0)
+    X = rng.normal(size=(40, 3))
+    mask0 = np.zeros(40, dtype=bool)
+    mask0[:5] = True
+    generator = ZScoreSamplingGenerator(random_generator=default_rng(1))
+    Xt = generator.generate(X.copy(), selector=lambda X_, targets=None: {0: mask0})
+    outliers = Xt[len(X):]
+    assert outliers.shape == (5, 3)
+    labels = generator.get_outliers_labels()
+    assert not labels[:len(X)].any()
+    assert labels[len(X):].all()
+    # unfired columns keep the seed row's values exactly
+    np.testing.assert_array_equal(outliers[:, 1:], X[:5, 1:])
+    np.testing.assert_array_equal(outliers[:, 2:], X[:5, 2:])
+    # fired column is beyond 3 sigma of its column
+    stds = X.std(axis=0)
+    assert np.all(np.abs(outliers[:, 0] - X[:, 0].mean()) > 3.0 * stds[0])
+
+
+def test_zscore__explicit_count_selector():
+    """An explicit CountSelector owns count and targets."""
+    X = default_rng(0).normal(size=(40, 3))
+    generator = ZScoreSamplingGenerator(random_generator=default_rng(2))
+    selector = CountSelector([0], count=6, rng=default_rng(3))
+    ref_selector = CountSelector([0], count=6, rng=default_rng(3))
+    Xt = generator.generate(X.copy(), selector=selector)
+    assert Xt.shape == (46, 3)
+    labels = generator.get_outliers_labels()
+    assert labels[:40].sum() == 0 and labels[40:].all()
+    outliers = Xt[40:]
+    # the fired rows (selector's own draw, replayed on an equal-seeded
+    # selector) are the seeds: the unfired columns keep the seed values
+    seeds = np.flatnonzero(ref_selector(X, targets=[0])[0])
+    assert seeds.size == 6
+    np.testing.assert_array_equal(outliers[:, 1:], X[seeds, 1:])
+    stds = X.std(axis=0)
+    assert np.all(np.abs(outliers[:, 0] - X[:, 0].mean()) > 3.0 * stds[0])
 
 
 def test_histogram__2d_raises_not_implemented():
