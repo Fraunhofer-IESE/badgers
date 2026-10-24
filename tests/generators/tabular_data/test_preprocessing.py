@@ -48,3 +48,27 @@ def test_preprocess_inputs_rejects_more_than_two_dimensions():
 def test_preprocess_inputs_rejects_unsupported_X_type():
     with pytest.raises(ValueError, match="X must be a list"):
         XOnlyGenerator().generate("not tabular data")
+
+
+class _FakeGen:
+    @preprocess_inputs
+    def generate(self, X, selector=None, value=0.0):
+        return X, selector, value
+
+
+def test_preprocess_accepts_dataframe_and_keeps_positional_args():
+    gen = _FakeGen()
+    X, selector, value = gen.generate(pd.DataFrame({"a": [1.0, 2.0]}), "SELECTOR", 7.5)
+    assert isinstance(X, np.ndarray)
+    assert selector == "SELECTOR"
+    assert value == 7.5
+
+
+def test_preprocess_forwards_kwargs_and_readonly_copy():
+    gen = _FakeGen()
+    ro = np.arange(4).reshape(2, 2)
+    ro.flags.writeable = False
+    X, selector, value = gen.generate(ro, selector="S", value=1.5)
+    assert X.flags.writeable
+    assert (X == np.arange(4).reshape(2, 2)).all()
+    assert selector == "S" and value == 1.5

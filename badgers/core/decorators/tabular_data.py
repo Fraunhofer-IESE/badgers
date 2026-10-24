@@ -13,7 +13,7 @@ def preprocess_inputs(generate_func):
     """
 
     @functools.wraps(generate_func)
-    def wrapper(self, X, **kwargs):
+    def wrapper(self, X, *args, **kwargs):
         # Validate and preprocess X
         if isinstance(X, list):
             X = np.array(X)
@@ -43,6 +43,6 @@ def preprocess_inputs(generate_func):
             )
 
         # Call the original function with the preprocessed input
-        return generate_func(self, X, **kwargs)
+        return generate_func(self, X, *args, **kwargs)
 
     return wrapper
