@@ -1,7 +1,9 @@
 """Sampling strategies for generating values within or outside observed distributions.
 
 WithinDistributionSampler subclasses generate plausible values from the
-observed data distribution (used for exogenous nodes in causal generation).
+observed data distribution (used for exogenous nodes in causal generation,
+and for within-distribution value synthesis: ``InstanceSampler`` copies
+real values per cell).
 
 OutOfDistributionSampler subclasses generate anomalous values outside the
 observed distribution (used for perturbation nodes in causal generation).
@@ -77,6 +79,21 @@ class UniformSampler(WithinDistributionSampler):
         mins = X[:, columns].min(axis=0)
         maxs = X[:, columns].max(axis=0)
         return rng.uniform(low=mins, high=maxs, size=(n_samples, len(columns)))
+
+
+class InstanceSampler(WithinDistributionSampler):
+    """Sample each cell by copying the value of a random real row.
+
+    Per-cell bootstrap: for every (sample, column) pair an independent
+    row is drawn from the full data and that cell's value is copied.
+    Every returned value is a real value of its column, but the cells of
+    one row come from different rows, so each row is a plausible-looking
+    recombination — within-distribution per cell, unlikely as a row.
+    """
+
+    def sample(self, rng, X, columns, n_samples):
+        row_indices = rng.integers(0, len(X), size=(n_samples, len(columns)))
+        return X[row_indices, np.asarray(columns)]
 
 
 _WITHIN_DISTRIBUTION_REGISTRY = {

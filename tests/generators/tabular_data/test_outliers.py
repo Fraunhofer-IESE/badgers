@@ -7,7 +7,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-from badgers.core.selectors import AlwaysSelector
+from badgers.core.selectors import AlwaysSelector, CountSelector
 from badgers.core.utils import random_spherical_coordinates, random_sign
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
@@ -400,3 +400,35 @@ def test_causal_outlier_propagation__labels_without_y_output(make_gcm_dgp):
     assert len(labels) == len(Xt)
     assert not labels[:n_samples].any()
     assert labels[n_samples:].all()
+
+# --- UniformInstanceAttributeSampling (selector surface) ---
+
+def test_instance_sampling__bit_identical_delegation():
+    """Full-width delegation keeps today's inline per-cell bootstrap values."""
+    rng = default_rng(42)
+    X = rng.normal(size=(30, 4))
+    generator = UniformInstanceAttributeSampling(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), n_outliers=5)
+    ref = X[default_rng(0).integers(0, 30, size=(5, 4)), np.arange(4)]
+    np.testing.assert_array_equal(Xt[len(X):], ref)
+
+
+def test_instance_sampling__n_outliers_capped_at_row_count():
+    X = np.arange(20.0).reshape(10, 2)
+    generator = UniformInstanceAttributeSampling(random_generator=default_rng(0))
+    with pytest.raises(ValueError, match="must not exceed"):
+        generator.generate(X.copy(), n_outliers=11)
+
+
+def test_instance_sampling__selector_is_ignored_with_warning():
+    rng = default_rng(0)
+    X = rng.normal(size=(30, 3))
+    generator = UniformInstanceAttributeSampling(random_generator=default_rng(1))
+    with pytest.warns(UserWarning, match="selector is ignored"):
+        Xt = generator.generate(
+            X.copy(), n_outliers=5,
+            selector=CountSelector([0], count=3, rng=default_rng(2)))
+    assert Xt.shape == (35, 3)
+    labels = generator.get_outliers_labels()
+    assert labels[:30].sum() == 0
+    assert labels[30:].all()

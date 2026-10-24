@@ -7,6 +7,7 @@ from badgers.core.sampling import (
     Sampler,
     NormalSampler,
     UniformSampler,
+    InstanceSampler,
     ZScoreSampler,
     HypersphereSampler,
     UniformOutOfDistributionSampler,
@@ -88,6 +89,26 @@ def test_uniform_sampler_single_column(rng, X):
     sampler = UniformSampler()
     result = sampler.sample(rng, X, [1], 30)
     assert result.shape == (30, 1)
+
+
+# --- InstanceSampler ---
+def test_instance_sampler_shape(rng, X):
+    out = InstanceSampler().sample(rng, X, [0, 1], 7)
+    assert out.shape == (7, 2)
+
+
+def test_instance_sampler_values_are_real_column_values(rng, X):
+    out = InstanceSampler().sample(rng, X, [1, 0], 50)
+    assert np.isin(out[:, 0], X[:, 1]).all()
+    assert np.isin(out[:, 1], X[:, 0]).all()
+
+
+def test_instance_sampler_full_width_draw_parity():
+    """Full-width call keeps the inline per-cell bootstrap draw shape."""
+    X = np.arange(80.0).reshape(20, 4)
+    out = InstanceSampler().sample(np.random.default_rng(5), X, list(range(4)), 5)
+    ref = X[np.random.default_rng(5).integers(0, 20, size=(5, 4)), np.arange(4)]
+    np.testing.assert_array_equal(out, ref)
 
 
 # --- ZScoreSampler ---
