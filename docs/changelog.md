@@ -37,6 +37,28 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
     now requires a selector (per-cell pinning: firing masks a single cell per
     selected row, pure-bootstrap rows are labeled ``False``, and rows sharing
     a firing pattern are perturbed as one group).
+- **Wave 3: the outliers generators consume selectors; outlier rows are seeded from real rows.**
+  All six tabular outliers generators take a selector and realize it through the
+  shared firing field. ``CausalOutlierPropagationGenerator.generate(X, selector,
+  *, out_of_distribution_sampler=None)``: the selector is required and fires on
+  ``X`` — the fired rows are appended as COPIES (an unfired cell keeps the seed
+  row's value; descendants of fired targets recompute through the DGP; labels are
+  all ``True``); ``n_outliers`` and ``within_distribution_sampler`` are removed
+  (``CountSelector([x], count=10)`` replaces ``n_outliers=10``). The direct
+  generators (``HyperCubeSampling``, ``ZScoreSamplingGenerator``,
+  ``HypersphereSamplingGenerator``) make selectors the only firing mechanism:
+  ``n_outliers`` is only the DEFAULT count (``selector=None`` builds an internal
+  ``CountSelector``, default 10), passing both raises, and appended rows are
+  copies of fired rows with fired cells overwritten by the same samplers as
+  before (same-seed values shift: the selector machinery consumes draws first).
+  The low-density trio (``IndependentHistogramsGenerator``,
+  ``HistogramSamplingGenerator``, ``LowDensitySamplingGenerator``) uses selector
+  KEYS as the synthesized columns (mask discarded) and fills unselected columns
+  with per-cell bootstrap copies. ``UniformInstanceAttributeSampling`` accepts
+  ``selector`` for API uniformity but ignores it (warning; ``n_outliers`` stays
+  its count). Everywhere in the family a requested count is capped at the
+  dataset size (``count > len(X)`` raises), 0 is a no-op and a negative count
+  raises.
 - **The `(X, y)` contract is removed; generators and selectors take `X` only (breaking).**
   Every generator's signature is `generate(X, **params)` and it returns exactly one
   generated object `Xt` — the old `y` parameter and the two-tuple return are gone
@@ -303,6 +325,16 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   mutate the base DGP; they compose by delegation.
 
 ### Added
+
+- **Exact-count selector presets**: ``CountSelector(columns, count, rng)`` —
+  exactly ``count`` distinct rows with one shared mask under every target
+  (``count > len(X)`` raises); ``ClassCountSelector(columns, class_column,
+  counts, rng)`` — exact row counts per class value (unknown class values and
+  per-class overflow raise).
+- **New within-distribution sampler ``InstanceSampler``** — per-cell bootstrap
+  (each cell copies the value of a random real row); extracted from
+  ``UniformInstanceAttributeSampling``, which now delegates to it
+  (bit-identical values).
 
 - **New DGP backend `GcmSCMDGP` (dowhy extra)**: plug an externally built
   `dowhy.gcm.StructuralCausalModel` into badgers — mechanism fitting is
