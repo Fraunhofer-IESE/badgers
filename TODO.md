@@ -32,9 +32,11 @@ so that specifications/requirements can be derived directly from them.
     noise to exactly that class's rows; unfired rows are bit-identical to the input.
 - **Implementation status**: done — `AdditiveNoiseGenerator.generate` accepts keyword-only
   `selector=None`; the drawn noise is zeroed on unfired rows (OR of the selector's masks, computed
-  on the un-mutated input) and combined with the `perturbation_nodes` column mask. The shared
-  row-selection helper lives in `badgers.core.selectors` (`fired_mask`/`fired_rows`; also used by
-  the drift and imbalance consumers). Covered by 6 new tests in
+  on the un-mutated input). The shared realization helper is
+  `badgers.core.selectors.fired(X, selector, rng)`: it returns the narrow bool field
+  `(n_rows, n_targets)` (column `i` ↔ the selector's `i`-th target); consumers take the
+  row-level union themselves with `field.any(axis=1)` (the drift and imbalance consumers do
+  the same). Covered by 6 new tests in
   [test_additive.py](tests/generators/tabular_data/noise/test_additive.py); full suite green.
 - **Consequence / open decisions**:
   - `GaussianNoiseClassesGenerator` (a.k.a. GaussianWhiteNoise) then degenerates to

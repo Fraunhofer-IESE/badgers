@@ -583,7 +583,7 @@ class TestBaseContract:
         _check_spec(np.zeros(5, dtype=bool), 5)
         _check_spec(np.array([0.0, 1.0, 0.5, 1.0, 0.0]), 5)
 
-    @pytest.mark.parametrize("bad", [2.0, -0.1, np.zeros(3), np.zeros((5, 1))])
+    @pytest.mark.parametrize("bad", [2.0, -0.1, True, False, np.zeros(3), np.zeros((5, 1))])
     def test_check_spec_rejects(self, bad):
         with pytest.raises(ValueError):
             _check_spec(bad, 5)

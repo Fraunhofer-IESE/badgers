@@ -223,3 +223,40 @@ def test_generate__all_nan_column_does_not_crash(chain_data, make_gcm_dgp):
     np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))
     # Descendant Z is NaN exactly where the Y delta was NaN.
     np.testing.assert_array_equal(np.isnan(Xt[:, 2]), np.isnan(before[:, 1]))
+
+
+def test_generate__selector_none_raises(chain_data, make_gcm_dgp):
+    # The selector is required: it owns the intervention targets.
+    # (Unlike the other causal generators, drift's signature has no
+    # selector default -- pass None explicitly to hit the guard.)
+    X, graph, column_mapping = chain_data
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    with pytest.raises(ValueError, match="selector is required"):
+        gen.generate(X, selector=None, shift_amount=1.0)
+
+
+def test_generate__shift_amount_dict_per_target(chain_data, make_gcm_dgp):
+    # shift_amount as a dict keyed by COLUMN POSITION applies a per-target
+    # shift: column 0 (X) moves by 1.0 * std(X), column 1 (Y) by 0.5 * std(Y).
+    X, graph, column_mapping = chain_data
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0, 1]),
+        shift_amount={0: 1.0, 1: 0.5},
+    )
+    np.testing.assert_allclose(
+        np.abs(Xt[:, 0] - X_orig[:, 0]), 1.0 * np.std(X_orig[:, 0]), rtol=1e-8)
+    np.testing.assert_allclose(
+        np.abs(Xt[:, 1] - X_orig[:, 1]), 0.5 * np.std(X_orig[:, 1]), rtol=1e-8)
+
+
+def test_generate__shift_amount_dict_missing_entry_raises(chain_data, make_gcm_dgp):
+    # A dict keyed by column position must cover EVERY target column.
+    X, graph, column_mapping = chain_data
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    with pytest.raises(ValueError, match="shift_amount dict is missing entries"):
+        gen.generate(X, selector=AlwaysSelector([0, 1]), shift_amount={0: 1.0})

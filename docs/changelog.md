@@ -16,7 +16,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   return firing decisions (bool masks; ``AlwaysSelector``'s constant
   scalar ``1.0`` realizes to all-true); value-driven presets return ``[0, 1]``
   firing specs (float scalar or ``(n,)`` array) that generators realize with
-    the single rule ``rng.random(n) < spec``). Direct generators no longer take
+    the single rule ``rng.random(n) < spec``. Direct generators no longer take
     ``column_mapping`` — ``AdditiveNoiseGenerator.generate(X, distribution,
     noise_std=1.0, *, selector=None)``. Causal generators' call-time targets
     are owned by the selector itself: its ``columns`` (column positions) are

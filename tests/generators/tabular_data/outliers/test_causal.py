@@ -432,15 +432,16 @@ def test_generate__selector_none_raises(rng):
 
 
 def test_generate__per_cell_pinning_partial_fire(rng):
-    """Rows fired only on one target: that cell is OOD, the other target keeps
-    its bootstrap value; rows fired nowhere stay pure bootstrap (label False)."""
+    """Rows fired only on one target: that cell is OOD, the other target
+    stays in-distribution (recomputed through the SCM surgery); the row
+    fired nowhere stays a pure bootstrap row (label False)."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
     coefs = {("X", "Y"): 0.0}
     X, column_mapping = _generate_linear_data(
         graph, n_samples=100, rng=rng, coefficients=coefs)
-    fire_x = np.array([True, False, True, False, True])
-    fire_y = np.array([False, True, False, True, False])
+    fire_x = np.array([True, True, True, False, False])
+    fire_y = np.array([True, False, True, True, False])
     generator = CausalOutlierPropagationGenerator(
         random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
@@ -453,6 +454,30 @@ def test_generate__per_cell_pinning_partial_fire(rng):
         col_fired = (fire_x if col == 0 else fire_y)
         dev = np.abs(Xt[100 + np.flatnonzero(col_fired), col] - X[:, col].mean())
         assert np.all(dev > 3.0 * stds[col])
+
+    # Regression: whole-row pinning would OOD-pin EVERY target cell of any
+    # row firing anywhere. With the masks above, row 104 fires nowhere (it
+    # exercises the pure-bootstrap branch and must stay in-distribution),
+    # and row 101 fires only on X, so its unfired Y target must NOT be
+    # pinned: per-cell semantics recompute it through the SCM surgery as
+    # response("Y", X_pinned) + fresh in-distribution noise (the ("X","Y")
+    # coefficient is 0 in this fixture, so the recomputed Y stays at the
+    # noise scale). A whole-row pin would place that Y cell at >= 3 sigma
+    # from the mean; the seeded recomputed value sits under 1 sigma.
+    nowhere = 100 + 4
+    assert np.all(np.isfinite(Xt[nowhere]))
+    for col in (0, 1):
+        # the within sampler resamples N(mean, std) per column (not rows
+        # of X), so a pure bootstrap row is checked against a loose
+        # in-distribution band rather than exact observed values
+        dev = abs(Xt[nowhere, col] - X[:, col].mean())
+        assert dev < 4.0 * stds[col]
+    only_x = 100 + 1
+    assert abs(Xt[only_x, 0] - X[:, 0].mean()) > 3.0 * stds[0]
+    pred_y = float(
+        generator.dgp.response("Y", Xt[only_x:only_x + 1, [0]])[0])
+    assert abs(Xt[only_x, 1] - pred_y) < 0.5
+    assert abs(Xt[only_x, 1] - X[:, 1].mean()) < 3.0 * stds[1]
 
 
 def test_generate__invalid_out_of_distribution_sampler_type_raises(rng):
