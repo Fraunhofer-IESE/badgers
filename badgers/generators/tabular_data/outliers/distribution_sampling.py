@@ -1,10 +1,9 @@
 import numpy as np
 from numpy.random import default_rng
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.sampling import ZScoreSampler
-from badgers.core.utils import random_sign, random_spherical_coordinate, random_spherical_coordinates
+from badgers.core.sampling import HypersphereSampler, ZScoreSampler
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
 
@@ -146,47 +145,28 @@ class HypersphereSamplingGenerator(OutliersGenerator):
     @preprocess_inputs
     def generate(self, X, n_outliers: int = 10, scale: float = 1.0):
         r"""
-        Randomly generates outliers by sampling points from a hypersphere.
+        Generates outliers by sampling points from a hypersphere with radius at least 3 sigma.
 
-        The process involves the following steps:
-        1. Standardize the input data so that it has a mean of 0 and a variance of 1.
-        2. Generate outliers by:
-           - choosing angles uniformly at random for each dimension of the data.
-           - setting the radius to be 3 plus a random number drawn from an exponential distribution
-             (see https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html).
-        3. Convert the spherical coordinates to Cartesian coordinates.
-        4. Apply the inverse of the standardization transformation to convert the generated outliers back to the original scale.
+        Outlier values are produced by
+        :class:`badgers.core.sampling.HypersphereSampler` directly on the
+        original scale: radii of ``3 + exponential(scale)`` in standardized
+        space are converted to Cartesian coordinates and mapped back per
+        column (``mean + z * std``).
 
         :param X: the input features (pandas DataFrame or numpy array).
         :param n_outliers: The number of outliers to generate.
-        :param scale: float (the scale parameter from https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
+        :param scale: float (the scale parameter from
+                    https://numpy.org/doc/stable/reference/random/generated/numpy.random.Generator.exponential.html)
                     The scale parameter, :math:`\beta = 1/\lambda`. Must be
-                    non-negative.
+                    positive.
         :return: The augmented feature matrix with added outliers.
         """
         assert n_outliers > 0
         assert scale > 0
 
-        # standardize X
-        scaler = StandardScaler()
-
-        # fit, transform
-        scaler.fit(X)
-        Xt = scaler.transform(X)
-
-        # computing outliers (vectorized: all radii + coordinates at once)
-        radii = 3.0 + self.random_generator.exponential(scale=scale, size=n_outliers)
-        outliers = random_spherical_coordinates(
-            random_generator=self.random_generator,
-            size=Xt.shape[1],
-            radii=radii,
+        outliers = HypersphereSampler(scale=scale).sample(
+            self.random_generator, X, columns=list(range(X.shape[1])), n_samples=n_outliers
         )
-
-        # in case we only have 1 outlier, reshape the array to match sklearn convention
-        if outliers.shape[0] == 1:
-            outliers = outliers.reshape(1, -1)
-
-        outliers = scaler.inverse_transform(outliers)
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])

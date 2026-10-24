@@ -8,7 +8,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from badgers.core.selectors import AlwaysSelector
-from badgers.core.utils import random_sign
+from badgers.core.utils import random_spherical_coordinates, random_sign
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
     ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
@@ -219,6 +219,28 @@ def test_hypersphere__scale_effect_on_radius():
     r_large = np.linalg.norm(outliers_large, axis=1).mean()
 
     assert r_large > r_small
+
+
+def test_hypersphere__delegates_to_sampler_math():
+    """Outlier rows equal the original inline formula (standardize → radii → coords → inverse)."""
+    rng = default_rng(42)
+    X = rng.normal(size=(50, 4))
+    n_outliers, scale = 10, 1.0
+
+    generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), n_outliers=n_outliers, scale=scale)
+
+    ref_rng = default_rng(0)
+    scaler = StandardScaler().fit(X)
+    radii = 3.0 + ref_rng.exponential(scale=scale, size=n_outliers)
+    outliers_ref = scaler.inverse_transform(
+        random_spherical_coordinates(random_generator=ref_rng, size=X.shape[1], radii=radii)
+    )
+
+    # sampler computes mean/std with numpy's two-pass algorithm while the old
+    # inline math used sklearn's sum-based mean/var: identical up to fp ordering
+    # (1 ULP observed), so pin to atol=1e-12 rather than bit equality
+    np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
 
 def test_hypercube__expansion_zero_within_min_max():
