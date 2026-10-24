@@ -613,19 +613,32 @@ def test_generate__uniform_out_of_distribution_sampler(rng):
     assert np.allclose(Xt[:100], X)
 
 
-def test_generate__uniform_out_of_distribution_no_expansion_raises(rng):
-    """UniformOutOfDistributionSampler with expansion=0 should raise ValueError."""
+def test_generate__uniform_out_of_distribution_zero_expansion_allowed(rng):
+    """UniformOutOfDistributionSampler accepts expansion=0 (exact bounding box)."""
     from badgers.core.sampling import UniformOutOfDistributionSampler
 
-    with pytest.raises(ValueError, match="expansion must be > 0"):
-        UniformOutOfDistributionSampler(expansion=0)
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
+
+    sampler = UniformOutOfDistributionSampler(expansion=0)
+    generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
+    Xt = generator.generate(
+        X,
+        selector=AlwaysSelector([0]),
+        n_outliers=3,
+        out_of_distribution_sampler=sampler,
+    )
+
+    assert Xt.shape == (103, 2)
+    assert np.allclose(Xt[:100], X)
 
 
-def test_generate__uniform_out_of_distribution_negative_expansion_raises(rng):
+def test_generate__uniform_out_of_distribution_negative_expansion_raises():
     """UniformOutOfDistributionSampler with negative expansion should raise ValueError."""
     from badgers.core.sampling import UniformOutOfDistributionSampler
 
-    with pytest.raises(ValueError, match="expansion must be > 0"):
+    with pytest.raises(ValueError, match="expansion must be >= 0"):
         UniformOutOfDistributionSampler(expansion=-0.5)
 
 

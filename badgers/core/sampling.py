@@ -185,7 +185,7 @@ class HypersphereSampler(OutOfDistributionSampler):
 
 
 class UniformOutOfDistributionSampler(OutOfDistributionSampler):
-    """Sample uniformly beyond the observed range.
+    """Sample uniformly around the observed range.
 
     Samples from [min - expansion*range, max + expansion*range] for each
     column independently.
@@ -193,14 +193,16 @@ class UniformOutOfDistributionSampler(OutOfDistributionSampler):
     Parameters
     ----------
     expansion : float
-        Fraction to expand beyond [min, max]. Must be > 0.
+        Fraction to expand beyond [min, max]. Must be >= 0.
+        ``0`` samples the exact data bounding box [min, max]
+        (in-distribution by construction; the out-of-distribution-ness is
+        the caller's choice).
     """
 
     def __init__(self, expansion):
-        if expansion <= 0:
+        if expansion < 0:
             raise ValueError(
-                f"expansion must be > 0 for out-of-distribution sampling, "
-                f"got {expansion}"
+                f"expansion must be >= 0 for uniform sampling, got {expansion}"
             )
         self.expansion = expansion
 

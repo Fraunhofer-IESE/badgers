@@ -168,13 +168,18 @@ def test_uniform_ood_sampler_beyond_bounds(rng, X):
     assert np.any((result < mins) | (result > maxs))
 
 
-def test_uniform_ood_sampler_no_expansion_raises():
-    with pytest.raises(ValueError, match="expansion must be > 0"):
-        UniformOutOfDistributionSampler(expansion=0)
+def test_uniform_ood_sampler_zero_expansion_allowed(rng, X):
+    """expansion=0 is the exact data bounding box (in-distribution by construction)."""
+    sampler = UniformOutOfDistributionSampler(expansion=0)
+    result = sampler.sample(rng, X, [0, 1], 50)
+    mins = np.min(X, axis=0)
+    maxs = np.max(X, axis=0)
+    assert np.all(result >= mins)
+    assert np.all(result <= maxs)
 
 
 def test_uniform_ood_sampler_negative_expansion_raises():
-    with pytest.raises(ValueError, match="expansion must be > 0"):
+    with pytest.raises(ValueError, match="expansion must be >= 0"):
         UniformOutOfDistributionSampler(expansion=-0.5)
 
 
