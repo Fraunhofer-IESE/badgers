@@ -9,6 +9,7 @@ own exogenous noise is preserved exactly.
 import numpy as np
 import pytest
 
+from badgers.core.selectors import AlwaysSelector
 from badgers.generators.tabular_data.drift.causal import CausalDriftGenerator
 
 
@@ -17,7 +18,7 @@ def test_generate__drift_systematic_shift(chain_data, make_gcm_dgp):
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, selector=AlwaysSelector([0]),
         shift_amount=1.0,
     )
     # in-place: same shape
@@ -34,7 +35,7 @@ def test_generate__drift_shift_is_constant_across_rows(chain_data, make_gcm_dgp)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, selector=AlwaysSelector([0]),
         shift_amount=1.0,
     )
     # Drift is systematic: the shift is applied identically to
@@ -51,7 +52,7 @@ def test_generate__drift_zero_shift_recompute(chain_data, make_gcm_dgp):
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, selector=AlwaysSelector([0]),
         shift_amount=0.0,
     )
     # shift_amount=0 -> shift of exactly 0: the perturbed column is written
@@ -79,7 +80,7 @@ def test_generate__drift_propagates_recompute(chain_data, make_gcm_dgp):
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, selector=AlwaysSelector([0]),
         shift_amount=1.0,
     )
     dX = Xt[:, 0] - X_orig[:, 0]
@@ -112,7 +113,7 @@ def test_generate__drift_magnitude(chain_data, make_gcm_dgp):
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
-        X, perturbation_nodes=["X"],
+        X, selector=AlwaysSelector([0]),
         shift_amount=2.0,
     )
     # The shift is deterministic: exactly shift_amount * col_std.
@@ -134,7 +135,7 @@ def test_generate__drift_closed_form_exact(make_gcm_dgp):
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(data))
     Xt = gen.generate(
-        data, perturbation_nodes=["X"],
+        data, selector=AlwaysSelector([0]),
         shift_amount=1.0,
     )
     np.testing.assert_allclose(
@@ -149,7 +150,7 @@ def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
     gen = CausalDriftGenerator()
     with pytest.raises(RuntimeError, match="no structure"):
-        gen.generate(X, perturbation_nodes=["X"])
+        gen.generate(X, selector=AlwaysSelector([0]))
 
 
 def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):
@@ -167,8 +168,8 @@ def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):
     Xn[:50, 1] = np.nan  # stage 1 (e.g. missingness) wrote NaNs into Y
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
     n_nan_y = int(np.isnan(Xn[:, 1]).sum())
-    Xt = gen.generate(Xn, perturbation_nodes=["Y"],
-                         shift_amount=0.5)
+    Xt = gen.generate(Xn, selector=AlwaysSelector([1]),
+                      shift_amount=0.5)
     # The perturbed column gains NO new NaN cells (finite scale).
     assert int(np.isnan(Xt[:, 1]).sum()) == n_nan_y
     # Column X (untouched upstream) gains no NaNs either.
@@ -195,8 +196,8 @@ def test_generate__all_nan_column_does_not_crash(chain_data, make_gcm_dgp):
     Xn = X.copy()
     Xn[:, 1] = np.nan
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
-    Xt = gen.generate(Xn, perturbation_nodes=["Y"],
-                         shift_amount=0.5)
+    Xt = gen.generate(Xn, selector=AlwaysSelector([1]),
+                      shift_amount=0.5)
     # No crash; no NEW NaNs in the perturbed or upstream columns.
     assert int(np.isnan(Xt[:, 1]).sum()) == before.shape[0]
     np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))

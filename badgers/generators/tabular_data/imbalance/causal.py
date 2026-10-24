@@ -10,7 +10,7 @@ no DGP is needed.
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import realize_firing
+from badgers.core.selectors import fired
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -74,9 +74,9 @@ class CausalImbalanceGenerator(CausalGenerator):
 
         if selector is not None:
             # Explicit selector: rows FIRED by the selector are dropped
-            # (subsampling polarity). Union over the returned columns.
-            fired = realize_firing(X, selector, self.random_generator)
-            dropped = fired.any(axis=1)
+            # (subsampling polarity). Union over the selector's targets.
+            field = fired(X, selector, self.random_generator)
+            dropped = field.any(axis=1)
             keep = ~dropped
         else:
             self._validate_structure(X)

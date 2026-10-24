@@ -1,22 +1,29 @@
 """Causal drift generator.
 
-Injects a deterministic distributional shift at perturbation nodes (applied
-to all affected rows) and recomputes the descendants of the affected
-rows through the structural equations (Pearl surgery: each descendant is
+Injects a deterministic distributional shift at the cells fired by the
+selector (applied to all affected rows) and recomputes the descendants of the
+affected rows through the structural equations (Pearl surgery: each descendant is
 re-evaluated from its shifted parents with fresh noise).
 """
 
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.selectors import fired
+from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.causal._base import (
     CausalGenerator,
     _column_stds,
+    _param_by_target,
 )
 
 
 class CausalDriftGenerator(CausalGenerator):
     """Generates causally-propagated systematic drift.
+
+    The SELECTOR is required and owns the intervention targets: the
+    selector's own ``columns`` are the nodes where the drift is injected
+    (``selector=None`` raises).
 
     Parameters
     ----------
@@ -30,19 +37,19 @@ class CausalDriftGenerator(CausalGenerator):
 
     generate() parameters (passed via **params)
     ----------
-    perturbation_nodes : list of str
-        Nodes where the drift is injected (required).
-    selector : Selector or None, default=None
-        Row-selection rule from ``badgers.core.selectors``
-        (``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
-        ``TopQuantileSelector``, or any callable with the same signature).
-        ``None`` = every row fires.
-    shift_amount : float or np.ndarray, default=0.5
-        Signed shift applied to the perturbed node(s), in units of the
+    selector : Selector
+        Row-selection rule from ``badgers.core.selectors`` (REQUIRED).
+        ``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
+        ``TopQuantileSelector``, or any callable with the same signature.
+        Its ``columns`` are the intervention targets; the rows it fires
+        receive the shift.
+    shift_amount : float or dict, default=0.5
+        Signed shift applied to the fired target cells, in units of the
         column's standard deviation. Positive shifts in the + direction,
         negative in the − direction. Deterministic: the exact shift value
-        is applied to all affected rows (no random draw). Scalar or
-        per-perturbation-node.
+        is applied to all affected rows (no random draw). Scalar
+        (broadcast to every target) or a dict keyed by COLUMN POSITION
+        that must cover every target.
     """
 
     deficit_name = "drift"
@@ -64,59 +71,44 @@ class CausalDriftGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        perturbation_nodes=None,
-        selector=None,
+        selector,
         shift_amount=0.5,
     ):
         """Inject a causally-propagated deterministic drift in place."""
         self._require_fitted()
-        self._require_dgp(X)
+        if selector is None:
+            raise ValueError(
+                "selector is required: it owns the intervention targets"
+            )
         self._validate_structure(X)
-        self._validate_perturbation_nodes(perturbation_nodes)
-        node_to_col = self.column_mapping
-        n_samples = X.shape[0]
+        targets = list(_resolve_targets(selector, X, None))
+        shift = _param_by_target(shift_amount, "shift_amount", targets)
+        rng = self.random_generator
+
+        # Apply the signed shift (deterministic: no random draw) to the
+        # rows fired by the selector. The firing field is decided on the
+        # UN-mutated data (thresholds/selection read the input as-is).
+        field = fired(X, selector, rng)
+        rows = np.flatnonzero(field.any(axis=1))
         col_stds = _column_stds(X)
-
-        if np.isscalar(shift_amount):
-            drift_scale = np.full(len(perturbation_nodes), float(shift_amount))
-        else:
-            drift_scale = np.asarray(shift_amount, dtype=float)
-            if drift_scale.shape != (len(perturbation_nodes),):
-                raise ValueError(
-                    "shift_amount array must have one entry per perturbation node"
-                )
-
-        # Apply the signed shift (deterministic: no random draw).
-        # Positive = shift in the + direction, negative = in the − direction.
-        shifts = {}
-        for j, node in enumerate(perturbation_nodes):
-            col = node_to_col[node]
-            shifts[col] = drift_scale[j] * col_stds[col]
-
-        # Apply the shift to the rows fired by the selector
-        # (fire masks for ALL rows at once, thresholds on the un-mutated data).
-        fires = self._fire_masks(
-            X, perturbation_nodes, selector=selector,
-        )
-        affected = np.zeros(n_samples, dtype=bool)
-        for node in perturbation_nodes:
-            mask = fires[node]
-            col = node_to_col[node]
-            X[mask, col] += shifts[col]
+        affected = np.zeros(X.shape[0], dtype=bool)
+        for i, col in enumerate(targets):
+            mask = field[:, i]
+            # Positive = shift in the + direction, negative = in the −
+            # direction.
+            X[mask, col] += shift[col] * col_stds[col]
             affected |= mask
 
         # Recompute the descendants of the AFFECTED rows through the
         # structural equations (Pearl surgery): descendant = f(new parents)
-        # + fresh noise. The shift at the perturbation node is systematic
+        # + fresh noise. The shift at the target nodes is systematic
         # (a single shift applied to all affected rows); unaffected rows
-        # are left untouched.
-        affected_rows = np.flatnonzero(affected)
-        if affected_rows.size:
-            sub = X[affected_rows]
-            self.dgp.intervene(
-                sub, perturbation_nodes, rng=self.random_generator
-            )
-            X[affected_rows] = sub
+        # are left untouched. Intervene receives ALL target names, fired
+        # or not.
+        if rows.size:
+            sub = X[rows]
+            sub = self.dgp.intervene(sub, self._node_names(targets), rng=rng)
+            X[rows] = sub
 
         self.deficit_labels_ = affected.copy()
         return X
