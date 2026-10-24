@@ -6,7 +6,28 @@ from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.sampling import InstanceSampler
+from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.outliers import OutliersGenerator
+
+
+def _resolve_count_and_targets(X, n_outliers, selector):
+    """Shared trio plumbing: count validation + synthesized-column targets.
+
+    The selector's KEYS choose the synthesized columns (its mask is
+    discarded and the selector is never invoked); ``selector=None`` means
+    all columns. The count is capped at the dataset size.
+    """
+    if n_outliers < 0:
+        raise ValueError(f"n_outliers must be a positive count, got {n_outliers}")
+    if n_outliers > len(X):
+        raise ValueError(
+            f"n_outliers must not exceed the number of rows of X "
+            f"({len(X)}), got {n_outliers}")
+    n_features = X.shape[1]
+    if selector is None:
+        return list(range(n_features))
+    return sorted(_resolve_targets(selector, X, None))
 
 
 class IndependentHistogramsGenerator(OutliersGenerator):
@@ -24,7 +45,7 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, n_outliers: int = 10, bins: int = 10):
+    def generate(self, X, n_outliers: int = 10, bins: int = 10, *, selector=None):
         """
         Randomly generates outliers from low density regions.
         Low density regions are estimated through several independent histograms (one for each feature).
@@ -34,20 +55,32 @@ class IndependentHistogramsGenerator(OutliersGenerator):
 
         All values generated for each feature are simply concatenated (independence hypothesis!).
 
+        The selector's keys choose the columns where the synthesis happens
+        (its mask is discarded); the remaining columns of the appended rows
+        are per-cell bootstrap copies of real X values. Requested counts
+        are capped at ``len(X)``.
+
         :param X: the input features (pandas DataFrame or numpy array).
-        :param n_outliers: The number of outliers to generate.
+        :param n_outliers: The number of outliers to generate
+            (must not exceed the number of rows of X).
         :param bins: The number of bins to use when creating histograms for each feature.
+        :param selector: optional selector from ``badgers.core.selectors``;
+            its KEYS (columns) are the synthesized columns.
         :return: The augmented feature matrix with added outliers.
         """
-        assert n_outliers > 0
         assert bins > 0
+        targets = _resolve_count_and_targets(X, n_outliers, selector)
+        if n_outliers == 0:
+            self._set_outlier_labels(len(X), 0)
+            return X
+        rng = self.random_generator
 
         # Pre-allocate output array for memory efficiency
         n_features = X.shape[1]
         outliers = np.empty((n_outliers, n_features), dtype=X.dtype)
 
-        # Compute independent histograms for each feature
-        for col in range(n_features):
+        # Compute independent histograms for each synthesized feature
+        for col in targets:
             hist, bin_edges = np.histogram(X[:, col], bins=bins)
 
             # Compute inverse density and sampling probabilities
@@ -55,15 +88,19 @@ class IndependentHistogramsGenerator(OutliersGenerator):
             p = inv_density / np.sum(inv_density)
 
             # Generate bin indices for this feature
-            indices = self.random_generator.choice(
-                bins, p=p, size=n_outliers, replace=True
-            )
+            indices = rng.choice(bins, p=p, size=n_outliers, replace=True)
 
             # Uniform sampling from selected bins
-            outliers[:, col] = self.random_generator.uniform(
+            outliers[:, col] = rng.uniform(
                 low=bin_edges[indices],
                 high=bin_edges[indices + 1]
             )
+
+        # Fill the columns the selector did not synthesize with real values
+        unselected = [c for c in range(n_features) if c not in targets]
+        if unselected:
+            outliers[:, unselected] = InstanceSampler().sample(
+                rng, X, unselected, n_outliers)
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
@@ -98,7 +135,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
 
     @preprocess_inputs
     def generate(self, X, n_outliers: int = 10,
-                 threshold_low_density: float = 0.1, bins: int = 10):
+                 threshold_low_density: float = 0.1, bins: int = 10, *, selector=None):
         """
         Randomly generates outliers from low density regions. Low density regions are estimated through histograms
 
@@ -107,25 +144,38 @@ class HistogramSamplingGenerator(OutliersGenerator):
         3. Sample datapoint uniformly at random within bins of low density
         4. Inverse the standardization transformation
 
+        The selector's keys choose the columns where the synthesis happens —
+        the joint histogram is computed over the synthesized columns only
+        (its mask is discarded); the remaining columns of the appended rows
+        are per-cell bootstrap copies of real X values. Requested counts
+        are capped at ``len(X)``.
+
         :param X: the input features
         :param n_outliers: The number of outliers to generate
+            (must not exceed the number of rows of X).
         :param threshold_low_density: the threshold that defines a low density region (must be between 0 and 1)
         :param bins: number of bins for the histogram
+        :param selector: optional selector from ``badgers.core.selectors``;
+            its KEYS (columns) are the synthesized columns.
         :return:
         """
-        assert n_outliers > 0
         assert bins > 0
         assert 0 < threshold_low_density < 1
+        targets = _resolve_count_and_targets(X, n_outliers, selector)
+        if n_outliers == 0:
+            self._set_outlier_labels(len(X), 0)
+            return X
+        rng = self.random_generator
         n_features = X.shape[1]
-        if n_features > 5:
-            raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns')
+        if len(targets) > 5:
+            raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns to synthesize')
         # standardize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
 
-        # compute the histogram of the data
-        hist, edges = np.histogramdd(Xt, density=False, bins=bins)
+        # compute the histogram of the synthesized columns
+        hist, edges = np.histogramdd(Xt[:, targets], density=False, bins=bins)
         # normalize - use max only (min is always 0 for histogram counts)
         norm_hist = hist / np.max(hist)
         # get coordinates of the histogram where the density is low (below a certain threshold)
@@ -134,22 +184,26 @@ class HistogramSamplingGenerator(OutliersGenerator):
         if len(low_density_coordinates) == 0:
             raise ValueError(f"Could not find regions of low density. Maybe threshold {threshold_low_density} is too high!")
         # randomly pick some coordinates in the histogram where the density is low
-        hist_coords_random = self.random_generator.choice(low_density_coordinates, n_outliers, replace=True)
+        hist_coords_random = rng.choice(low_density_coordinates, n_outliers, replace=True)
 
-        # Vectorized outlier generation using meshgrid for efficient sampling
+        # Vectorized outlier generation: one bin per synthesized column
         n_out = hist_coords_random.shape[0]
         outliers = np.empty((n_out, n_features), dtype=Xt.dtype)
 
-        for col in range(n_features):
-            # Get min and max for this dimension
-            dim_min = edges[col][0]
-            dim_max = edges[col][-1]
+        for j, col in enumerate(targets):
             # Get bin indices for this dimension from the random coordinates
-            bin_indices = np.array([coord[col] for coord in hist_coords_random])
+            bin_indices = hist_coords_random[:, j]
             # Sample uniformly within each selected bin
-            bin_width = edges[col][bin_indices + 1] - edges[col][bin_indices]
-            random_offsets = self.random_generator.uniform(0, 1, size=n_out)
-            outliers[:, col] = edges[col][bin_indices] + random_offsets * bin_width
+            bin_width = edges[j][bin_indices + 1] - edges[j][bin_indices]
+            random_offsets = rng.uniform(0, 1, size=n_out)
+            outliers[:, col] = edges[j][bin_indices] + random_offsets * bin_width
+
+        # Fill the columns the selector did not synthesize, in STANDARDIZED
+        # space so the single inverse transform below restores real values
+        unselected = [c for c in range(n_features) if c not in targets]
+        if unselected:
+            outliers[:, unselected] = InstanceSampler().sample(
+                rng, Xt, unselected, n_out)
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
@@ -160,7 +214,7 @@ class HistogramSamplingGenerator(OutliersGenerator):
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        self._set_outlier_labels(len(X), n_outliers)
+        self._set_outlier_labels(len(X), n_out)
         return Xt
 
 
@@ -183,7 +237,8 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         self.density_estimator: KernelDensity = KernelDensity(bandwidth="scott")
 
     @preprocess_inputs
-    def generate(self, X, n_outliers: int = 10, threshold_low_density: float = 0.1, max_samples: int = 100):
+    def generate(self, X, n_outliers: int = 10,
+                 threshold_low_density: float = 0.1, max_samples: int = 100, *, selector=None):
         """
         Generate data points belonging to low density regions.
 
@@ -194,35 +249,50 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         - Sample uniformly at random within the hypercube [min, max]
         - Estimate the density of the new points and filter out the ones with a density that is above the threshold
 
+        The selector's keys choose the columns where the synthesis happens —
+        the density is estimated on the synthesized columns only (its mask
+        is discarded); the remaining columns of the appended rows are
+        per-cell bootstrap copies of real X values. Requested counts are
+        capped at ``len(X)``.
+
         :param X: the input features
         :param n_outliers: The number of outliers to generate
+            (must not exceed the number of rows of X).
         :param threshold_low_density: the threshold that defines a low density region (must be between 0 and 1)
         :param max_samples:
+        :param selector: optional selector from ``badgers.core.selectors``;
+            its KEYS (columns) are the synthesized columns.
         :return:
         """
-        assert n_outliers > 0
         assert 0 < threshold_low_density < 1
         assert max_samples > 0
+        targets = _resolve_count_and_targets(X, n_outliers, selector)
+        if n_outliers == 0:
+            self._set_outlier_labels(len(X), 0)
+            return X
+        rng = self.random_generator
+        n_features = X.shape[1]
         # standardize X
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
-        # fit density estimator
-        self.density_estimator = self.density_estimator.fit(Xt)
-        low_density_threshold = np.percentile(self.density_estimator.score_samples(Xt), threshold_low_density)
+        # fit density estimator on the synthesized columns
+        self.density_estimator = self.density_estimator.fit(Xt[:, targets])
+        low_density_threshold = np.percentile(
+            self.density_estimator.score_samples(Xt[:, targets]), threshold_low_density)
 
         if max_samples is None:
             max_samples = n_outliers * 100
 
         # Cache min/max for vectorized sampling
-        dim_min = np.min(Xt, axis=0)
-        dim_max = np.max(Xt, axis=0)
+        dim_min = np.min(Xt[:, targets], axis=0)
+        dim_max = np.max(Xt[:, targets], axis=0)
 
         # Generate all candidate samples at once (vectorized)
-        candidates = self.random_generator.uniform(
+        candidates = rng.uniform(
             low=dim_min,
             high=dim_max,
-            size=(max_samples, Xt.shape[1])
+            size=(max_samples, len(targets))
         )
 
         # Vectorized density estimation for all candidates (batch operation)
@@ -230,13 +300,23 @@ class LowDensitySamplingGenerator(OutliersGenerator):
 
         # Vectorized filtering - keep only low density samples
         mask = densities <= low_density_threshold
-        outliers = candidates[mask]
+        outliers_synth = candidates[mask]
 
-        if outliers.shape[0] < n_outliers:
+        if outliers_synth.shape[0] < n_outliers:
             warnings.warn(
-                f'LowDensitySamplingGenerator could not generate all {n_outliers} outliers. It only generated {len(outliers)}.')
+                f'LowDensitySamplingGenerator could not generate all {n_outliers} outliers. It only generated {len(outliers_synth)}.')
         else:
-            outliers = outliers[:n_outliers]
+            outliers_synth = outliers_synth[:n_outliers]
+
+        n_out = outliers_synth.shape[0]
+        outliers = np.empty((n_out, n_features), dtype=Xt.dtype)
+        outliers[:, targets] = outliers_synth
+        # Fill the columns the selector did not synthesize, in STANDARDIZED
+        # space so the single inverse transform below restores real values
+        unselected = [c for c in range(n_features) if c not in targets]
+        if unselected:
+            outliers[:, unselected] = InstanceSampler().sample(
+                rng, Xt, unselected, n_out)
 
         # in case we only have 1 outlier, reshape the array to match sklearn convention
         if outliers.shape[0] == 1:
