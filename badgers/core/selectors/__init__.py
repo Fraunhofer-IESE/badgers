@@ -30,6 +30,10 @@ on the call). There is deliberately no base class and no registry --
 conformance to the :class:`Selector` protocol is defined by the call
 signature alone, and each preset's rule is inlined in ``__call__``.
 
+Exact-count presets (``CountSelector``, ``ClassCountSelector``) bind a
+requested ROW count at construction -- the machinery behind the outliers
+generators' count knobs.
+
 MODIFYING consumers preserve the input's shape and only ALTER the fired
 cells (missingness, noise, outliers, ...); SUBSAMPLING consumers
 (imbalance) DROP the fired rows, so their output is smaller than the
@@ -43,9 +47,13 @@ presets, split along the one constructor-contract difference they have
 (value-free presets never read ``X``, value-driven presets read column
 positions).
 """
-
 from .base import Selector, fired, resolve_class_column
-from .value_driven import ClassSelector, ProportionalSelector, TopQuantileSelector
+from .value_driven import (
+    ClassCountSelector,
+    ClassSelector,
+    ProportionalSelector,
+    TopQuantileSelector,
+)
 from .value_free import AlwaysSelector, BernoulliSelector, CountSelector, ExactCountSelector
 
 __all__ = [
@@ -58,5 +66,6 @@ __all__ = [
     "ExactCountSelector",
     "TopQuantileSelector",
     "ClassSelector",
+    "ClassCountSelector",
     "ProportionalSelector",
 ]

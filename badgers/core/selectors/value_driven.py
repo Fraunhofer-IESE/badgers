@@ -21,6 +21,7 @@ from .base import (
 __all__ = [
     "TopQuantileSelector",
     "ClassSelector",
+    "ClassCountSelector",
     "ProportionalSelector",
 ]
 
@@ -131,6 +132,77 @@ class ClassSelector:
         return (f"ClassSelector(columns={self.columns!r}, "
                 f"class_column={self.class_column!r}, "
                 f"proportions={self.proportions!r})")
+
+
+class ClassCountSelector:
+    """Selector: exactly ``counts[class_value]`` rows per listed class.
+
+    The value-driven exact-count preset (the class-aware sibling of
+    :class:`~badgers.core.selectors.value_free.CountSelector`). Reads the
+    class labels from ``class_column`` ONCE; for every class value in
+    ``counts`` exactly that many rows of the class are drawn WITHOUT
+    REPLACEMENT (uniform) and the union mask is returned under every
+    target. Classes absent from ``counts`` fire nothing; a count for a
+    class value missing from ``X`` raises (typo protection), and a count
+    above the class size raises (an explicit count is a request, not a
+    share -- unlike :class:`ClassSelector`'s share clipping).
+
+    Parameters
+    ----------
+    columns : int or sequence of int
+        Column positions this selector covers.
+    class_column : int
+        Position of the column holding the class labels.
+    counts : dict mapping class_value -> int
+        Exact number of rows fired per class value (ints >= 0).
+    rng : numpy.random.Generator or None, default=None
+        Random generator used for the row draws.
+    """
+
+    def __init__(self, columns: int | Sequence[int], class_column: int,
+                 counts: dict, rng: np.random.Generator | None = None):
+        self.columns = _validate_columns(columns)
+        if not isinstance(class_column, (int, np.integer)):
+            raise ValueError(
+                f"class_column must be an int position, got {class_column!r}")
+        self.class_column = int(class_column)
+        for value, count in counts.items():
+            if not isinstance(count, (int, np.integer)) or isinstance(count, bool):
+                raise ValueError(
+                    f"counts[{value!r}] must be an int, got {count!r}")
+            if count < 0:
+                raise ValueError(f"counts[{value!r}] must be >= 0, got {count}")
+        self.counts = counts
+        self.rng = rng
+
+    def __call__(self, X: np.ndarray, targets=None):
+        _require_rng(self)
+        targets = _resolve_targets(self, X, targets)
+        n_rows = X.shape[0]
+        labels = X[:, self.class_column]
+        values = set(np.unique(labels).tolist())
+        unknown = [v for v in self.counts if v not in values]
+        if unknown:
+            raise ValueError(
+                f"class value(s) {unknown!r} not found in column "
+                f"{self.class_column} (found {sorted(values)!r})")
+        mask = np.zeros(n_rows, dtype=bool)
+        for class_value, count in self.counts.items():
+            rows = np.flatnonzero(labels == class_value)
+            if count > len(rows):
+                raise ValueError(
+                    f"counts[{class_value!r}]={count} exceeds the number "
+                    f"of rows of class {class_value!r} ({len(rows)})")
+            if count:
+                # Sampling without replacement: sequential by nature.
+                idx = self.rng.choice(rows, size=count, replace=False)
+                mask[idx] = True
+        return {t: mask for t in targets}
+
+    def __repr__(self) -> str:
+        return (f"ClassCountSelector(columns={self.columns!r}, "
+                f"class_column={self.class_column!r}, "
+                f"counts={self.counts!r})")
 
 
 class ProportionalSelector:

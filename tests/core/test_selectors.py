@@ -18,6 +18,7 @@ from badgers.core.selectors import (
     AlwaysSelector,
     BernoulliSelector,
     CountSelector,
+    ClassCountSelector,
     ExactCountSelector,
     TopQuantileSelector,
     ClassSelector,
@@ -541,6 +542,72 @@ class TestClassSelector:
         selector = ClassSelector(0, class_column=1, proportions={0: 0.5})
         text = repr(selector)
         assert "ClassSelector" in text and "class_column=1" in text
+
+
+class TestClassCountSelector:
+    def _Xy(self):
+        X = _X(10, 3)
+        X[:, 2] = np.array([0, 0, 0, 0, 1, 1, 1, 2, 2, 2], dtype=float)
+        return X
+
+    def test_exact_per_class_counts_shared_mask(self):
+        X = self._Xy()
+        selector = ClassCountSelector([0, 1], class_column=2,
+                                      counts={0: 2, 1: 1}, rng=default_rng(0))
+        masks = selector(X)
+        mask = masks[0]
+        assert mask.dtype == bool
+        assert mask.sum() == 3
+        assert mask[X[:, 2] == 0].sum() == 2
+        assert mask[X[:, 2] == 1].sum() == 1
+        np.testing.assert_array_equal(masks[0], masks[1])
+
+    def test_absent_class_fires_nothing(self):
+        X = self._Xy()
+        masks = ClassCountSelector([0], class_column=2, counts={0: 1},
+                                   rng=default_rng(0))(X)
+        assert masks[0][X[:, 2] != 0].sum() == 0
+        assert masks[0].sum() == 1
+
+    def test_zero_count_fires_nothing(self):
+        X = self._Xy()
+        masks = ClassCountSelector([0], class_column=2, counts={0: 0, 1: 2},
+                                   rng=default_rng(0))(X)
+        assert masks[0].sum() == 2
+        assert masks[0][X[:, 2] == 0].sum() == 0
+
+    def test_unknown_class_raises(self):
+        X = self._Xy()
+        with pytest.raises(ValueError, match="not found in column"):
+            ClassCountSelector([0], class_column=2, counts={7: 1},
+                               rng=default_rng(0))(X)
+
+    def test_count_exceeding_class_size_raises(self):
+        X = self._Xy()  # class 0 has 4 rows
+        with pytest.raises(ValueError, match="exceeds the number of rows of class"):
+            ClassCountSelector([0], class_column=2, counts={0: 5},
+                               rng=default_rng(0))(X)
+
+    def test_negative_count_raises(self):
+        with pytest.raises(ValueError, match="counts"):
+            ClassCountSelector([0], class_column=2, counts={0: -1},
+                               rng=default_rng(0))
+
+    def test_missing_rng_raises(self):
+        with pytest.raises(ValueError, match="no random generator bound"):
+            ClassCountSelector([0], class_column=2, counts={0: 1})(self._Xy())
+
+    def test_call_time_targets_subset(self):
+        X = self._Xy()
+        masks = ClassCountSelector([0, 1], class_column=2, counts={0: 1},
+                                   rng=default_rng(0))(X, targets=[1])
+        assert set(masks) == {1}
+        assert masks[1].sum() == 1
+
+    def test_satisfies_protocol(self):
+        assert isinstance(
+            ClassCountSelector([0], class_column=2, counts={0: 1},
+                               rng=default_rng(0)), Selector)
 
 
 class TestProportionalSelector:
