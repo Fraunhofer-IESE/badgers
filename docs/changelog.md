@@ -436,6 +436,23 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ### Changed
 
+- **Direct outliers generators delegate to the OOD samplers
+  (internal).** ``ZScoreSamplingGenerator``,
+  ``HypersphereSamplingGenerator`` and ``HyperCubeSampling`` no longer
+  inline their value production; they delegate to ``ZScoreSampler``,
+  ``HypersphereSampler`` and ``UniformOutOfDistributionSampler`` from
+  ``badgers.core.sampling``, making it the single source of
+  out-of-distribution sampling math. ``UniformOutOfDistributionSampler``
+  now accepts ``expansion=0`` (the exact data bounding box; previously
+  it required ``expansion > 0``). One behavior change: for degenerate
+  (constant) columns, outliers are now pinned at exactly the constant
+  value (bounding-box semantics of a zero range), where the old
+  ``MinMaxScaler`` round-trip spread them around/above the constant
+  (e.g. constant 5.0: ``expansion=0.1`` → [4.949, 5.936];
+  ``expansion=0`` → [5.041, 5.863], above the data max). Same seeds
+  produce the same outliers (z-score and hypersphere bit-identical; the
+  hypercube's uniform draw is unchanged, values may shift by ±1 ulp).
+  Public `generate` signatures are unchanged.
 - **Causal generators require an explicit DGP (hard error when
   missing).** There is no implicit default backend: every causal defect
   generator raises when no `dgp=` is supplied to the
