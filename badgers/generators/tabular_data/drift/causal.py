@@ -1,7 +1,7 @@
 """Causal drift generator.
 
-Injects a systematic distributional shift at perturbation nodes (drawn once,
-applied to all affected rows) and recomputes the descendants of the affected
+Injects a deterministic distributional shift at perturbation nodes (applied
+to all affected rows) and recomputes the descendants of the affected
 rows through the structural equations (Pearl surgery: each descendant is
 re-evaluated from its shifted parents with fresh noise).
 """
@@ -21,7 +21,8 @@ class CausalDriftGenerator(CausalGenerator):
     Parameters
     ----------
     random_generator : numpy.random.Generator, default=rng(seed=0)
-        Random number generator instance.
+        Random number generator used for the fresh noise drawn during the
+        Pearl-surgery recompute of descendant nodes.
     dgp : DGP or None, default=None
         DGP instance (passed via the constructor or use_dgp(); fitted
         explicitly by the caller, or lazily inside generate() if
@@ -36,8 +37,11 @@ class CausalDriftGenerator(CausalGenerator):
         (``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
         ``TopQuantileSelector``, or any callable with the same signature).
         ``None`` = every row fires.
-    drift_std : float or np.ndarray, default=0.5
-        Std of the systematic shift, relative to column std. Scalar or
+    shift_amount : float or np.ndarray, default=0.5
+        Signed shift applied to the perturbed node(s), in units of the
+        column's standard deviation. Positive shifts in the + direction,
+        negative in the − direction. Deterministic: the exact shift value
+        is applied to all affected rows (no random draw). Scalar or
         per-perturbation-node.
     """
 
@@ -62,9 +66,9 @@ class CausalDriftGenerator(CausalGenerator):
         X,
         perturbation_nodes=None,
         selector=None,
-        drift_std=0.5,
+        shift_amount=0.5,
     ):
-        """Inject causally-propagated systematic drift in place."""
+        """Inject a causally-propagated deterministic drift in place."""
         self._require_fitted()
         self._require_dgp(X)
         self._validate_structure(X)
@@ -73,22 +77,21 @@ class CausalDriftGenerator(CausalGenerator):
         n_samples = X.shape[0]
         col_stds = _column_stds(X)
 
-        if np.isscalar(drift_std):
-            drift_scale = np.full(len(perturbation_nodes), float(drift_std))
+        if np.isscalar(shift_amount):
+            drift_scale = np.full(len(perturbation_nodes), float(shift_amount))
         else:
-            drift_scale = np.asarray(drift_std, dtype=float)
+            drift_scale = np.asarray(shift_amount, dtype=float)
             if drift_scale.shape != (len(perturbation_nodes),):
                 raise ValueError(
-                    "drift_std array must have one entry per perturbation node"
+                    "shift_amount array must have one entry per perturbation node"
                 )
 
-        # Draw the systematic shift ONCE (applied to all rows).
+        # Apply the signed shift (deterministic: no random draw).
+        # Positive = shift in the + direction, negative = in the − direction.
         shifts = {}
         for j, node in enumerate(perturbation_nodes):
             col = node_to_col[node]
-            shifts[col] = self.random_generator.normal(
-                0, drift_scale[j] * col_stds[col]
-            )
+            shifts[col] = drift_scale[j] * col_stds[col]
 
         # Apply the shift to the rows fired by the selector
         # (fire masks for ALL rows at once, thresholds on the un-mutated data).

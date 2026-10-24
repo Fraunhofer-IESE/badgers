@@ -1,7 +1,7 @@
 """Tests for CausalDriftGenerator (delta propagation semantics).
 
-Drift semantics: a single systematic shift (drawn once, applied to every
-affected row) at the perturbation node, propagated to the descendants as a
+Drift semantics: a single deterministic shift (applied to every affected
+row) at the perturbation node, propagated to the descendants as a
 delta: descendant_new = descendant_orig + beta @ delta_parents. Each node's
 own exogenous noise is preserved exactly.
 """
@@ -18,7 +18,7 @@ def test_generate__drift_systematic_shift(chain_data, make_gcm_dgp):
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
         X, perturbation_nodes=["X"],
-        drift_std=1.0,
+        shift_amount=1.0,
     )
     # in-place: same shape
     assert Xt.shape == X.shape
@@ -35,11 +35,12 @@ def test_generate__drift_shift_is_constant_across_rows(chain_data, make_gcm_dgp)
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
         X, perturbation_nodes=["X"],
-        drift_std=1.0,
+        shift_amount=1.0,
     )
-    # Drift is systematic: the shift is drawn ONCE and applied identically to
-    # every affected row. With the default selector all rows are affected, so
-    # the per-row change at the perturbation node must be a single constant.
+    # Drift is systematic: the shift is applied identically to
+    # every affected row (deterministic). With the default selector all
+    # rows are affected, so the per-row change at the perturbation node
+    # must be a single constant.
     shift = Xt[:, 0] - X_orig[:, 0]
     assert np.allclose(shift, shift[0], atol=1e-8)
 
@@ -51,9 +52,9 @@ def test_generate__drift_zero_shift_recompute(chain_data, make_gcm_dgp):
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
         X, perturbation_nodes=["X"],
-        drift_std=0.0,
+        shift_amount=0.0,
     )
-    # drift_std=0 -> shift of exactly 0: the perturbed column is written
+    # shift_amount=0 -> shift of exactly 0: the perturbed column is written
     # back unchanged (bit-identical). The DESCENDANTS are recomputed with
     # FRESH noise: statistically equivalent to the originals, not identical
     # (Pearl surgery, not delta propagation).
@@ -79,7 +80,7 @@ def test_generate__drift_propagates_recompute(chain_data, make_gcm_dgp):
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
         X, perturbation_nodes=["X"],
-        drift_std=1.0,
+        shift_amount=1.0,
     )
     dX = Xt[:, 0] - X_orig[:, 0]
     dB = Xt[:, 1] - X_orig[:, 1]
@@ -112,13 +113,11 @@ def test_generate__drift_magnitude(chain_data, make_gcm_dgp):
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
         X, perturbation_nodes=["X"],
-        drift_std=2.0,
+        shift_amount=2.0,
     )
-    # The systematic shift is drawn once (std ~ drift_std * col_std); its
-    # sampled value can be small, so assert on a generous bound (a tighter
-    # bound would be seed-flaky).
+    # The shift is deterministic: exactly shift_amount * col_std.
     shift = abs(Xt[0, 0] - X_orig[0, 0])
-    assert shift > 0.05 * (2.0 * np.std(X_orig[:, 0]))
+    np.testing.assert_allclose(shift, 2.0 * np.std(X_orig[:, 0]), rtol=1e-8)
 
 
 def test_generate__drift_closed_form_exact(make_gcm_dgp):
@@ -136,7 +135,7 @@ def test_generate__drift_closed_form_exact(make_gcm_dgp):
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(data))
     Xt = gen.generate(
         data, perturbation_nodes=["X"],
-        drift_std=1.0,
+        shift_amount=1.0,
     )
     np.testing.assert_allclose(
         Xt[:, 1] - data_orig[:, 1], 2.0 * (Xt[:, 0] - data_orig[:, 0]), rtol=1e-10, atol=1e-12
@@ -169,7 +168,7 @@ def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
     n_nan_y = int(np.isnan(Xn[:, 1]).sum())
     Xt = gen.generate(Xn, perturbation_nodes=["Y"],
-                         drift_std=0.5)
+                         shift_amount=0.5)
     # The perturbed column gains NO new NaN cells (finite scale).
     assert int(np.isnan(Xt[:, 1]).sum()) == n_nan_y
     # Column X (untouched upstream) gains no NaNs either.
@@ -197,7 +196,7 @@ def test_generate__all_nan_column_does_not_crash(chain_data, make_gcm_dgp):
     Xn[:, 1] = np.nan
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
     Xt = gen.generate(Xn, perturbation_nodes=["Y"],
-                         drift_std=0.5)
+                         shift_amount=0.5)
     # No crash; no NEW NaNs in the perturbed or upstream columns.
     assert int(np.isnan(Xt[:, 1]).sum()) == before.shape[0]
     np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))
