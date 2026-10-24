@@ -16,12 +16,27 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   return firing decisions (bool masks; ``AlwaysSelector``'s constant
   scalar ``1.0`` realizes to all-true); value-driven presets return ``[0, 1]``
   firing specs (float scalar or ``(n,)`` array) that generators realize with
-  the single rule ``rng.random(n) < spec`` (``realize_firing``/``fired_mask``/
-  ``fired_rows``). Direct generators no longer take ``column_mapping`` —
-  ``AdditiveNoiseGenerator.generate(X, distribution, noise_std=1.0,
-  *, selector=None)``. Causal generators keep ``perturbation_nodes``
-  (graph node names) and the DGP's ``column_mapping``; only selector
-  constructions moved to positions.
+    the single rule ``rng.random(n) < spec``). Direct generators no longer take
+    ``column_mapping`` — ``AdditiveNoiseGenerator.generate(X, distribution,
+    noise_std=1.0, *, selector=None)``. Causal generators' call-time targets
+    are owned by the selector itself: its ``columns`` (column positions) are
+    the intervention targets, so ``perturbation_nodes`` is gone from their
+    signatures.
+  - **Wave 2: the ``fired()`` field unification and selector-owned causal targets.**
+    The three realization helpers collapse into one —
+    ``badgers.core.selectors.fired(X, selector, rng)`` returns the narrow bool
+    field ``(n_rows, n_targets)`` (column ``i`` ↔ the selector's ``i``-th
+    target); row-level union is ``field.any(axis=1)`` (``fired_mask`` and
+    ``fired_rows`` are deleted). All causal generators now require a selector
+    at call time — ``perturbation_nodes`` is removed from their signatures
+    (``CausalImbalanceGenerator``'s legacy ``perturbation_nodes`` +
+    ``quantile_range`` fallback is the one exception). Drift's ``drift_std``
+    is replaced by ``shift_amount`` (deterministic signed shift, scalar or
+    dict keyed by column position), and ``CausalNoiseGenerator.noise_std`` is
+    scalar-or-dict-by-position as well. ``CausalOutlierPropagationGenerator``
+    now requires a selector (per-cell pinning: firing masks a single cell per
+    selected row, pure-bootstrap rows are labeled ``False``, and rows sharing
+    a firing pattern are perturbed as one group).
 - **The `(X, y)` contract is removed; generators and selectors take `X` only (breaking).**
   Every generator's signature is `generate(X, **params)` and it returns exactly one
   generated object `Xt` — the old `y` parameter and the two-tuple return are gone
