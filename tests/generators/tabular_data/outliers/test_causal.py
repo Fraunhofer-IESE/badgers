@@ -5,7 +5,11 @@ import numpy as np
 import pytest
 
 from badgers.core.dgp.backends.gcm_scm import GcmSCMDGP
-from badgers.core.selectors import AlwaysSelector
+from badgers.core.selectors import (
+    AlwaysSelector,
+    CountSelector,
+    TopQuantileSelector,
+)
 from badgers.generators.tabular_data.outliers.causal import CausalOutlierPropagationGenerator
 
 
@@ -87,8 +91,7 @@ def test_generate__chain_x_to_y(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=5,
+        CountSelector([0], count=5, rng=rng),
     )
 
     # Original data should be unchanged
@@ -116,8 +119,7 @@ def test_generate__chain_y_do_intervention(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([1]),
-        n_outliers=3,
+        CountSelector([1], count=3, rng=rng),
     )
 
     # Original data unchanged
@@ -146,8 +148,7 @@ def test_generate__fork(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=5,
+        CountSelector([0], count=5, rng=rng),
     )
 
     assert Xt.shape == (105, 3)
@@ -173,8 +174,7 @@ def test_generate__collider(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=5,
+        CountSelector([0], count=5, rng=rng),
     )
 
     assert Xt.shape == (105, 3)
@@ -203,8 +203,7 @@ def test_generate__diamond(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=5,
+        CountSelector([0], count=5, rng=rng),
     )
 
     assert Xt.shape == (105, 4)
@@ -251,8 +250,7 @@ def test_generate__labels_without_y_output(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
+        CountSelector([0], count=3, rng=rng),
     )
 
     assert Xt.shape == (103, 2)
@@ -270,8 +268,7 @@ def test_generate__original_data_unchanged(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=5,
+        CountSelector([0], count=5, rng=rng),
     )
 
     assert np.allclose(Xt[:100], X)
@@ -286,8 +283,7 @@ def test_generate__magnitude_zero(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
+        CountSelector([0], count=3, rng=rng),
     )
 
     assert Xt.shape == (103, 3)
@@ -306,22 +302,6 @@ def test_generate__magnitude_zero(rng):
     assert np.allclose(outliers[:, 2], beta_yz * outliers[:, 1], atol=0.5)
 
 
-def test_generate__n_outliers_zero_raises(rng):
-    """Should raise ValueError if n_outliers <= 0."""
-    graph = nx.DiGraph()
-    graph.add_edges_from([("X", "Y")])
-    X = rng.normal(size=(10, 2))
-    generator = CausalOutlierPropagationGenerator(
-        random_generator=rng, dgp=_dgp_shell(graph, {"X": 0, "Y": 1})
-    )
-    with pytest.raises(ValueError, match="n_outliers must be positive"):
-        generator.generate(
-            X,
-            selector=AlwaysSelector([0]),
-            n_outliers=0,
-        )
-
-
 # --- New tests for the selector-owned targets and samplers ---
 
 def test_generate__multiple_perturbation_nodes(rng):
@@ -334,8 +314,7 @@ def test_generate__multiple_perturbation_nodes(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0, 1]),
-        n_outliers=5,
+        CountSelector([0, 1], count=5, rng=rng),
     )
 
     assert Xt.shape == (105, 3)
@@ -360,8 +339,7 @@ def test_generate__non_root_perturbation_do_style(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([1]),
-        n_outliers=5,
+        CountSelector([1], count=5, rng=rng),
     )
 
     assert Xt.shape == (105, 3)
@@ -389,8 +367,7 @@ def test_generate__out_of_distribution_sampler_string(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
+        CountSelector([0], count=3, rng=rng),
         out_of_distribution_sampler="hypersphere",
     )
 
@@ -410,8 +387,7 @@ def test_generate__out_of_distribution_sampler_instance(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
+        CountSelector([0], count=3, rng=rng),
         out_of_distribution_sampler=sampler,
     )
 
@@ -428,51 +404,33 @@ def test_generate__selector_none_raises(rng):
         random_generator=rng, dgp=_dgp_shell(graph, {"X": 0, "Y": 1})
     )
     with pytest.raises(ValueError, match="selector is required"):
-        generator.generate(X, n_outliers=3)
+        generator.generate(X, None)
 
 
 def test_generate__per_cell_pinning_partial_fire(rng):
     """Rows fired only on one target: that cell is OOD, the other target
-    stays in-distribution (recomputed through the SCM surgery); the row
-    fired nowhere stays a pure bootstrap row (label False)."""
+    is recomputed through the SCM surgery (per-cell pinning); labels are
+    True for every appended row (no pure-bootstrap rows exist)."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
     coefs = {("X", "Y"): 0.0}
     X, column_mapping = _generate_linear_data(
         graph, n_samples=100, rng=rng, coefficients=coefs)
-    fire_x = np.array([True, True, True, False, False])
-    fire_y = np.array([True, False, True, True, False])
+    fire_x = np.zeros(100, dtype=bool)
+    fire_x[[0, 1, 2]] = True
+    fire_y = np.zeros(100, dtype=bool)
+    fire_y[[0, 2, 3]] = True
     generator = CausalOutlierPropagationGenerator(
         random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt = generator.generate(
-        X, lambda rows, targets=None: {0: fire_x, 1: fire_y}, n_outliers=5)
-    assert Xt.shape == (105, 2)
+    Xt = generator.generate(X, lambda X_, targets=None: {0: fire_x, 1: fire_y})
+    assert Xt.shape == (104, 2)
     labels = generator.get_outliers_labels()
-    np.testing.assert_array_equal(labels[100:], fire_x | fire_y)
+    np.testing.assert_array_equal(labels[:100], np.zeros(100, dtype=bool))
+    assert labels[100:].all()  # every appended row fired somewhere
     stds = X.std(axis=0)
-    for i, col in enumerate((0, 1)):
-        col_fired = (fire_x if col == 0 else fire_y)
-        dev = np.abs(Xt[100 + np.flatnonzero(col_fired), col] - X[:, col].mean())
-        assert np.all(dev > 3.0 * stds[col])
-
-    # Regression: whole-row pinning would OOD-pin EVERY target cell of any
-    # row firing anywhere. With the masks above, row 104 fires nowhere (it
-    # exercises the pure-bootstrap branch and must stay in-distribution),
-    # and row 101 fires only on X, so its unfired Y target must NOT be
-    # pinned: per-cell semantics recompute it through the SCM surgery as
-    # response("Y", X_pinned) + fresh in-distribution noise (the ("X","Y")
-    # coefficient is 0 in this fixture, so the recomputed Y stays at the
-    # noise scale). A whole-row pin would place that Y cell at >= 3 sigma
-    # from the mean; the seeded recomputed value sits under 1 sigma.
-    nowhere = 100 + 4
-    assert np.all(np.isfinite(Xt[nowhere]))
-    for col in (0, 1):
-        # the within sampler resamples N(mean, std) per column (not rows
-        # of X), so a pure bootstrap row is checked against a loose
-        # in-distribution band rather than exact observed values
-        dev = abs(Xt[nowhere, col] - X[:, col].mean())
-        assert dev < 4.0 * stds[col]
-    only_x = 100 + 1
+    # appended rows are the seeds in increasing X-row order: 0, 1, 2, 3
+    # row 101 fires only on X -> its Y cell is recomputed, not pinned
+    only_x = 101
     assert abs(Xt[only_x, 0] - X[:, 0].mean()) > 3.0 * stds[0]
     pred_y = float(
         generator.dgp.response("Y", Xt[only_x:only_x + 1, [0]])[0])
@@ -492,102 +450,18 @@ def test_generate__invalid_out_of_distribution_sampler_type_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
             out_of_distribution_sampler=42,
         )
 
 
-def test_generate__within_distribution_sampler_string(rng):
-    """within_distribution_sampler as a string should be resolved via create_within_distribution_sampler."""
-    graph = nx.DiGraph()
-    graph.add_edges_from([("X", "Y")])
-    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
-
-    generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt = generator.generate(
-        X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
-        within_distribution_sampler="uniform",
-    )
-
-    assert Xt.shape == (103, 2)
-    assert np.allclose(Xt[:100], X)
-
-
-def test_generate__within_distribution_sampler_instance(rng):
-    """within_distribution_sampler as a WithinDistributionSampler instance should be used directly."""
-    from badgers.core.sampling import UniformSampler
-
-    graph = nx.DiGraph()
-    graph.add_edges_from([("X", "Y")])
-    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
-
-    sampler = UniformSampler()
-    generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt = generator.generate(
-        X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
-        within_distribution_sampler=sampler,
-    )
-
-    assert Xt.shape == (103, 2)
-    assert np.allclose(Xt[:100], X)
-
-
-def test_generate__invalid_within_distribution_sampler_type_raises(rng):
-    """Should raise ValueError if within_distribution_sampler is not a WithinDistributionSampler or str."""
-    graph = nx.DiGraph()
-    graph.add_edges_from([("X", "Y")])
-    X = rng.normal(size=(10, 2))
-    generator = CausalOutlierPropagationGenerator(
-        random_generator=rng, dgp=_dgp_shell(graph, {"X": 0, "Y": 1})
-    )
-    with pytest.raises(ValueError, match="within_distribution_sampler must be"):
-        generator.generate(
-            X,
-            selector=AlwaysSelector([0]),
-            n_outliers=3,
-            within_distribution_sampler=42,
-        )
-
-
-def test_generate__both_samplers_specified(rng):
-    """Both within_distribution_sampler and out_of_distribution_sampler can be specified."""
-    from badgers.core.sampling import UniformSampler, ZScoreSampler
-
-    graph = nx.DiGraph()
-    graph.add_edges_from([("C", "Y"), ("Y", "T")])
-    coefs = {("C", "Y"): 1.5, ("Y", "T"): 0.8}
-    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng, coefficients=coefs)
-
-    generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt = generator.generate(
-        X,
-        selector=AlwaysSelector([1]),
-        n_outliers=5,
-        within_distribution_sampler=UniformSampler(),
-        out_of_distribution_sampler=ZScoreSampler(scale=2.0),
-    )
-
-    assert Xt.shape == (105, 3)
-    assert np.allclose(Xt[:100], X)
-
-
 def test_generate__default_samplers(rng):
-    """Default samplers should be NormalSampler (within) and ZScoreSampler (out-of)."""
+    """The default out-of-distribution sampler should be ZScoreSampler."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
     X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
 
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt = generator.generate(
-        X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
-    )
-
+    Xt = generator.generate(X, CountSelector([0], count=3, rng=rng))
     assert Xt.shape == (103, 2)
     assert np.allclose(Xt[:100], X)
 
@@ -604,8 +478,7 @@ def test_generate__uniform_out_of_distribution_sampler(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
+        CountSelector([0], count=3, rng=rng),
         out_of_distribution_sampler=sampler,
     )
 
@@ -625,8 +498,7 @@ def test_generate__uniform_out_of_distribution_zero_expansion_allowed(rng):
     generator = CausalOutlierPropagationGenerator(random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(
         X,
-        selector=AlwaysSelector([0]),
-        n_outliers=3,
+        CountSelector([0], count=3, rng=rng),
         out_of_distribution_sampler=sampler,
     )
 
@@ -640,25 +512,6 @@ def test_generate__uniform_out_of_distribution_negative_expansion_raises():
 
     with pytest.raises(ValueError, match="expansion must be >= 0"):
         UniformOutOfDistributionSampler(expansion=-0.5)
-
-
-def test_generate__within_distribution_sampler_rejects_out_of_distribution(rng):
-    """Passing an OutOfDistributionSampler as within_distribution_sampler should raise."""
-    from badgers.core.sampling import ZScoreSampler
-
-    graph = nx.DiGraph()
-    graph.add_edges_from([("X", "Y")])
-    X = rng.normal(size=(10, 2))
-    generator = CausalOutlierPropagationGenerator(
-        random_generator=rng, dgp=_dgp_shell(graph, {"X": 0, "Y": 1})
-    )
-    with pytest.raises(ValueError, match="within_distribution_sampler must be"):
-        generator.generate(
-            X,
-            selector=AlwaysSelector([0]),
-            n_outliers=3,
-            within_distribution_sampler=ZScoreSampler(),
-        )
 
 
 def test_generate__out_of_distribution_sampler_rejects_within_distribution(rng):
@@ -675,7 +528,6 @@ def test_generate__out_of_distribution_sampler_rejects_within_distribution(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
             out_of_distribution_sampler=UniformSampler(),
         )
 
@@ -692,7 +544,6 @@ def test_generate__column_mapping_not_dict_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
 
 
@@ -708,7 +559,6 @@ def test_generate__column_mapping_missing_node_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
 
 
@@ -724,7 +574,6 @@ def test_generate__column_mapping_extra_node_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
 
 
@@ -740,7 +589,6 @@ def test_generate__column_mapping_non_int_value_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
 
 
@@ -756,7 +604,6 @@ def test_generate__column_mapping_out_of_range_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
 
 
@@ -772,7 +619,6 @@ def test_generate__column_mapping_duplicate_index_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
 
 
@@ -788,7 +634,54 @@ def test_generate__column_mapping_int_nodes_raises(rng):
         generator.generate(
             X,
             selector=AlwaysSelector([0]),
-            n_outliers=3,
         )
+
+
+def test_generate__count_zero_generates_nothing(rng):
+    """An empty firing selects no seeds: X is returned unchanged."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
+    generator = CausalOutlierPropagationGenerator(
+        random_generator=rng, dgp=_world(graph, X, column_mapping))
+    Xt = generator.generate(X, CountSelector([0], count=0, rng=rng))
+    np.testing.assert_array_equal(Xt, X)
+    labels = generator.get_outliers_labels()
+    assert not labels.any()
+
+
+def test_generate__seeds_are_copies_of_fired_rows(rng):
+    """Unfired non-descendant cells keep the seed row's own values."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("A", "B")])
+    coefs = {("A", "B"): 0.0}
+    X, column_mapping = _generate_linear_data(
+        graph, n_samples=100, rng=rng, coefficients=coefs)
+    generator = CausalOutlierPropagationGenerator(
+        random_generator=rng, dgp=_world(graph, X, column_mapping))
+    Xt = generator.generate(X, CountSelector([0], count=5, rng=rng))
+    # A is the fired root; B recomputes (descendant); the appended rows
+    # are 5 distinct real rows' copies
+    assert Xt.shape == (105, 2)
+    assert np.allclose(Xt[:100], X)
+    # the 5 appended rows must be distinct rows of X (without replacement)
+    assert np.unique(Xt[100:, 0]).size == 5
+
+
+def test_generate__value_driven_selector_reads_X(rng):
+    """A value-driven selector seeds the rows it fires on X."""
+    graph = nx.DiGraph()
+    graph.add_edges_from([("X", "Y")])
+    X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
+    generator = CausalOutlierPropagationGenerator(
+        random_generator=rng, dgp=_world(graph, X, column_mapping))
+    Xt = generator.generate(X, TopQuantileSelector([0], column=0, quantile=0.9))
+    n_seeds = int((X[:, 0] >= np.quantile(X[:, 0], 0.9)).sum())
+    assert Xt.shape == (100 + n_seeds, 2)
+    labels = generator.get_outliers_labels()
+    assert labels[100:].all()
+    # the pinned cells are beyond 3 sigma of the column
+    stds = X.std(axis=0)
+    assert np.all(np.abs(Xt[100:, 0] - X[:, 0].mean()) > 3.0 * stds[0])
 
 

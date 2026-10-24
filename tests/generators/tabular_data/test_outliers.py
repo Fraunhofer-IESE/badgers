@@ -448,7 +448,8 @@ def test_causal_outlier_propagation__labels_without_y_output(make_gcm_dgp):
     with pytest.raises(RuntimeError):
         generator.get_outliers_labels()
 
-    Xt = generator.generate(X, AlwaysSelector([column_mapping["a"]]), n_outliers=7)
+    Xt = generator.generate(
+        X, CountSelector([column_mapping["a"]], count=7, rng=rng))
 
     labels = generator.get_outliers_labels()
     assert labels.dtype == bool
@@ -558,3 +559,71 @@ def test_direct_four__selector_oracle_unfired_cells(gen_class, kwargs):
     np.testing.assert_array_equal(outliers[:, 2:], X[:5, 2:])
     # fired cells were overwritten (not seed copies)
     assert not np.array_equal(outliers[:, 0], X[:5, 0])
+
+
+# --- low-density trio selector surface ---
+
+def test_independent_histograms__selector_keys_choose_synthesized_columns():
+    """Keys choose the synthesized columns; the mask is discarded; unselected
+    columns are per-cell bootstrap copies of real X values."""
+    rng = default_rng(0)
+    X = rng.normal(size=(60, 3))
+    generator = IndependentHistogramsGenerator(random_generator=default_rng(1))
+    # a CountSelector fires only 3 rows — proof the mask is discarded: the
+    # output still appends n_outliers FULL rows
+    Xt = generator.generate(
+        X.copy(), n_outliers=10, bins=5,
+        selector=CountSelector([0], count=3, rng=rng))
+    assert Xt.shape == (70, 3)
+    labels = generator.get_outliers_labels()
+    assert labels[:60].sum() == 0 and labels[60:].all()
+    fill = Xt[60:, 1:]  # unselected columns
+    assert np.isin(fill[:, 0], X[:, 1]).all()
+    assert np.isin(fill[:, 1], X[:, 2]).all()
+
+
+def test_independent_histograms__default_path_unchanged():
+    """selector=None reproduces today's all-column synthesis exactly."""
+    X = default_rng(0).normal(size=(60, 3))
+    Xt1 = IndependentHistogramsGenerator(random_generator=default_rng(1)).generate(
+        X.copy(), n_outliers=10, bins=5)
+    Xt2 = IndependentHistogramsGenerator(random_generator=default_rng(1)).generate(
+        X.copy(), n_outliers=10, bins=5, selector=None)
+    np.testing.assert_array_equal(Xt1, Xt2)
+
+
+@pytest.mark.parametrize("gen_class,kwargs", [
+    (IndependentHistogramsGenerator, {"bins": 3}),
+    (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
+    (LowDensitySamplingGenerator, {}),
+])
+def test_trio__n_outliers_capped_at_row_count(gen_class, kwargs):
+    X = np.arange(20.0).reshape(10, 2)
+    with pytest.raises(ValueError, match="must not exceed"):
+        gen_class(random_generator=default_rng(0)).generate(
+            X.copy(), n_outliers=11, **kwargs)
+
+
+@pytest.mark.parametrize("gen_class,kwargs", [
+    (IndependentHistogramsGenerator, {"bins": 3}),
+    (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
+    (LowDensitySamplingGenerator, {}),
+])
+def test_trio__negative_n_outliers_raises(gen_class, kwargs):
+    X = np.arange(20.0).reshape(10, 2)
+    with pytest.raises(ValueError, match="n_outliers must be a positive"):
+        gen_class(random_generator=default_rng(0)).generate(
+            X.copy(), n_outliers=-1, **kwargs)
+
+
+@pytest.mark.parametrize("gen_class,kwargs", [
+    (IndependentHistogramsGenerator, {"bins": 3}),
+    (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
+    (LowDensitySamplingGenerator, {}),
+])
+def test_trio__n_outliers_zero_is_noop(gen_class, kwargs):
+    X = np.arange(40.0).reshape(20, 2)
+    generator = gen_class(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), n_outliers=0, **kwargs)
+    np.testing.assert_array_equal(Xt, X)
+    assert not generator.get_outliers_labels().any()

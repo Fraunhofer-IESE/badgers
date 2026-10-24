@@ -3,44 +3,40 @@
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired
-from badgers.core.selectors.base import _resolve_targets
 from badgers.core.sampling import (
-    WithinDistributionSampler,
     OutOfDistributionSampler,
-    create_within_distribution_sampler,
     create_out_of_distribution_sampler,
 )
 from badgers.generators.tabular_data.causal._base import CausalGenerator
+from badgers.generators.tabular_data.outliers._firing import (
+    fire_and_seed,
+    iter_firing_groups,
+)
 
 
 class CausalOutlierPropagationGenerator(CausalGenerator):
     """
-    Generates outlier rows by intervening per cell on the nodes the
-    selector fires, and propagating the effect to all descendants.
+    Generates outlier rows by copying real rows of ``X`` and intervening
+    per cell on the nodes the selector fires, propagating the effect to
+    all descendants.
 
     The generator synthesizes rows (it appends to ``X`` instead of
     modifying it), so it keeps its own target input: the selector OWNS
-    the targets of the generated rows (``selector=None`` raises).
-    ``n_outliers`` rows are first bootstrapped from ``X`` (the within
-    sampler draws EVERY column — a full resample of the world, replacing
-    the previous zero-fill of the untouched columns with plausible
-    values). The selector is then applied to the BOOTSTRAPPED rows: each
-    fired target cell is pinned to an out-of-distribution value
-    (per-cell pinning — a row is pinned only where its own firing
-    pattern says fire), while an unfired target cell keeps its bootstrap
-    value. Each group of rows sharing one distinct firing pattern gets
-    its own surgery through the fitted DGP (``dgp.intervene`` — Pearl
-    surgery: fired targets stay pinned, their descendants recompute with
-    fresh noise; a target that is a DESCENDANT of a fired target
-    recomputes from the fired parents).
+    the targets of the generated rows (``selector=None`` raises). The
+    selector fires on ``X``: the rows it fires are the SEEDS, appended as
+    copies of those rows (every appended row fires somewhere — labels all
+    ``True``). Each fired target cell is pinned to an out-of-distribution
+    value (per-cell pinning — a row is pinned only where its own firing
+    pattern says fire), while an unfired cell keeps the seed row's own
+    value EXCEPT when it is a descendant of a fired target: descendants
+    recompute through the structural equations. Each group of rows
+    sharing one distinct firing pattern gets its own surgery through the
+    fitted DGP (``dgp.intervene`` — Pearl surgery: fired targets stay
+    pinned, their descendants get fresh noise).
 
-    Rows where the selector fires nowhere stay pure bootstrap rows and
-    are labeled ``False`` by :meth:`get_outliers_labels`.
-
-    Value-free presets are recommended (``AlwaysSelector``,
-    ``BernoulliSelector``, ``ExactCountSelector``): a value-driven
-    selector reads the BOOTSTRAPPED rows, not ``X``.
+    Value-driven selectors read ``X`` directly (no bootstrap
+    indirection): e.g. ``TopQuantileSelector`` seeds the top-quantile
+    rows, ``ClassCountSelector`` seeds exact per-class row counts.
 
     Parameters
     ----------
@@ -57,13 +53,8 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
     selector : Selector
         Row/column selection rule from ``badgers.core.selectors``
         (REQUIRED: ``None`` is rejected). Its ``columns`` are the
-        intervention targets of the generated rows; firing is decided
-        on the BOOTSTRAPPED rows.
-    n_outliers : int, default=10
-        Number of outlier rows to generate.
-    within_distribution_sampler : WithinDistributionSampler or str, default="normal"
-        Sampling strategy for the bootstrap rows (all columns).
-        A string is resolved via :func:`create_within_distribution_sampler`.
+        intervention targets of the generated rows; the fired rows of
+        ``X`` are the seeds.
     out_of_distribution_sampler : OutOfDistributionSampler or str, default="zscore"
         Sampling strategy for the pinned target cells.
         A string is resolved via :func:`create_out_of_distribution_sampler`.
@@ -80,9 +71,8 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         Return the outlier labels of the last generated output.
 
         A boolean vector aligned with the rows of the last generated
-        output: ``True`` for rows where the selector fired at least one
-        target cell (the outlier deficit), ``False`` for original rows
-        and for pure bootstrap rows (nothing fired).
+        output: ``True`` for the appended rows (every appended row is a
+        fired seed), ``False`` for original rows.
         """
         if self.outlier_labels_ is None:
             raise RuntimeError(
@@ -91,30 +81,23 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         return self.outlier_labels_
 
     @preprocess_inputs
-    def generate(self, X, selector=None, n_outliers=10,
-                 within_distribution_sampler=None,
-                 out_of_distribution_sampler=None):
+    def generate(self, X, selector, *, out_of_distribution_sampler=None):
         """
         Generate outlier rows with per-cell pinned intervention targets.
 
-        The selector decides which target cells of the generated rows
-        are pinned; each distinct firing pattern gets its own surgery.
+        The selector decides which rows of ``X`` seed the generated rows
+        and which target cells of them are pinned; each distinct firing
+        pattern gets its own surgery.
 
         Parameters
         ----------
         X : np.ndarray of shape (n_samples, n_features)
-            Input data (the world the outlier rows are bootstrapped from).
+            Input data (the world the outlier rows are seeded from).
         selector : Selector
             Row/column selection rule from ``badgers.core.selectors``
             (REQUIRED: ``None`` is rejected). Its ``columns`` own the
-            intervention targets; firing is decided on the BOOTSTRAPPED
-            rows, so value-free presets are recommended.
-        n_outliers : int, default=10
-            Number of outlier rows to generate.
-        within_distribution_sampler : WithinDistributionSampler or str, default="normal"
-            Sampling strategy for the bootstrap rows (all columns).
-            A string is resolved via
-            :func:`create_within_distribution_sampler`.
+            intervention targets; the fired rows of ``X`` are the seeds,
+            so value-driven presets read the original data.
         out_of_distribution_sampler : OutOfDistributionSampler or str, default="zscore"
             Sampling strategy for the pinned target cells.
             A string is resolved via
@@ -122,35 +105,17 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
 
         Returns
         -------
-        Xt : np.ndarray of shape (n_samples + n_outliers, n_features)
-            Original data with the outlier rows appended.
+        Xt : np.ndarray of shape (n_samples + n_seeds, n_features)
+            Original data with the outlier rows appended (no appended rows
+            when the selector fires nowhere).
         """
         rng = self.random_generator
         if selector is None:
             raise ValueError(
                 "selector is required: it owns the intervention targets "
-                "(e.g. AlwaysSelector([0]) fires every row on column 0)")
-        if n_outliers <= 0:
-            raise ValueError(
-                f"n_outliers must be positive, got {n_outliers}"
-            )
+                "(e.g. CountSelector([0], count=10) seeds 10 rows fired "
+                "on column 0)")
         self._validate_structure(X)
-
-        # Resolve within-distribution sampler (the bootstrap rows)
-        if within_distribution_sampler is None:
-            within = create_within_distribution_sampler("normal")
-        elif isinstance(within_distribution_sampler, str):
-            within = create_within_distribution_sampler(
-                within_distribution_sampler
-            )
-        elif isinstance(within_distribution_sampler, WithinDistributionSampler):
-            within = within_distribution_sampler
-        else:
-            raise ValueError(
-                f"within_distribution_sampler must be a "
-                f"WithinDistributionSampler instance or str, "
-                f"got {type(within_distribution_sampler).__name__}"
-            )
 
         # Resolve out-of-distribution sampler (the pinned target cells)
         if out_of_distribution_sampler is None:
@@ -173,32 +138,23 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         # implicit default backend.
         self._require_dgp(X)
 
-        # 1) bootstrap the generated rows (all columns; the row is a full
-        #    resample from the world)
-        n_features = X.shape[1]
-        outliers = np.asarray(
-            within.sample(rng, X, list(range(n_features)), n_outliers),
-            dtype=X.dtype,
-        )
+        # 1) the selector fires on X: the fired rows seed the generated
+        #    rows (copies of those rows — every appended row fires)
+        field, targets, seed_rows = fire_and_seed(X, selector, rng)
+        self.outlier_labels_ = np.concatenate([
+            np.zeros(X.shape[0], dtype=bool),
+            np.ones(seed_rows.size, dtype=bool),
+        ])
+        if seed_rows.size == 0:
+            return X
+        outliers = X[seed_rows].copy()
 
-        # 2) the selector decides which TARGET CELLS are pinned (firing
-        #    is decided on the BOOTSTRAPPED rows)
-        field = fired(outliers, selector, rng)
-        targets = list(_resolve_targets(selector, outliers, None))
-        self.outlier_labels_ = np.concatenate(
-            [np.zeros(X.shape[0], dtype=bool), field.any(axis=1)])
-
-        # 3) one surgery per distinct firing pattern: only the cells this
+        # 2) one surgery per distinct firing pattern: only the cells this
         #    pattern fired are pinned; the group's rows are then
         #    recomputed through the structural equations (Pearl surgery:
         #    pinned targets stay pinned, their descendants get fresh
-        #    noise). Pure bootstrap rows are left as bootstrapped.
-        patterns, group_of_row = np.unique(field, axis=0, return_inverse=True)
-        for gi, pattern in enumerate(patterns):
-            group_rows = np.flatnonzero(group_of_row == gi)
-            fired_cols = [targets[j] for j in np.flatnonzero(pattern)]
-            if not fired_cols:
-                continue  # pure bootstrap rows: nothing fired, nothing pinned
+        #    noise; unfired non-descendants keep the seed row's values)
+        for group_rows, fired_cols in iter_firing_groups(field, targets, seed_rows):
             outliers[np.ix_(group_rows, fired_cols)] = (
                 ood.sample(rng, X, fired_cols, group_rows.size))
             outliers[group_rows] = self.dgp.intervene(
