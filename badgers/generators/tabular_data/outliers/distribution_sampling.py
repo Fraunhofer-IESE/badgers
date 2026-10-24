@@ -1,9 +1,12 @@
 import numpy as np
 from numpy.random import default_rng
-from sklearn.preprocessing import MinMaxScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.sampling import HypersphereSampler, ZScoreSampler
+from badgers.core.sampling import (
+    HypersphereSampler,
+    UniformOutOfDistributionSampler,
+    ZScoreSampler,
+)
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
 
@@ -53,14 +56,10 @@ class HyperCubeSampling(OutliersGenerator):
         """
         assert n_outliers > 0
         assert expansion >= 0
-        low = 0 - expansion
-        high = 1 + expansion
 
-        scaler = MinMaxScaler()
-        scaler.fit(X)
-
-        outliers = self.random_generator.uniform(low=low, high=high, size=(n_outliers, X.shape[1]))
-        outliers = scaler.inverse_transform(outliers)
+        outliers = UniformOutOfDistributionSampler(expansion=expansion).sample(
+            self.random_generator, X, columns=list(range(X.shape[1])), n_samples=n_outliers
+        )
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])

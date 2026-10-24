@@ -297,6 +297,29 @@ def test_hypercube__expansion_negative_raises():
         pass
 
 
+def test_hypercube__delegates_to_sampler_math():
+    """Outlier rows match the original MinMax round-trip draw (ulp tolerance)."""
+    rng = default_rng(42)
+    X = rng.normal(size=(50, 4))
+    n_outliers, expansion = 10, 0.1
+
+    generator = HyperCubeSampling(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), n_outliers=n_outliers, expansion=expansion)
+
+    ref_rng = default_rng(0)
+    scaler = MinMaxScaler().fit(X)
+    u = ref_rng.uniform(low=-expansion, high=1 + expansion, size=(n_outliers, X.shape[1]))
+    outliers_ref = scaler.inverse_transform(u)
+
+    np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
+
+    # the expansion=0 default path through the relaxed sampler: exact bounding box
+    generator0 = HyperCubeSampling(random_generator=default_rng(0))
+    Xt0 = generator0.generate(X.copy(), n_outliers=n_outliers, expansion=0.0)
+    assert np.all(Xt0[len(X):] >= X.min(axis=0) - 1e-12)
+    assert np.all(Xt0[len(X):] <= X.max(axis=0) + 1e-12)
+
+
 def test_decomposition_and_outlier__generates_correct_shape():
     """DecompositionAndOutlierGenerator produces correct shape outliers."""
     X = make_blobs(centers=5, n_features=10, n_samples=100)[0]
