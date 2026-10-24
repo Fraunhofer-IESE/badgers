@@ -46,7 +46,7 @@ positions).
 
 from .base import Selector, fired, resolve_class_column
 from .value_driven import ClassSelector, ProportionalSelector, TopQuantileSelector
-from .value_free import AlwaysSelector, BernoulliSelector, ExactCountSelector
+from .value_free import AlwaysSelector, BernoulliSelector, CountSelector, ExactCountSelector
 
 __all__ = [
     "Selector",
@@ -54,6 +54,7 @@ __all__ = [
     "resolve_class_column",
     "AlwaysSelector",
     "BernoulliSelector",
+    "CountSelector",
     "ExactCountSelector",
     "TopQuantileSelector",
     "ClassSelector",
