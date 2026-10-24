@@ -7,9 +7,13 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-from badgers.core.sampling import ZScoreSampler
+from badgers.core.sampling import (
+    HypersphereSampler,
+    UniformOutOfDistributionSampler,
+    ZScoreSampler,
+)
 from badgers.core.selectors import AlwaysSelector, CountSelector, fired
-from badgers.core.utils import random_spherical_coordinates, random_sign
+from badgers.core.utils import random_sign
 from badgers.generators.tabular_data.outliers._firing import iter_firing_groups
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
@@ -254,7 +258,7 @@ def test_hypersphere__radius_ge_three_in_standardized_space():
 def test_hypersphere__scale_effect_on_radius():
     """Larger scale should, on average, yield larger radii."""
     rng = default_rng(0)
-    X = pd.DataFrame(rng.normal(size=(100, 10)), columns=[f"col{i}" for i in range(10)])
+    X = pd.DataFrame(rng.normal(size=(300, 10)), columns=[f"col{i}" for i in range(10)])
     generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
     Xt_small = generator.generate(X.copy(), n_outliers=200, scale=0.1)
     Xt_large = generator.generate(X.copy(), n_outliers=200, scale=5.0)
@@ -270,7 +274,7 @@ def test_hypersphere__scale_effect_on_radius():
 
 
 def test_hypersphere__delegates_to_sampler_math():
-    """Outlier rows equal the original inline formula (standardize → radii → coords → inverse)."""
+    """Outlier rows equal the selector-flow replay on the same stream."""
     rng = default_rng(42)
     X = rng.normal(size=(50, 4))
     n_outliers, scale = 10, 1.0
@@ -279,15 +283,14 @@ def test_hypersphere__delegates_to_sampler_math():
     Xt = generator.generate(X.copy(), n_outliers=n_outliers, scale=scale)
 
     ref_rng = default_rng(0)
-    scaler = StandardScaler().fit(X)
-    radii = 3.0 + ref_rng.exponential(scale=scale, size=n_outliers)
-    outliers_ref = scaler.inverse_transform(
-        random_spherical_coordinates(random_generator=ref_rng, size=X.shape[1], radii=radii)
-    )
-
-    # sampler computes mean/std with numpy's two-pass algorithm while the old
-    # inline math used sklearn's sum-based mean/var: identical up to fp ordering
-    # (1 ULP observed), so pin to atol=1e-12 rather than bit equality
+    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
+    ref_field = fired(X, ref_selector, ref_rng)
+    ref_targets = list(range(X.shape[1]))
+    ref_seeds = np.flatnonzero(ref_field.any(axis=1))
+    outliers_ref = X[ref_seeds].astype(np.float64)
+    for group_rows, fired_cols in iter_firing_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, fired_cols)] = HypersphereSampler(scale=scale).sample(
+            ref_rng, X, fired_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
 
@@ -346,7 +349,7 @@ def test_hypercube__expansion_negative_raises():
 
 
 def test_hypercube__delegates_to_sampler_math():
-    """Outlier rows match the original MinMax round-trip draw (ulp tolerance)."""
+    """Outlier rows equal the selector-flow replay on the same stream."""
     rng = default_rng(42)
     X = rng.normal(size=(50, 4))
     n_outliers, expansion = 10, 0.1
@@ -355,10 +358,14 @@ def test_hypercube__delegates_to_sampler_math():
     Xt = generator.generate(X.copy(), n_outliers=n_outliers, expansion=expansion)
 
     ref_rng = default_rng(0)
-    scaler = MinMaxScaler().fit(X)
-    u = ref_rng.uniform(low=-expansion, high=1 + expansion, size=(n_outliers, X.shape[1]))
-    outliers_ref = scaler.inverse_transform(u)
-
+    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
+    ref_field = fired(X, ref_selector, ref_rng)
+    ref_targets = list(range(X.shape[1]))
+    ref_seeds = np.flatnonzero(ref_field.any(axis=1))
+    outliers_ref = X[ref_seeds].astype(np.float64)
+    for group_rows, fired_cols in iter_firing_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, fired_cols)] = UniformOutOfDistributionSampler(
+            expansion=expansion).sample(ref_rng, X, fired_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
     # the expansion=0 default path through the relaxed sampler: exact bounding box
@@ -480,3 +487,74 @@ def test_instance_sampling__selector_is_ignored_with_warning():
     labels = generator.get_outliers_labels()
     assert labels[:30].sum() == 0
     assert labels[30:].all()
+
+
+# --- shared direct-four selector-flow suite ---
+
+DIRECT_FOUR = [
+    (HyperCubeSampling, {"expansion": 0.1}),
+    (ZScoreSamplingGenerator, {"scale": 1.0}),
+    (HypersphereSamplingGenerator, {"scale": 1.0}),
+]
+
+
+@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
+def test_direct_four__n_outliers_capped_at_row_count(gen_class, kwargs):
+    X = np.arange(20.0).reshape(10, 2)
+    with pytest.raises(ValueError, match="exceeds the number of rows"):
+        gen_class(random_generator=default_rng(0)).generate(
+            X.copy(), n_outliers=11, **kwargs)
+
+
+@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
+def test_direct_four__negative_n_outliers_raises(gen_class, kwargs):
+    X = np.arange(20.0).reshape(10, 2)
+    with pytest.raises(ValueError, match="count must be >= 0"):
+        gen_class(random_generator=default_rng(0)).generate(
+            X.copy(), n_outliers=-1, **kwargs)
+
+
+@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
+def test_direct_four__n_outliers_with_selector_raises(gen_class, kwargs):
+    X = np.arange(20.0).reshape(10, 2)
+    with pytest.raises(ValueError, match="only the default count"):
+        gen_class(random_generator=default_rng(0)).generate(
+            X.copy(), n_outliers=5,
+            selector=CountSelector([0], count=3, rng=default_rng(1)), **kwargs)
+
+
+@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
+def test_direct_four__n_outliers_zero_is_noop(gen_class, kwargs):
+    X = np.arange(40.0).reshape(20, 2)
+    generator = gen_class(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), n_outliers=0, **kwargs)
+    np.testing.assert_array_equal(Xt, X)
+    assert not generator.get_outliers_labels().any()
+
+
+@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
+def test_direct_four__default_count_is_ten(gen_class, kwargs):
+    X = np.arange(40.0).reshape(20, 2)
+    generator = gen_class(random_generator=default_rng(0))
+    Xt = generator.generate(X.copy(), **kwargs)
+    assert Xt.shape == (30, 2)
+    labels = generator.get_outliers_labels()
+    assert labels[:20].sum() == 0 and labels[20:].all()
+
+
+@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
+def test_direct_four__selector_oracle_unfired_cells(gen_class, kwargs):
+    """Unfired cells of an appended row equal the seed row's values."""
+    rng = default_rng(0)
+    X = rng.normal(size=(40, 3))
+    mask0 = np.zeros(40, dtype=bool)
+    mask0[:5] = True
+    generator = gen_class(random_generator=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector=lambda X_, targets=None: {0: mask0}, **kwargs)
+    outliers = Xt[len(X):]
+    assert outliers.shape == (5, 3)
+    np.testing.assert_array_equal(outliers[:, 1:], X[:5, 1:])
+    np.testing.assert_array_equal(outliers[:, 2:], X[:5, 2:])
+    # fired cells were overwritten (not seed copies)
+    assert not np.array_equal(outliers[:, 0], X[:5, 0])
