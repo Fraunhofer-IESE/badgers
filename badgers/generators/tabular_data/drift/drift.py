@@ -4,7 +4,7 @@ from typing import Union
 import numpy as np
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired_mask, fired_rows, resolve_class_column
+from badgers.core.selectors import fired, resolve_class_column
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
@@ -76,7 +76,8 @@ class RandomShiftGenerator(DriftGenerator):
                          value-free presets return bool masks --
                          ``AlwaysSelector`` the scalar ``1.0`` -- value-driven
                          presets ``[0, 1]`` firing specs as ``(n,)`` arrays),
-                         realized internally via ``fired_rows``. ``None`` =
+                         realized internally via ``fired`` (row-level
+                         union ``.any(axis=1)``). ``None`` =
                          every row is shifted (backward compatible).
         :return: The modified feature matrix `X'`.
         """
@@ -95,7 +96,7 @@ class RandomShiftGenerator(DriftGenerator):
         sign = np.broadcast_to(np.sign(shift_std), (X.shape[1],))
         shift = self.random_generator.normal(loc=0, scale=scale, size=X.shape[1]) * sign
         # add shift to the FIRED rows only (masks computed on the un-mutated input)
-        rows = fired_rows(X, selector, self.random_generator)
+        rows = np.flatnonzero(fired(X, selector, self.random_generator).any(axis=1))
         Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
@@ -138,7 +139,8 @@ class FixedShiftGenerator(DriftGenerator):
                          value-free presets return bool masks --
                          ``AlwaysSelector`` the scalar ``1.0`` -- value-driven
                          presets ``[0, 1]`` firing specs as ``(n,)`` arrays),
-                         realized internally via ``fired_rows``. ``None`` =
+                         realized internally via ``fired`` (row-level
+                         union ``.any(axis=1)``). ``None`` =
                          every row is shifted (backward compatible).
         :return: The modified feature matrix `X'`.
         """
@@ -157,7 +159,7 @@ class FixedShiftGenerator(DriftGenerator):
         # rng, but the shift itself draws nothing -- bind a fixed private
         # stream so repeated calls return the same output.
         rng = self.random_generator if self.random_generator is not None else default_rng(0)
-        rows = fired_rows(X, selector, rng)
+        rows = np.flatnonzero(fired(X, selector, rng).any(axis=1))
         Xt[rows] += shift
         # inverse transform
         return scaler.inverse_transform(Xt)
@@ -226,8 +228,8 @@ class RandomShiftClassesGenerator(DriftGenerator):
                 "which rows shift (e.g. ClassSelector over the class "
                 "column): classes are columns of X."
             )
-        fired = fired_mask(X, selector, self.random_generator)
-        if not fired.any():
+        firing = fired(X, selector, self.random_generator).any(axis=1)
+        if not firing.any():
             return X
         # resolve the class column: explicit parameter first, selector sniffing as fallback
         class_col = class_column
@@ -264,7 +266,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
         Xt = scaler.transform(X)
         # one independent shift per class value among the fired rows
         if class_col is not None:
-            values = np.unique(X[fired, class_col])
+            values = np.unique(X[firing, class_col])
         else:
             values = np.array([None])
         for value in values:
@@ -274,7 +276,7 @@ class RandomShiftClassesGenerator(DriftGenerator):
                 std = stds[value]
             else:
                 std = shift_std
-            rows = fired if class_col is None else (fired & (X[:, class_col] == value))
+            rows = firing if class_col is None else (firing & (X[:, class_col] == value))
             # signed magnitude: |std| is the scale, sign(std) the direction
             shift = self.random_generator.normal(loc=0, scale=abs(std), size=cols.size)
             Xt[np.ix_(rows, cols)] += np.sign(std) * shift
@@ -335,8 +337,8 @@ class FixedShiftClassesGenerator(DriftGenerator):
         # rng, but the shift itself draws nothing -- bind a fixed private
         # stream so repeated calls return the same output.
         rng = self.random_generator if self.random_generator is not None else default_rng(0)
-        fired = fired_mask(X, selector, rng)
-        if not fired.any():
+        firing = fired(X, selector, rng).any(axis=1)
+        if not firing.any():
             return X
         # resolve the class column: explicit parameter first, selector sniffing as fallback
         class_col = class_column
@@ -373,7 +375,7 @@ class FixedShiftClassesGenerator(DriftGenerator):
         Xt = scaler.transform(X)
         # one exact shift per class value among the fired rows
         if class_col is not None:
-            values = np.unique(X[fired, class_col])
+            values = np.unique(X[firing, class_col])
         else:
             values = np.array([None])
         for value in values:
@@ -385,7 +387,7 @@ class FixedShiftClassesGenerator(DriftGenerator):
                 shift_value = np.broadcast_to(np.asarray(shift, dtype=float), (cols.size,))
             else:
                 shift_value = np.full(cols.size, float(shift))
-            rows = fired if class_col is None else (fired & (X[:, class_col] == value))
+            rows = firing if class_col is None else (firing & (X[:, class_col] == value))
             Xt[np.ix_(rows, cols)] += shift_value
         # inverse transform
         return scaler.inverse_transform(Xt)

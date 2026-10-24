@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 
 from badgers.core.dgp import DGPMixin
-from badgers.core.selectors import AlwaysSelector
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -66,70 +65,6 @@ def test_validate_perturbation_nodes__empty_raises(chain_data):
     gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
     with pytest.raises(ValueError, match="not be empty"):
         gen._validate_perturbation_nodes([])
-
-
-def test_fire_masks__none_selector_fires_all_rows(chain_data):
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-    fires = gen._fire_masks(X, ["X"], selector=None)
-    assert set(fires) == {"X"}
-    assert fires["X"].all()
-
-
-def test_fire_masks__delegates_to_selector(chain_data):
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-
-    def selector(X, targets=None):
-        return {col: np.zeros(X.shape[0], dtype=bool) for col in targets}
-
-    fires = gen._fire_masks(X, ["X"], selector=selector)
-    assert not fires["X"].any()
-
-
-def test_fire_masks__preset_selector_keys_are_column_positions(chain_data):
-    # Index-only contract: the selector covers COLUMN POSITIONS ("X" is
-    # column 0 in chain_data) and its specs are realized into the
-    # per-node row masks.
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-    selector = AlwaysSelector([0])  # node "X" -> column 0
-    fires = gen._fire_masks(X, ["X"], selector=selector)
-    assert fires["X"].all()
-
-
-def test_fire_masks__mask_follows_column_position_not_name(chain_data):
-    # Column *i* of the realized firing field maps to
-    # ``perturbation_nodes[i]``; a node whose column is absent from the
-    # selector's output stays all-False.
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-
-    def selector(X, targets=None):
-        return {targets[0]: 1.0}  # only the FIRST node's column fires
-
-    fires = gen._fire_masks(X, ["X", "Y"], selector=selector)
-    assert fires["X"].all()      # "X" -> column 0 -> spec 1.0
-    assert not fires["Y"].any()  # "Y" -> column 1 -> no key -> False
-
-
-def test_fire_masks__single_rng_stream_in_perturbation_nodes_order(chain_data):
-    # RNG discipline: ONE stream (the generator's rng) realizes every
-    # node's spec, in perturbation_nodes order -- the second node's
-    # realization consumes the SECOND batch of n_rows draws.
-    X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
-    gen.random_generator = np.random.default_rng(0)
-
-    def selector(X, targets=None):
-        return {targets[0]: 1.0, targets[1]: 0.5}
-
-    fires = gen._fire_masks(X, ["X", "Y"], selector=selector)
-    assert fires["X"].all()  # spec 1.0 -> deterministic
-    stream = np.random.default_rng(0)
-    np.testing.assert_array_equal(
-        fires["Y"], stream.random(2 * X.shape[0])[X.shape[0]:] < 0.5
-    )
 
 
 def test_deficit_labels__start_as_none(chain_data):

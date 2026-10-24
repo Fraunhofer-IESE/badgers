@@ -82,7 +82,7 @@ def test_generate__validation_errors(chain_data, make_gcm_dgp):
         )
 
 
-def test_generate__explicit_selector_drops_fired_rows(chain_data, make_gcm_dgp):
+def test_generate__explicit_selector_drops_firing_rows(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = _fitted_generator(X, graph, column_mapping, make_gcm_dgp)
     selector = TopQuantileSelector(

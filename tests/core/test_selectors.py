@@ -601,7 +601,7 @@ class TestBaseContract:
         assert 0.2 < field[:, 1].mean() < 0.3
 
     def test_fired_row_or_is_inline(self):
-        # former fired_mask: the row-level union is expressed at the call site
+        # the old flat-mask helper is gone: the row-level union is expressed at the call site
         sel = lambda X, targets=None: {0: 0.0, 1: 1.0}  # noqa: E731
         rows = fired(np.zeros((4, 2)), sel, default_rng(0)).any(axis=1)
         assert rows.tolist() == [True, True, True, True]

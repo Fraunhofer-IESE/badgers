@@ -5,7 +5,7 @@ from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired_mask
+from badgers.core.selectors import fired
 from badgers.core.utils import normalize_proba
 
 
@@ -93,9 +93,9 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
             self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
             return X
         # a row is dropped if fired in any class column
-        fired = fired_mask(X, selector, self.random_generator)
-        Xt = X[~fired, :]
-        self.imbalance_labels_ = fired
+        firing = fired(X, selector, self.random_generator).any(axis=1)
+        Xt = X[~firing, :]
+        self.imbalance_labels_ = firing
         return Xt
 
 
@@ -188,9 +188,9 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             if size is not None and size < len(kept):
                 kept = self.random_generator.choice(kept, size=size, replace=False)
             Xt = X[kept, :]
-            fired = np.ones(X.shape[0], dtype=bool)
-            fired[kept] = False
-            self.imbalance_labels_ = fired
+            firing = np.ones(X.shape[0], dtype=bool)
+            firing[kept] = False
+            self.imbalance_labels_ = firing
             return Xt
         # Fractional scores: normalize the keep weights into a probability
         # vector and resample from them.
@@ -200,7 +200,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             replace=replace,
         )
         Xt = X[n, :]
-        fired = np.ones(X.shape[0], dtype=bool)
-        fired[n] = False
-        self.imbalance_labels_ = fired
+        firing = np.ones(X.shape[0], dtype=bool)
+        firing[n] = False
+        self.imbalance_labels_ = firing
         return Xt

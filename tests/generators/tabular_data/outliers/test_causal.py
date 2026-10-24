@@ -450,8 +450,8 @@ def test_generate__per_cell_pinning_partial_fire(rng):
     np.testing.assert_array_equal(labels[100:], fire_x | fire_y)
     stds = X.std(axis=0)
     for i, col in enumerate((0, 1)):
-        fired_mask = (fire_x if col == 0 else fire_y)
-        dev = np.abs(Xt[100 + np.flatnonzero(fired_mask), col] - X[:, col].mean())
+        col_fired = (fire_x if col == 0 else fire_y)
+        dev = np.abs(Xt[100 + np.flatnonzero(col_fired), col] - X[:, col].mean())
         assert np.all(dev > 3.0 * stds[col])
 
 

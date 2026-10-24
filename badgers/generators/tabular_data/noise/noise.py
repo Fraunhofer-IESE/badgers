@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired_mask, realize_firing, resolve_class_column
+from badgers.core.selectors import fired, resolve_class_column
 
 
 class NoiseGenerator(GeneratorMixin):
@@ -79,8 +79,8 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
                 "which rows receive noise (e.g. ClassSelector over the "
                 "class column): classes are columns of X with discrete values."
             )
-        fired = fired_mask(X, selector, self.random_generator)
-        if not fired.any():
+        firing = fired(X, selector, self.random_generator).any(axis=1)
+        if not firing.any():
             return X
         # resolve the class column from the selector's class_column
         class_col = resolve_class_column(selector, X)
@@ -107,11 +107,11 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
         # noise per class value among the fired rows
-        for value in np.unique(X[fired, class_col]):
+        for value in np.unique(X[firing, class_col]):
             if value not in noise_std_per_class:
                 continue
             noise_std = noise_std_per_class[value]
-            rows = fired & (X[:, class_col] == value)
+            rows = firing & (X[:, class_col] == value)
             noise = self.random_generator.normal(
                 loc=0, scale=noise_std, size=(int(rows.sum()), X.shape[1])
             )
@@ -189,13 +189,14 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         # Realized firing per the selector's own column scope; cells not
         # fired (or in columns the selector does not cover) get no noise.
         # A bare user callable without a ``columns`` attribute covers
-        # every column of X.
-        fired = realize_firing(X, selector, self.random_generator)
+        # every column of X (fired() resolves call-time targets the same
+        # way -- keep in sync).
+        field = fired(X, selector, self.random_generator)
         covered = getattr(selector, "columns", None)
         if covered is None:
             # same default as _resolve_targets in badgers/core/selectors/base.py -- keep in sync
             covered = range(X.shape[1])
         full = np.zeros(X.shape, dtype=bool)
-        full[:, list(covered)] = fired
+        full[:, list(covered)] = field
         noise[~full] = 0.0
         return X + noise
