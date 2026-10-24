@@ -2,11 +2,16 @@
 
 Owns the shared plumbing: DGP configuration (no generator-side ``fit`` —
 the DGP is fitted by its own ``fit``, explicitly by the caller or lazily
-inside ``generate()``), input/structure validation, and the firing rule
-(which rows get the defect). Subclasses define the defect injection and
-propagation, and manage their OWN labels: each generator stores the
-per-row defect labels of its last generated output and exposes them
-through a public getter (e.g. ``get_outliers_labels()``).
+inside ``generate()``) and input/structure validation. Subclasses define
+the defect injection and propagation, and manage their OWN labels: each
+generator stores the per-row defect labels of its last generated output
+and exposes them through a public getter (e.g. ``get_outliers_labels()``).
+
+Firing (which rows get the defect) is realized by
+``badgers.core.selectors.fired``; generators import and call it
+themselves. The DGP's ``column_mapping`` is the ONLY name↔position
+bridge: generators speak column positions, and ``_node_names``
+translates them back at the intervene boundary.
 """
 
 import numpy as np
@@ -14,7 +19,6 @@ from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.causal_graph import validate_dag
-from badgers.core.selectors import realize_firing
 
 
 def _column_stds(X):
@@ -30,6 +34,28 @@ def _column_stds(X):
         warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN slice
         std = np.nanstd(X, axis=0)
     return np.where(np.isfinite(std) & (std > 0), std, 1.0)
+
+
+def _param_by_target(param, name, targets):
+    """Per-target scalar parameter: scalar broadcast or dict by column position.
+
+    ``{0: 0.3}`` keys are COLUMN POSITIONS (the selector's targets), not
+    node names. The dict must cover every target column.
+    """
+    if np.isscalar(param):
+        return {c: float(param) for c in targets}
+    if not isinstance(param, dict):
+        raise ValueError(
+            f"{name} must be a scalar or a dict keyed by column "
+            f"position, got {type(param).__name__}"
+        )
+    missing = [c for c in targets if c not in param]
+    if missing:
+        raise ValueError(
+            f"{name} dict is missing entries for target column(s) {missing} "
+            f"(keys are column positions; selector targets = {list(targets)})"
+        )
+    return {c: float(param[c]) for c in targets}
 
 
 class CausalGenerator(GeneratorMixin):
@@ -146,57 +172,6 @@ class CausalGenerator(GeneratorMixin):
             )
         return self.dgp.sample(self.random_generator, n_samples)
 
-    # -- Firing mechanism (Distinction 3) -----------------------------------
-
-    def _fire_masks(self, rows, perturbation_nodes, selector=None):
-        """Fire masks for ALL rows at once: dict {node: bool row-mask}.
-
-        Delegates to a ``Selector`` from ``badgers.core.selectors``:
-        ``selector(rows, targets=[positions]) -> {position: spec}``;
-        specs are realized here with the generator's rng (single stream,
-        ``perturbation_nodes`` order). ``selector=None`` = every row fires
-        on every perturbation node.
-
-        Parameters
-        ----------
-        rows : the raw input rows whose firing the selector decides
-            (masks are realized on the un-expanded input; only
-            noise/causal.py expands rows afterwards).
-        perturbation_nodes : list of str, non-empty (pre-validated).
-        selector : Selector or None, default None
-            Index-only row-selection rule from ``badgers.core.selectors``
-            (``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
-            ``TopQuantileSelector``, ``ClassSelector``, ``ProportionalSelector``,
-            or any callable with the same signature).
-
-        Note: masks are computed against ``rows`` BEFORE any mutation
-        (callers write NaNs/noise afterwards), which makes the firing
-        order-independent -- the "compute ALL masks first" invariant the
-        legacy missingness path already documented.
-        """
-        if selector is None:
-            return {
-                node: np.ones(rows.shape[0], dtype=bool)
-                for node in perturbation_nodes
-            }
-        if self.column_mapping is None:
-            raise ValueError(
-                "_fire_masks with an explicit selector needs a DGP: the "
-                "perturbation nodes are mapped to column positions via "
-                "column_mapping. Pass a dgp=... to the constructor, or "
-                "use use_dgp(dgp)."
-            )
-        targets = [
-            self.column_mapping[node]
-            for node in perturbation_nodes
-        ]
-        fired = realize_firing(rows, selector, self.random_generator,
-                               targets=targets)
-        return {
-            node: fired[:, i]
-            for i, node in enumerate(perturbation_nodes)
-        }
-
     # -- Validation ---------------------------------------------------------
 
     def _validate_structure(self, X):
@@ -275,6 +250,9 @@ class CausalGenerator(GeneratorMixin):
 
         Requires a non-empty list of nodes that exist in the graph.
         Raises ``ValueError`` otherwise; returns nothing.
+
+        Only the legacy ``quantile_range`` fallback of
+        ``CausalImbalanceGenerator`` still takes node names.
         """
         graph = self.graph
         if graph is None:
@@ -297,3 +275,13 @@ class CausalGenerator(GeneratorMixin):
                 raise ValueError(
                     f"perturbation node '{node}' not found in graph"
                 )
+
+    def _node_names(self, columns):
+        """Node names for column positions (inverse of ``column_mapping``).
+
+        Total after :meth:`_validate_structure`: the mapping is a bijection
+        between graph nodes and in-range column indices, so every valid
+        position has exactly one name.
+        """
+        names = {col: node for node, col in self.column_mapping.items()}
+        return [names[c] for c in columns]
