@@ -100,7 +100,7 @@ def test_generate__selector_none_is_relevant_default_selector():
 
 
 def test_generate__selector_restricts_noisy_rows(gen):
-    """Only the columns and rows fired by the selector receive noise."""
+    """Only the columns and rows selected by the selector receive noise."""
     rng = np.random.default_rng(0)
     X = _simple_data(rng)
     selector = TopQuantileSelector([0, 1], 0, 0.8)
@@ -110,10 +110,10 @@ def test_generate__selector_restricts_noisy_rows(gen):
     masks = selector(X)
     # column 2 never perturbed
     np.testing.assert_array_equal(Xt[:, 2], X[:, 2])
-    # columns 0 and 1: non-fired rows untouched
+    # columns 0 and 1: non-selected rows untouched
     np.testing.assert_array_equal(Xt[~masks[0], 0], X[~masks[0], 0])
     np.testing.assert_array_equal(Xt[~masks[1], 1], X[~masks[1], 1])
-    # fired rows are noisy
+    # selected rows are noisy
     assert not np.allclose(Xt[masks[0], 0], X[masks[0], 0])
 
 
@@ -148,19 +148,19 @@ def test_generate__class_selector_gates_noise_to_that_class(gen):
     np.testing.assert_array_equal(Xt[~target], Xc[~target])
 
 
-def test_generate__selector_scope_and_firing_combine(gen):
-    """Noise lands only where a fired row AND a covered column intersect."""
+def test_generate__selector_scope_and_selection_combine(gen):
+    """Noise lands only where a selected row AND a covered column intersect."""
     rng = np.random.default_rng(0)
     X = _simple_data(rng)
     selector = TopQuantileSelector([1], 1, 0.8)
     gen2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
     Xt = gen2.generate(X, distribution=scipy.stats.norm(scale=2.0),
                        selector=selector)
-    fired = selector(X)[1]
+    selected = selector(X)[1]
     np.testing.assert_array_equal(Xt[:, 0], X[:, 0])
     np.testing.assert_array_equal(Xt[:, 2], X[:, 2])
-    np.testing.assert_array_equal(Xt[~fired, 1], X[~fired, 1])
-    assert not np.allclose(Xt[fired, 1], X[fired, 1])
+    np.testing.assert_array_equal(Xt[~selected, 1], X[~selected, 1])
+    assert not np.allclose(Xt[selected, 1], X[selected, 1])
 
 
 def test_generate__masks_computed_on_unmutated_input(gen):

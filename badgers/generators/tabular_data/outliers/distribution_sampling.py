@@ -8,9 +8,9 @@ from badgers.core.sampling import (
 )
 from badgers.core.selectors import CountSelector
 from badgers.generators.tabular_data.outliers import OutliersGenerator
-from badgers.generators.tabular_data.outliers._firing import (
-    fire_and_seed,
-    iter_firing_groups,
+from badgers.generators.tabular_data.outliers._selection import (
+    select_and_seed,
+    iter_selection_groups,
 )
 
 
@@ -43,13 +43,13 @@ class HyperCubeSampling(OutliersGenerator):
         hypercube encapsulating all the instances.
 
         The count comes from a selector: ``n_outliers`` is only the DEFAULT
-        when no selector is passed (an internal ``CountSelector`` fires that
-        many rows, or 10). The fired rows are the SEEDS: each appended
-        outlier row starts as a copy of a fired row of ``X``, and every cell
-        fired by the selector is overwritten with a value uniform in the
+        when no selector is passed (an internal ``CountSelector`` selects that
+        many rows, or 10). The selected rows are the SEEDS: each appended
+        outlier row starts as a copy of a selected row of ``X``, and every cell
+        selected by the selector is overwritten with a value uniform in the
         (possibly expanded) data bounding box
         (:class:`badgers.core.sampling.UniformOutOfDistributionSampler`).
-        A column not fired keeps the seed row's own value. The requested
+        A column not selected keeps the seed row's own value. The requested
         count must not exceed ``len(X)`` (a larger count raises).
 
         How to set the values for expansion.
@@ -72,7 +72,7 @@ class HyperCubeSampling(OutliersGenerator):
             number of rows of X).
         :param expansion: how much the hypercube shall be expanded beyond (min,max) range, in percent (0.1 == 10%)
         :param selector: optional selector from ``badgers.core.selectors``;
-            its fired rows are the seeds and its columns the perturbed cells
+            its selected rows are the seeds and its columns the perturbed cells
             (``n_outliers`` must then not be passed).
         :return: The augmented feature matrix with added outliers.
         """
@@ -92,12 +92,12 @@ class HyperCubeSampling(OutliersGenerator):
             )
         rng = self.random_generator
 
-        field, targets, seed_rows = fire_and_seed(X, selector, rng)
+        field, targets, seed_rows = select_and_seed(X, selector, rng)
         outliers = X[seed_rows].astype(np.float64, copy=True)
-        for group_rows, fired_cols in iter_firing_groups(field, targets, seed_rows):
-            outliers[np.ix_(group_rows, fired_cols)] = (
+        for group_rows, selected_cols in iter_selection_groups(field, targets, seed_rows):
+            outliers[np.ix_(group_rows, selected_cols)] = (
                 UniformOutOfDistributionSampler(expansion=expansion).sample(
-                    rng, X, fired_cols, group_rows.size
+                    rng, X, selected_cols, group_rows.size
                 ))
 
         self._set_outlier_labels(len(X), seed_rows.size)
@@ -131,13 +131,13 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         Randomly generates outliers as data points with a z-score > 3.
 
         The count comes from a selector: ``n_outliers`` is only the DEFAULT
-        when no selector is passed (an internal ``CountSelector`` fires that
-        many rows, or 10). The fired rows are the SEEDS: each appended
-        outlier row starts as a copy of a fired row of ``X``, and every cell
-        fired by the selector is overwritten with an out-of-distribution
+        when no selector is passed (an internal ``CountSelector`` selects that
+        many rows, or 10). The selected rows are the SEEDS: each appended
+        outlier row starts as a copy of a selected row of ``X``, and every cell
+        selected by the selector is overwritten with an out-of-distribution
         value from :class:`badgers.core.sampling.ZScoreSampler` (a random
         sign and ``3 + exponential(scale)`` standard deviations from the
-        column mean). A column not fired keeps the seed row's own value.
+        column mean). A column not selected keeps the seed row's own value.
         The requested count must not exceed ``len(X)`` (a larger count
         raises).
 
@@ -150,7 +150,7 @@ class ZScoreSamplingGenerator(OutliersGenerator):
                     The scale parameter, :math:`\beta = 1/\lambda`. Must be
                     positive.
         :param selector: optional selector from ``badgers.core.selectors``;
-            its fired rows are the seeds and its columns the perturbed cells
+            its selected rows are the seeds and its columns the perturbed cells
             (``n_outliers`` must then not be passed).
         :return: The augmented feature matrix with added outliers.
         """
@@ -170,11 +170,11 @@ class ZScoreSamplingGenerator(OutliersGenerator):
             )
         rng = self.random_generator
 
-        field, targets, seed_rows = fire_and_seed(X, selector, rng)
+        field, targets, seed_rows = select_and_seed(X, selector, rng)
         outliers = X[seed_rows].astype(np.float64, copy=True)
-        for group_rows, fired_cols in iter_firing_groups(field, targets, seed_rows):
-            outliers[np.ix_(group_rows, fired_cols)] = ZScoreSampler(scale=scale).sample(
-                rng, X, fired_cols, group_rows.size
+        for group_rows, selected_cols in iter_selection_groups(field, targets, seed_rows):
+            outliers[np.ix_(group_rows, selected_cols)] = ZScoreSampler(scale=scale).sample(
+                rng, X, selected_cols, group_rows.size
             )
 
         self._set_outlier_labels(len(X), seed_rows.size)
@@ -208,13 +208,13 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         Generates outliers by sampling points from a hypersphere with radius at least 3 sigma.
 
         The count comes from a selector: ``n_outliers`` is only the DEFAULT
-        when no selector is passed (an internal ``CountSelector`` fires that
-        many rows, or 10). The fired rows are the SEEDS: each appended
-        outlier row starts as a copy of a fired row of ``X``, and every cell
-        fired by the selector is overwritten with a hypersphere point
+        when no selector is passed (an internal ``CountSelector`` selects that
+        many rows, or 10). The selected rows are the SEEDS: each appended
+        outlier row starts as a copy of a selected row of ``X``, and every cell
+        selected by the selector is overwritten with a hypersphere point
         (:class:`badgers.core.sampling.HypersphereSampler`, radius
         ``3 + exponential(scale)`` in standardized space). A column not
-        fired keeps the seed row's own value. The requested count must not
+        selected keeps the seed row's own value. The requested count must not
         exceed ``len(X)`` (a larger count raises).
 
         :param X: the input features (pandas DataFrame or numpy array).
@@ -226,7 +226,7 @@ class HypersphereSamplingGenerator(OutliersGenerator):
                     The scale parameter, :math:`\beta = 1/\lambda`. Must be
                     positive.
         :param selector: optional selector from ``badgers.core.selectors``;
-            its fired rows are the seeds and its columns the perturbed cells
+            its selected rows are the seeds and its columns the perturbed cells
             (``n_outliers`` must then not be passed).
         :return: The augmented feature matrix with added outliers.
         """
@@ -246,11 +246,11 @@ class HypersphereSamplingGenerator(OutliersGenerator):
             )
         rng = self.random_generator
 
-        field, targets, seed_rows = fire_and_seed(X, selector, rng)
+        field, targets, seed_rows = select_and_seed(X, selector, rng)
         outliers = X[seed_rows].astype(np.float64, copy=True)
-        for group_rows, fired_cols in iter_firing_groups(field, targets, seed_rows):
-            outliers[np.ix_(group_rows, fired_cols)] = HypersphereSampler(scale=scale).sample(
-                rng, X, fired_cols, group_rows.size
+        for group_rows, selected_cols in iter_selection_groups(field, targets, seed_rows):
+            outliers[np.ix_(group_rows, selected_cols)] = HypersphereSampler(scale=scale).sample(
+                rng, X, selected_cols, group_rows.size
             )
 
         self._set_outlier_labels(len(X), seed_rows.size)

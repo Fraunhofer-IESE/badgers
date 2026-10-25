@@ -8,30 +8,31 @@ from badgers.core.sampling import (
     create_out_of_distribution_sampler,
 )
 from badgers.generators.tabular_data.causal._base import CausalGenerator
-from badgers.generators.tabular_data.outliers._firing import (
-    fire_and_seed,
-    iter_firing_groups,
+from badgers.generators.tabular_data.outliers._selection import (
+    select_and_seed,
+    iter_selection_groups,
 )
 
 
 class CausalOutlierPropagationGenerator(CausalGenerator):
     """
     Generates outlier rows by copying real rows of ``X`` and intervening
-    per cell on the nodes the selector fires, propagating the effect to
+    per cell on the nodes the selector selects, propagating the effect to
     all descendants.
 
     The generator synthesizes rows (it appends to ``X`` instead of
     modifying it), so it keeps its own target input: the selector OWNS
     the targets of the generated rows (``selector=None`` raises). The
-    selector fires on ``X``: the rows it fires are the SEEDS, appended as
-    copies of those rows (every appended row fires somewhere — labels all
-    ``True``). Each fired target cell is pinned to an out-of-distribution
-    value (per-cell pinning — a row is pinned only where its own firing
-    pattern says fire), while an unfired cell keeps the seed row's own
-    value EXCEPT when it is a descendant of a fired target: descendants
+    selector realizes on ``X``: the rows it selects are the SEEDS, appended as
+    copies of those rows (every appended row has at least one selected cell —
+    labels all ``True``). Each selected target cell is pinned to an
+    out-of-distribution
+    value (per-cell pinning — a row is pinned only where its own selection
+    pattern selects), while an unselected cell keeps the seed row's own
+    value EXCEPT when it is a descendant of a selected target: descendants
     recompute through the structural equations. Each group of rows
-    sharing one distinct firing pattern gets its own surgery through the
-    fitted DGP (``dgp.intervene`` — Pearl surgery: fired targets stay
+    sharing one distinct selection pattern gets its own surgery through the
+    fitted DGP (``dgp.intervene`` — Pearl surgery: selected targets stay
     pinned, their descendants get fresh noise).
 
     Value-driven selectors read ``X`` directly (no bootstrap
@@ -54,7 +55,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         Row/column selection rule from ``badgers.core.selectors``
         (REQUIRED; ``None`` raises -- there is no relevant default: the
         selector owns the intervention targets). Its ``columns`` are the
-        intervention targets of the generated rows; the fired rows of
+        intervention targets of the generated rows; the selected rows of
         ``X`` are the seeds.
     out_of_distribution_sampler : OutOfDistributionSampler or str, default="zscore"
         Sampling strategy for the pinned target cells.
@@ -73,7 +74,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
 
         A boolean vector aligned with the rows of the last generated
         output: ``True`` for the appended rows (every appended row is a
-        fired seed), ``False`` for original rows.
+        selected seed), ``False`` for original rows.
         """
         if self.outlier_labels_ is None:
             raise RuntimeError(
@@ -87,7 +88,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         Generate outlier rows with per-cell pinned intervention targets.
 
         The selector decides which rows of ``X`` seed the generated rows
-        and which target cells of them are pinned; each distinct firing
+        and which target cells of them are pinned; each distinct selection
         pattern gets its own surgery.
 
         Parameters
@@ -98,7 +99,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
             Row/column selection rule from ``badgers.core.selectors``
             (REQUIRED; ``None`` raises -- there is no relevant default:
             the selector owns the intervention targets). Its ``columns``
-            own the intervention targets; the fired rows of ``X`` are the
+            own the intervention targets; the selected rows of ``X`` are the
             seeds, so value-driven presets read the original data.
         out_of_distribution_sampler : OutOfDistributionSampler or str, default="zscore"
             Sampling strategy for the pinned target cells.
@@ -109,13 +110,13 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         -------
         Xt : np.ndarray of shape (n_samples + n_seeds, n_features)
             Original data with the outlier rows appended (no appended rows
-            when the selector fires nowhere).
+            when the selector selects nothing).
         """
         rng = self.random_generator
         if selector is None:
             raise ValueError(
                 "selector is required: it owns the intervention targets "
-                "(e.g. CountSelector([0], count=10) seeds 10 rows fired "
+                "(e.g. CountSelector([0], count=10) selects 10 seed rows "
                 "on column 0)")
         self._validate_structure(X)
 
@@ -140,9 +141,10 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
         # implicit default backend.
         self._require_dgp(X)
 
-        # 1) the selector fires on X: the fired rows seed the generated
-        #    rows (copies of those rows — every appended row fires)
-        field, targets, seed_rows = fire_and_seed(X, selector, rng)
+        # 1) the selector realizes on X: the selected rows seed the generated
+        #    rows (copies of those rows — every appended row has at least one
+        #    selected cell)
+        field, targets, seed_rows = select_and_seed(X, selector, rng)
         self.outlier_labels_ = np.concatenate([
             np.zeros(X.shape[0], dtype=bool),
             np.ones(seed_rows.size, dtype=bool),
@@ -151,14 +153,14 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
             return X
         outliers = X[seed_rows].copy()
 
-        # 2) one surgery per distinct firing pattern: only the cells this
-        #    pattern fired are pinned; the group's rows are then
+        # 2) one surgery per distinct selection pattern: only the cells this
+        #    pattern selected are pinned; the group's rows are then
         #    recomputed through the structural equations (Pearl surgery:
         #    pinned targets stay pinned, their descendants get fresh
-        #    noise; unfired non-descendants keep the seed row's values)
-        for group_rows, fired_cols in iter_firing_groups(field, targets, seed_rows):
-            outliers[np.ix_(group_rows, fired_cols)] = (
-                ood.sample(rng, X, fired_cols, group_rows.size))
+        #    noise; unselected non-descendants keep the seed row's values)
+        for group_rows, selected_cols in iter_selection_groups(field, targets, seed_rows):
+            outliers[np.ix_(group_rows, selected_cols)] = (
+                ood.sample(rng, X, selected_cols, group_rows.size))
             outliers[group_rows] = self.dgp.intervene(
-                outliers[group_rows], self._node_names(fired_cols), rng=rng)
+                outliers[group_rows], self._node_names(selected_cols), rng=rng)
         return np.vstack([X, outliers])

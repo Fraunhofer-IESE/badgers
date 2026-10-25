@@ -381,7 +381,7 @@ python -m benchmarks compare --baseline v0.0.13
    wrap it again with `GcmSCMDGP`/`PyMCSCMDGP`. Edits return
    read-only views and never mutate the base DGP. Indicator derivation
    from the observation graph lives in the missingness generator
-   (structure-layer helpers + generator-local firing/spread logic).
+   (structure-layer helpers + generator-local selection/spread logic).
 
 Backend selection is **object injection only** (`dgp=...` / `use_dgp`).
 Deficit semantics live in the generators; they never see which backend ran.

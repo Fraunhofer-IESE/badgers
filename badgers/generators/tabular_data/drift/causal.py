@@ -1,6 +1,6 @@
 """Causal drift generator.
 
-Injects a deterministic distributional shift at the cells fired by the
+Injects a deterministic distributional shift at the cells selected by the
 selector (applied to all affected rows) and recomputes the descendants of the
 affected rows through the structural equations (Pearl surgery: each descendant is
 re-evaluated from its shifted parents with fresh noise).
@@ -9,7 +9,7 @@ re-evaluated from its shifted parents with fresh noise).
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired
+from badgers.core.selectors import get_selected_fields
 from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.causal._base import (
     CausalGenerator,
@@ -43,10 +43,10 @@ class CausalDriftGenerator(CausalGenerator):
         owns the intervention targets).
         ``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
         ``TopQuantileSelector``, or any callable with the same signature.
-        Its ``columns`` are the intervention targets; the rows it fires
+        Its ``columns`` are the intervention targets; the rows it selects
         receive the shift.
     shift_amount : float or dict, default=0.5
-        Signed shift applied to the fired target cells, in units of the
+        Signed shift applied to the selected target cells, in units of the
         column's standard deviation. Positive shifts in the + direction,
         negative in the − direction. Deterministic: the exact shift value
         is applied to all affected rows (no random draw). Scalar
@@ -85,9 +85,9 @@ class CausalDriftGenerator(CausalGenerator):
         rng = self.random_generator
 
         # Apply the signed shift (deterministic: no random draw) to the
-        # rows fired by the selector. The firing field is decided on the
+        # rows selected by the selector. The selected field is decided on the
         # UN-mutated data (thresholds/selection read the input as-is).
-        field = fired(X, selector, rng)
+        field = get_selected_fields(X, selector, rng)
         rows = np.flatnonzero(field.any(axis=1))
         col_stds = _column_stds(X)
         affected = np.zeros(X.shape[0], dtype=bool)
@@ -102,7 +102,7 @@ class CausalDriftGenerator(CausalGenerator):
         # structural equations (Pearl surgery): descendant = f(new parents)
         # + fresh noise. The shift at the target nodes is systematic
         # (a single shift applied to all affected rows); unaffected rows
-        # are left untouched. Intervene receives ALL target names, fired
+        # are left untouched. Intervene receives ALL target names, selected
         # or not.
         if rows.size:
             sub = X[rows]

@@ -81,7 +81,7 @@ def test_generate__noise_propagates_recompute(chain_data, make_gcm_dgp):
     X_orig = X.copy()
     # seed 0: the marginal beta-ratio oracle below is flaky for seeds
     # where mean(dX) lands near 0 by cancellation; this seed keeps both
-    # ratio deviations well under the 10% tolerance (fired() consumes no
+    # ratio deviations well under the 10% tolerance (get_selected_fields() consumes no
     # realization draw for the constant AlwaysSelector spec, so the
     # pinned stream is the draw-free one).
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
@@ -198,14 +198,14 @@ def test_generate__selector_gates_expanded_rows(chain_data, make_gcm_dgp):
     gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     # Bernoulli on the ORIGINAL rows: each seed row's copies either all
-    # fire or all stay clean (masks replicated to the expansion)
+    # are selected or all stay clean (masks replicated to the expansion)
     Xt = gen.generate(
         X, BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
         n_copies=3, noise_std=0.5,
     )
     assert Xt.shape == (X.shape[0] * 3, 3)
-    fired = gen.get_noise_labels()
+    selected = gen.get_noise_labels()
     # groups of n_copies share the same state
-    groups = fired.reshape(X.shape[0], 3)
+    groups = selected.reshape(X.shape[0], 3)
     assert np.all(groups[:, 0] == groups[:, 1]) and np.all(groups[:, 1] == groups[:, 2])
     assert 0.2 < groups.mean() < 0.8

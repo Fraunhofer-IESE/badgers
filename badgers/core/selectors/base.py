@@ -2,7 +2,7 @@
 
 This submodule holds the :class:`Selector` protocol, the shared validation
 helpers used by all presets, and the consumer-side helpers that realize a
-selector's output into firing fields. The presets themselves live in the
+selector's output into selected fields. The presets themselves live in the
 ``value_free`` and ``value_driven`` submodules.
 
 Selectors are index-only: variable names and ``column_mapping`` dicts do
@@ -16,18 +16,18 @@ import numpy as np
 
 __all__ = [
     "Selector",
-    "fired",
+    "get_selected_fields",
     "resolve_class_column",
 ]
 
 
 @runtime_checkable
 class Selector(Protocol):
-    """Protocol for selectors: callables producing per-column firing specs.
+    """Protocol for selectors: callables producing per-column selection specs.
 
     Implementations accept ``X`` and an optional ``targets`` sequence of
     column positions and return ``dict[int, spec]`` where the keys are the
-    fired-upon column positions and each spec is a ``[0, 1]`` scalar
+    selected column positions and each spec is a ``[0, 1]`` scalar
     (uniform level for the whole column) or an array of shape
     ``(n_rows,)`` (per-row level). Values are DECISIONS when restricted to
     ``{0, 1}`` and PROBABILITIES otherwise; the consuming generator
@@ -89,7 +89,7 @@ def _validate_rate(rate: float, name: str) -> float:
 
 
 def _check_spec(spec, n_rows: int) -> None:
-    """Validate a firing spec: scalar or (n_rows,) array, values in [0, 1]."""
+    """Validate a selection spec: scalar or (n_rows,) array, values in [0, 1]."""
     arr = np.asarray(spec)
     if arr.ndim == 0 and arr.dtype == bool:
         raise ValueError(
@@ -121,8 +121,8 @@ def _mask_from_indices(n_rows: int, idx: np.ndarray) -> np.ndarray:
     return mask
 
 
-def fired(X, selector, rng):
-    """Realized firing field: bool array ``(n_rows, len(targets))``.
+def get_selected_fields(X, selector, rng):
+    """Realized selection field: bool array ``(n_rows, len(targets))``.
 
     Column *i* corresponds to the selector's *i*-th target (its own
     ``columns`` when it declares a scope, else every column). Narrow on

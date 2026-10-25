@@ -28,7 +28,7 @@ from badgers.core.selectors.base import (
     _check_spec,
     _resolve_targets,
     _validate_columns,
-    fired,
+    get_selected_fields,
     resolve_class_column,
 )
 
@@ -317,9 +317,9 @@ class TestCountSelector:
 
 
 class TestTopQuantileSelector:
-    """Fires rows where the driver value is >= its quantile.
+    """Selects rows where the driver value is >= its quantile.
 
-    ``threshold = np.quantile(X[:, driver], quantile)``; a row fires when
+    ``threshold = np.quantile(X[:, driver], quantile)``; a row is selected when
     the driver value is ``>= threshold`` and the same mask is returned
     under every target column. ``driver=None`` = self mode (the column's
     own threshold).
@@ -329,14 +329,14 @@ class TestTopQuantileSelector:
         selector = TopQuantileSelector(0, column=0, quantile=0.75)
         assert isinstance(selector, Selector)
 
-    def test_fires_rows_above_explicit_quantile(self):
+    def test_selects_rows_above_explicit_quantile(self):
         # quantile=0.75 -> keep everything above Q3
         selector = TopQuantileSelector(0, column=0, quantile=0.75)
         X = _X(10, 3)  # col 0 == 0, 3, ..., 27
         (mask,) = selector(X).values()
         thr = np.quantile(X[:, 0], 0.75)
         np.testing.assert_array_equal(mask, X[:, 0] >= thr)
-        assert mask.sum() >= 1  # at least the maximum fires
+        assert mask.sum() >= 1  # at least the maximum selects
 
     def test_returns_dict_keyed_by_position(self):
         selector = TopQuantileSelector([0, 1], column=0, quantile=0.8)
@@ -347,7 +347,7 @@ class TestTopQuantileSelector:
 
     def test_self_mode_masks_differ_per_column_only_when_data_differ(self):
         # Self mode compares each target column against ITS OWN threshold:
-        # reversed column data then fire different rows. In self mode the
+        # reversed column data then select different rows. In self mode the
         # mask itself is always built from column 0 (the read column), so
         # this only holds when the READ column differs between calls --
         # expressed here by two selectors bound to different read columns.
@@ -394,14 +394,14 @@ class TestTopQuantileSelector:
         m2 = selector(X)[0]
         assert np.array_equal(m1, m2)
 
-    def test_quantile_one_fires_only_max_rows(self):
-        # threshold = column max; rows equal to the max still fire (>=)
+    def test_quantile_one_selects_only_max_rows(self):
+        # threshold = column max; rows equal to the max are still selected (>=)
         selector = TopQuantileSelector(0, column=0, quantile=1.0)
         X = _X(10, 3)
         (mask,) = selector(X).values()
         assert mask.sum() == int((X[:, 0] == X[:, 0].max()).sum())
 
-    def test_quantile_zero_fires_all_rows(self):
+    def test_quantile_zero_selects_all_rows(self):
         selector = TopQuantileSelector(0, column=0, quantile=0.0)
         (mask,) = selector(_X(10, 3)).values()
         assert mask.all()
@@ -562,14 +562,14 @@ class TestClassCountSelector:
         assert mask[X[:, 2] == 1].sum() == 1
         np.testing.assert_array_equal(masks[0], masks[1])
 
-    def test_absent_class_fires_nothing(self):
+    def test_absent_class_selects_nothing(self):
         X = self._Xy()
         masks = ClassCountSelector([0], class_column=2, counts={0: 1},
                                    rng=default_rng(0))(X)
         assert masks[0][X[:, 2] != 0].sum() == 0
         assert masks[0].sum() == 1
 
-    def test_zero_count_fires_nothing(self):
+    def test_zero_count_selects_nothing(self):
         X = self._Xy()
         masks = ClassCountSelector([0], class_column=2, counts={0: 0, 1: 2},
                                    rng=default_rng(0))(X)
@@ -713,51 +713,51 @@ class TestBaseContract:
         with pytest.raises(ValueError):
             _check_spec(bad, 5)
 
-    def test_fired_deterministic(self):
+    def test_get_selected_fields_deterministic(self):
         X = np.zeros((6, 2))
-        field = fired(X, _FakeSel(), default_rng(0))
+        field = get_selected_fields(X, _FakeSel(), default_rng(0))
         assert field.shape == (6, 2)
         assert field.all()  # spec 1.0 -> rng.random() < 1 always
 
-    def test_fired_probabilities(self):
+    def test_get_selected_fields_probabilities(self):
         sel = lambda X, targets=None: {0: 0.0, 1: 0.25}  # noqa: E731
-        field = fired(np.zeros((1000, 2)), sel, default_rng(0))
+        field = get_selected_fields(np.zeros((1000, 2)), sel, default_rng(0))
         assert not field[:, 0].any()
         assert 0.2 < field[:, 1].mean() < 0.3
 
-    def test_fired_row_or_is_inline(self):
+    def test_selected_row_or_is_inline(self):
         # the old flat-mask helper is gone: the row-level union is expressed at the call site
         sel = lambda X, targets=None: {0: 0.0, 1: 1.0}  # noqa: E731
-        rows = fired(np.zeros((4, 2)), sel, default_rng(0)).any(axis=1)
+        rows = get_selected_fields(np.zeros((4, 2)), sel, default_rng(0)).any(axis=1)
         assert rows.tolist() == [True, True, True, True]
 
-    def test_fired_selector_none_all_true_without_rng_draws(self):
+    def test_get_selected_fields_selector_none_all_true_without_rng_draws(self):
         rng = default_rng(0)
-        field = fired(np.zeros((3, 2)), None, rng)
+        field = get_selected_fields(np.zeros((3, 2)), None, rng)
         assert field.shape == (3, 2)
         assert field.all()
         # selector=None consumes NO rng draws: the next draws match a fresh generator
         np.testing.assert_array_equal(rng.random(5), default_rng(0).random(5))
 
-    def test_fired_constant_specs_without_rng_draws(self):
+    def test_get_selected_fields_constant_specs_without_rng_draws(self):
         """Scalar 0.0/1.0 specs are constant decisions: deterministic, no
         draw consumed (the AlwaysSelector default costs nothing)."""
         rng = default_rng(0)
-        field = fired(np.zeros((3, 2)), AlwaysSelector([0, 1]), rng)
+        field = get_selected_fields(np.zeros((3, 2)), AlwaysSelector([0, 1]), rng)
         assert field.all()
         np.testing.assert_array_equal(rng.random(5), default_rng(0).random(5))
 
-    def test_fired_fractional_scalar_spec_still_draws(self):
+    def test_get_selected_fields_fractional_scalar_spec_still_draws(self):
         """A fractional scalar spec is a probability: the realization draw
         is consumed (stream moves)."""
         rng = default_rng(0)
-        field = fired(np.zeros((1000, 1)), lambda X, targets=None: {0: 0.5}, rng)
+        field = get_selected_fields(np.zeros((1000, 1)), lambda X, targets=None: {0: 0.5}, rng)
         assert 0.2 < field[:, 0].mean() < 0.8
         assert not np.array_equal(rng.random(5), default_rng(0).random(5))
 
-    def test_fired_narrow_field_only_covers_selector_scope(self):
+    def test_get_selected_fields_narrow_field_only_covers_selector_scope(self):
         X = np.zeros((4, 3))
-        field = fired(X, lambda X, targets=None: {1: 1.0}, default_rng(0))
+        field = get_selected_fields(X, lambda X, targets=None: {1: 1.0}, default_rng(0))
         assert field.shape == (4, 3)
         assert field[:, 1].all()
         assert not field[:, 0].any()
@@ -779,10 +779,10 @@ class TestBaseContract:
         X = np.zeros((4, 3))
         assert resolve_class_column(SimpleNamespace(class_column=9), X) is None
 
-    def test_fired_rejects_unknown_keys(self):
+    def test_get_selected_fields_rejects_unknown_keys(self):
         sel = lambda X, targets=None: {0: 1.0, 7: 1.0}  # noqa: E731
         with pytest.raises(ValueError, match="not in targets"):
-            fired(np.zeros((4, 2)), sel, default_rng(0))
+            get_selected_fields(np.zeros((4, 2)), sel, default_rng(0))
 
 
 class TestValueFree:
@@ -838,15 +838,15 @@ class TestValueFree:
 class TestValueDriven:
     X4 = np.array([[0.0, 1, 0], [1.0, 1, 0], [2.0, 1, 1], [9.0, 2, 1]])
 
-    def test_class_selector_fires_share_of_class(self):
-        # class column = 1, values {0, 1, 2}; fire half of the total from class 1
+    def test_class_selector_selects_share_of_class(self):
+        # class column = 1, values {0, 1, 2}; select half of the total from class 1
         sel = ClassSelector([0], class_column=1,
                             proportions={1: 0.5}, rng=default_rng(0))
         out = sel(self.X4)
         assert set(out) == {0}
         mask = out[0]
         assert mask.sum() == 2  # int(0.5 * 4)
-        # fired rows must belong to class 1 (rows 0,1)
+        # selected rows must belong to class 1 (rows 0,1)
         assert mask[2:].all() == False and self.X4[mask, 1].tolist() == [1, 1]
 
     def test_class_selector_unknown_class_raises(self):
@@ -864,7 +864,7 @@ class TestValueDriven:
     def test_top_quantile_self(self):
         sel = TopQuantileSelector([0], column=0, quantile=0.5)
         mask = sel(self.X4)[0]
-        # values 0,1,2,9 -> Q2 = 1.5 -> rows 2,3 fire
+        # values 0,1,2,9 -> Q2 = 1.5 -> rows 2,3 are selected
         assert mask.tolist() == [False, False, True, True]
 
     def test_top_quantile_driver(self):

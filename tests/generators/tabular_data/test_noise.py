@@ -41,7 +41,7 @@ def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
 
 def test_gaussian_noise_classes__per_class_magnitude(tabular_data_labeled):
     """Only the class listed in noise_std_per_class receives noise; a class
-    value fired but absent from the dict raises."""
+    value selected but absent from the dict raises."""
     Xc_full = np.asarray(tabular_data_labeled)
     y = Xc_full[:, -1]
     classes = np.unique(y)
@@ -49,14 +49,14 @@ def test_gaussian_noise_classes__per_class_magnitude(tabular_data_labeled):
     cls_col = Xc.shape[1] - 1
     generator = GaussianNoiseClassesGenerator(random_generator=default_rng(0))
     noise_std_per_class = {classes[0]: 0.5}
-    with pytest.raises(ValueError, match="no entry for the fired class"):
+    with pytest.raises(ValueError, match="no entry for the selected class"):
         generator.generate(Xc.copy(), selector=selector, noise_std_per_class=noise_std_per_class)
-    # with an entry for every fired class only the listed class is noised
+    # with an entry for every selected class only the listed class is noised
     full = {c: 0.5 if c == classes[0] else 0.0 for c in classes}
     Xt = generator.generate(Xc.copy(), selector=selector, noise_std_per_class=full)
-    fired_cls0 = Xc[:, cls_col] == classes[0]
+    selected_cls0 = Xc[:, cls_col] == classes[0]
     other = Xc[:, cls_col] != classes[0]
-    assert not np.allclose(Xt[fired_cls0], Xc[fired_cls0])
+    assert not np.allclose(Xt[selected_cls0], Xc[selected_cls0])
     assert np.allclose(Xt[other], Xc[other])
 
 

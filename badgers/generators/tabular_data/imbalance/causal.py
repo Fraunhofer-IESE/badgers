@@ -10,7 +10,7 @@ no DGP is needed.
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired
+from badgers.core.selectors import get_selected_fields
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
 
@@ -29,10 +29,10 @@ class CausalImbalanceGenerator(CausalGenerator):
     generate() parameters (passed via **params)
     ----------
     selector : Selector or None, default=None
-        Row-selection rule from ``badgers.core.selectors``. The rows FIRED
+        Row-selection rule from ``badgers.core.selectors``. The rows SELECTED
         by the selector are dropped (subsampling polarity: ``True`` =
         deficit applied = row removed); with multiple variables the union
-        of fired rows is dropped. ``None`` falls back to the
+        of selected rows is dropped. ``None`` falls back to the
         ``perturbation_nodes`` + ``quantile_range`` rule below.
     perturbation_nodes : list of str
         Nodes whose quantile ranges define the kept set (only used when
@@ -68,9 +68,9 @@ class CausalImbalanceGenerator(CausalGenerator):
         n_samples = X.shape[0]
 
         if selector is not None:
-            # Explicit selector: rows FIRED by the selector are dropped
+            # Explicit selector: rows SELECTED by the selector are dropped
             # (subsampling polarity). Union over the selector's targets.
-            field = fired(X, selector, self.random_generator)
+            field = get_selected_fields(X, selector, self.random_generator)
             dropped = field.any(axis=1)
             keep = ~dropped
         else:

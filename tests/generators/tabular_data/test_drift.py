@@ -27,15 +27,15 @@ def test_random_shift__selector_none_matches_whole_data_shift(tabular_data):
 
 
 def test_random_shift__selector_restricts_shifted_rows(tabular_data):
-    """Only the rows fired by the selector are shifted; others stay untouched."""
+    """Only the rows selected by the selector are shifted; others stay untouched."""
     X = np.asarray(tabular_data, dtype=float)
     selector = TopQuantileSelector([0], 0, 0.8)
     generator = RandomShiftGenerator(random_generator=default_rng(0))
     Xt = generator.generate(X.copy(), shift_std=2.0, selector=selector)
-    fired = selector(X)[0]
-    assert fired.any() and not fired.all()
-    np.testing.assert_allclose(Xt[~fired], X[~fired], atol=1e-12)
-    assert not np.allclose(Xt[fired], X[fired])
+    selected = selector(X)[0]
+    assert selected.any() and not selected.all()
+    np.testing.assert_allclose(Xt[~selected], X[~selected], atol=1e-12)
+    assert not np.allclose(Xt[selected], X[selected])
 
 
 def test_random_shift__class_selector_shifts_only_that_class(tabular_data_labeled):
@@ -99,16 +99,16 @@ def test_fixed_shift__selector_none_matches_whole_data_shift(tabular_data):
 
 
 def test_fixed_shift__selector_restricts_shifted_rows(tabular_data):
-    """Only the rows fired by the selector receive the exact shift."""
+    """Only the rows selected by the selector receive the exact shift."""
     X = np.asarray(tabular_data, dtype=float)
     selector = TopQuantileSelector([0], 0, 0.8)
     generator = FixedShiftGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X.copy(), shift=1.0, selector=selector)
-    fired = selector(X)[0]
-    assert fired.any() and not fired.all()
-    np.testing.assert_allclose(Xt[~fired], X[~fired], atol=1e-12)
-    # fired rows moved by exactly one std per column
-    delta = Xt[fired] - X[fired]
+    selected = selector(X)[0]
+    assert selected.any() and not selected.all()
+    np.testing.assert_allclose(Xt[~selected], X[~selected], atol=1e-12)
+    # selected rows moved by exactly one std per column
+    delta = Xt[selected] - X[selected]
     expected = 1.0 * X.std(axis=0, ddof=0)
     np.testing.assert_allclose(delta, np.broadcast_to(expected, delta.shape), atol=1e-8)
 
@@ -225,7 +225,7 @@ def test_random_shift_classes__explicit_variables(tabular_data_labeled):
 def test_random_shift_classes__selector_without_class_column_raises(tabular_data_labeled):
     """The selector owns the class information: a selector that does not
     expose a class_column (e.g. BernoulliSelector) raises instead of the old
-    "all fired rows are one class" fallback."""
+    "all selected rows are one class" fallback."""
     Xc = np.asarray(tabular_data_labeled)
     selector = BernoulliSelector([0], rate=1.0, rng=default_rng(1))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
@@ -245,22 +245,22 @@ def test_random_shift_classes__selector_out_of_range_class_column_raises(tabular
 
 def test_random_shift_classes__per_class_dict_shift_std(tabular_data_labeled):
     """Dict shift_std shifts only the listed classes, one draw per class;
-    a fired class value absent from the dict raises."""
+    a selected class value absent from the dict raises."""
     Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
     classes = np.unique(Xc[:, -1])
-    # fire every row (all classes), magnitudes only for the first class
+    # select every row (all classes), magnitudes only for the first class
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     shift_std = {classes[0]: 0.5}
-    with pytest.raises(ValueError, match="no entry for the fired class"):
+    with pytest.raises(ValueError, match="no entry for the selected class"):
         generator.generate(Xc.copy(), selector=selector, shift_std=shift_std)
-    # with an entry for every fired class only the listed class is shifted
+    # with an entry for every selected class only the listed class is shifted
     full = {c: 0.5 if c == classes[0] else 0.0 for c in classes}
     Xt = generator.generate(Xc.copy(), selector=selector, shift_std=full)
-    fired_cls0 = Xc[:, cls_col] == classes[0]
+    selected_cls0 = Xc[:, cls_col] == classes[0]
     other = Xc[:, cls_col] != classes[0]
-    assert not np.allclose(np.asarray(Xt)[fired_cls0], Xc[fired_cls0])
+    assert not np.allclose(np.asarray(Xt)[selected_cls0], Xc[selected_cls0])
     assert np.allclose(np.asarray(Xt)[other], Xc[other])
 
 
@@ -344,20 +344,20 @@ def test_fixed_shift_classes__deterministic_and_per_class(tabular_data_labeled):
 
 
 def test_fixed_shift_classes__dict_shift_per_class(tabular_data_labeled):
-    """Dict shift applies exact shifts only to the listed classes; a fired
+    """Dict shift applies exact shifts only to the listed classes; a selected
     class value absent from the dict raises."""
     Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
     classes = np.unique(Xc[:, -1])
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
     generator = FixedShiftClassesGenerator(random_generator=np.random.default_rng(0))
-    with pytest.raises(ValueError, match="no entry for the fired class"):
+    with pytest.raises(ValueError, match="no entry for the selected class"):
         generator.generate(X=Xc.copy(), selector=selector, shift={classes[0]: 1.0})
-    # with an entry for every fired class only the listed class is shifted
+    # with an entry for every selected class only the listed class is shifted
     Xt = generator.generate(X=Xc.copy(), selector=selector, shift={c: 1.0 if c == classes[0] else 0.0 for c in classes})
-    fired = Xc[:, cls_col] == classes[0]
-    other = ~fired
-    assert not np.allclose(np.asarray(Xt)[fired], Xc[fired])
+    selected = Xc[:, cls_col] == classes[0]
+    other = ~selected
+    assert not np.allclose(np.asarray(Xt)[selected], Xc[selected])
     assert np.allclose(np.asarray(Xt)[other], Xc[other])
 
 

@@ -13,21 +13,21 @@ so that specifications/requirements can be derived directly from them.
   from an arbitrary frozen scipy distribution (global `noise_std` multiplier) to EVERY row;
   restriction is only possible via `perturbation_nodes` COLUMN indices — there is no per-row
   selection.
-- **Target**: add a `selector=None` parameter (the `badgers.core.selectors` contract); only FIRED
+- **Target**: add a `selector=None` parameter (the `badgers.core.selectors` contract); only SELECTED
   rows receive noise, all other rows are returned unchanged. `selector=None` keeps the current
-  behavior (every row fires) for backward compatibility.
+  behavior (every row is selected) for backward compatibility.
 - **Acceptance criteria**:
   - `generate(X, distribution, ..., selector=None)`: masks computed on the UN-mutated input
     (compute-all-masks-first invariant) and OR-combined across the selector's variables.
-  - Modifying consumer semantics: shape unchanged, noise added in place on fired rows only.
+  - Modifying consumer semantics: shape unchanged, noise added in place on selected rows only.
   - Any selector preset (Always, Bernoulli, ExactCount, TopQuantile, Class, Proportional) and any
     callable with the same signature is accepted.
   - Tests: `selector=None` reproduces the current whole-data behavior; a class selector restricts
-    noise to exactly that class's rows; unfired rows are bit-identical to the input.
+    noise to exactly that class's rows; unselected rows are bit-identical to the input.
 - **Implementation status**: done — `AdditiveNoiseGenerator.generate` accepts keyword-only
-  `selector=None`; the drawn noise is zeroed on unfired rows (OR of the selector's masks, computed
+  `selector=None`; the drawn noise is zeroed on unselected rows (OR of the selector's masks, computed
   on the un-mutated input). The shared realization helper is
-  `badgers.core.selectors.fired(X, selector, rng)`: it returns the narrow bool field
+  `badgers.core.selectors.get_selected_fields(X, selector, rng)`: it returns the narrow bool field
   `(n_rows, n_targets)` (column `i` ↔ the selector's `i`-th target); consumers take the
   row-level union themselves with `field.any(axis=1)` (the drift and imbalance consumers do
   the same). Covered by 6 new tests in
@@ -37,7 +37,7 @@ so that specifications/requirements can be derived directly from them.
     `AdditiveNoiseGenerator` with `distribution=norm(...)` — a special case. DECIDE after this
     refactor: remove it, or keep/re-implement it as a thin configuration over the unified
     generator. Note: its per-class `noise_std_per_class` lookup is NOT expressible through a
-    selector (a selector decides which rows fire, not the noise magnitude), so a true per-class
+    selector (a selector decides which rows are selected, not the noise magnitude), so a true per-class
     std needs an explicit mechanism (e.g. per-class distribution configs or per-column std).
   - ~~Decide whether noise generators should expose `get_noise_labels()` like the causal ones.~~
     DECIDED (2026-10-25, review): the direct generators deliberately report nothing — TODO item 6
@@ -102,17 +102,17 @@ so that specifications/requirements can be derived directly from them.
   row — random variant: per-column translation $\epsilon_i \sim \mathcal{N}(0, \text{shift\_std})$
   after standardization; fixed variant: exact per-column shift (reproducible). The `*Classes`
   counterparts already require a selector.
-- **Target**: add `selector=None` (None = all rows fire, backward compatible) so the whole drift
-  family is uniformly selector-driven; fired rows = OR of the selector's masks.
+- **Target**: add `selector=None` (None = all rows are selected, backward compatible) so the whole drift
+  family is uniformly selector-driven; selected rows = OR of the selector's masks.
 - **Acceptance criteria**:
-  - Same standardize → shift → inverse-transform pipeline; shifts drawn/applied ONLY for fired
-    rows; unfired rows bit-identical to the input; masks computed on the un-mutated input.
+  - Same standardize → shift → inverse-transform pipeline; shifts drawn/applied ONLY for selected
+    rows; unselected rows bit-identical to the input; masks computed on the un-mutated input.
   - Per-class shift/noise lookup stays in the `*Classes` variants.
   - Tests: `selector=None` reproduces current whole-data behavior; a `ClassSelector` restricting
     to one class shifts only that class's rows.
 - **Implementation status**: done — both generators accept keyword-only `selector=None`
   (`AlwaysSelector`, `BernoulliSelector`, `TopQuantileSelector`, `ClassSelector`, ... all work);
-  shifts are drawn/applied only for fired rows, masks are OR-ed from the selector output and
+  shifts are drawn/applied only for selected rows, masks are OR-ed from the selector output and
   computed on the un-mutated input. Covered by 11 new tests in
   [test_drift.py](tests/generators/tabular_data/test_drift.py) (all 93 pass).
 - **Open decisions**:
@@ -155,12 +155,12 @@ so that specifications/requirements can be derived directly from them.
     seed, or is API compatibility enough?
 - **Implementation status**: partially done (updated 2026-10-25, generator review) — the three
   distribution-based generators now construct the core Samplers instead of duplicating their math
-  (`fire_and_seed` in [outliers/_firing.py](badgers/generators/tabular_data/outliers/_firing.py)
+  (`select_and_seed` in [outliers/_selection.py](badgers/generators/tabular_data/outliers/_selection.py)
   realizes the selector/`n_outliers` count and seeds the anchor rows). Remaining gaps: the
   histogram/KDE strategies are still generator-local (no core Sampler), the count-resolution
   helper `_resolve_count_and_targets` in
   [low_density_sampling.py](badgers/generators/tabular_data/outliers/low_density_sampling.py)
-  duplicates the `fire_and_seed` contract for the selector-keys convention, and the open decisions
+  duplicates the `select_and_seed` contract for the selector-keys convention, and the open decisions
   above are unresolved.
 
 ## 6. All generators must provide a uniform "affected rows" function (ground truth)
@@ -200,9 +200,9 @@ so that specifications/requirements can be derived directly from them.
     outliers are output-aligned, direct imbalance generators are input-aligned.
   - Naming: one generic name (e.g. `get_deficit_labels()`, matching the causal base's
     `deficit_labels_` attribute) vs. keeping per-family names permanently.
-  - Whether "affected" means "deficit fired on this row" (selection) or "row value changed"
+  - Whether "affected" means "deficit selected on this row" (selection) or "row value changed"
     (e.g. a causal descendant recomputed after an upstream defect) — the causal generators
-    currently label only rows where the defect fired, not rows passively recomputed.
+    currently label only rows where the defect was selected, not rows passively recomputed.
 
 # Future work
 
@@ -229,7 +229,7 @@ and probing the suspected bugs at runtime. The bugs and API inconsistencies foun
   decision (merge into one generator with a deterministic/random switch) also resolves R5/R7.
 - **R11 ✅ FIXED** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py): the hand-rolled
   `covered = range(X.shape[1])` fallback (with its "keep in sync" comment) is gone — the consumer
-  calls the canonical `_resolve_targets(selector, X, None)`, the same rule `fired()` applies
+  calls the canonical `_resolve_targets(selector, X, None)`, the same rule `get_selected_fields()` applies
   internally. Outputs byte-identical for valid selectors; out-of-range/non-int selector columns
   now raise a clean `ValueError`. (commit `2f2c336`)
 - **R12 ✅ FIXED** [noise/causal.py](badgers/generators/tabular_data/noise/causal.py): both noise

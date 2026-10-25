@@ -1,4 +1,4 @@
-"""Tests for the CausalGenerator base class (validation + selector firing + intervene propagation)."""
+"""Tests for the CausalGenerator base class (validation + selector selection + intervene propagation)."""
 
 import networkx as nx
 import numpy as np

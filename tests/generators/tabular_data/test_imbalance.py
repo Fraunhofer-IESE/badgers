@@ -108,15 +108,15 @@ def test_random_sampling_targets__without_replacement_is_thinning(
 
 
 def test_random_sampling_targets__boolean_mask_selector_is_exact_drop():
-    """A boolean selector drops fired rows and the getter records that mask."""
+    """A boolean selector drops selected rows and the getter records that mask."""
     X = np.column_stack([np.arange(6.0), np.zeros(6)])
     keep_idx = np.arange(0, len(X), 2)
-    fired = np.ones(len(X), dtype=bool)
-    fired[keep_idx] = False
+    selected = np.ones(len(X), dtype=bool)
+    selected[keep_idx] = False
 
     class FixedMaskSelector:
         def __call__(self, X, targets=None):
-            return {0: fired}
+            return {0: selected}
 
     generator = RandomSamplingTargetsGenerator(random_generator=default_rng(0))
     Xt = generator.generate(
@@ -124,7 +124,7 @@ def test_random_sampling_targets__boolean_mask_selector_is_exact_drop():
     )
 
     np.testing.assert_array_equal(Xt, X[keep_idx])
-    np.testing.assert_array_equal(generator.get_imbalance_labels(), fired)
+    np.testing.assert_array_equal(generator.get_imbalance_labels(), selected)
 
 
 def test_random_sampling_targets__selector_none_raises(tabular_data):
@@ -142,7 +142,7 @@ def test_imbalance_labels__classes_generator_raises_before_generate():
 def test_random_sampling_targets__class_selector_is_exact_per_class_drop(
     tabular_data_labeled,
 ):
-    """A boolean ClassSelector fed to the resampler drops exactly the fired
+    """A boolean ClassSelector fed to the resampler drops exactly the selected
     rows of that class (the removed per-class behavior, one generator)."""
     Xc = np.asarray(tabular_data_labeled)
     rng = default_rng(0)

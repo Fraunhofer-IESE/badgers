@@ -32,7 +32,7 @@ def test_generate__shape_and_labels(chain_data):
     # strictly in-place
     assert Xt.shape == X.shape
     assert np.all(np.isfinite(Xt))
-    # every row fires
+    # every row is selected
     labels = gen.get_noise_labels()
     assert labels.dtype == bool
     assert labels.all()
@@ -194,16 +194,16 @@ def test_generate__selector_gates_rows(chain_data):
         random_generator=np.random.default_rng(0),
         dgp=_world(X, graph, column_mapping),
     )
-    # Bernoulli selector: only ~half the rows fire
+    # Bernoulli selector: only ~half the rows are selected
     Xt = gen.generate(
         X, BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
         distribution=scipy.stats.norm(scale=0.5),
     )
     assert Xt.shape == X.shape
-    fired = gen.get_noise_labels()
-    assert fired.any() and not fired.all()
-    # unfired rows are untouched
-    assert np.array_equal(Xt[~fired], X[~fired])
+    selected = gen.get_noise_labels()
+    assert selected.any() and not selected.all()
+    # unselected rows are untouched
+    assert np.array_equal(Xt[~selected], X[~selected])
 
 
 def test_generate__always_selector_reproducible(chain_data):
@@ -216,7 +216,7 @@ def test_generate__always_selector_reproducible(chain_data):
         X.copy(), AlwaysSelector([0]),
         distribution=scipy.stats.norm(scale=0.5),
     )
-    # labels: AlwaysSelector fires EVERY row
+    # labels: AlwaysSelector selects EVERY row
     np.testing.assert_array_equal(
         base.get_noise_labels(), np.ones(X.shape[0], dtype=bool)
     )

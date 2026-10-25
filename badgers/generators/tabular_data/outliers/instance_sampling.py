@@ -16,7 +16,7 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
     :class:`badgers.core.sampling.InstanceSampler`), so values are
     individually plausible while the row as a whole never existed.
 
-    The generator has no seed rows, so a selector has nothing to fire on:
+    The generator has no seed rows, so a selector has nothing to select on:
     ``selector`` is accepted for API uniformity but IGNORED (a warning is
     emitted; ``n_outliers`` remains the only count knob). The count must
     not exceed the dataset size (a larger count raises).

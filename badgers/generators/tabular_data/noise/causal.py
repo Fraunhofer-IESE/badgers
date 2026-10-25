@@ -9,7 +9,7 @@ fresh noise).
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired
+from badgers.core.selectors import get_selected_fields
 from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.causal._base import (
     CausalGenerator,
@@ -23,9 +23,9 @@ class CausalNoiseGenerator(CausalGenerator):
 
     A selector is required and owns the intervention targets: the
     selector's ``columns`` (column positions) are the nodes where the
-    noise is injected, and its firing rule decides which rows are
+    noise is injected, and its selection rule decides which rows are
     perturbed. The selector sees the ORIGINAL (un-expanded) rows:
-    firing masks are evaluated before the ``n_copies`` expansion, then
+    selection masks are evaluated before the ``n_copies`` expansion, then
     replicated so every copy of a seed row shares the same state.
 
     Parameters
@@ -88,17 +88,17 @@ class CausalNoiseGenerator(CausalGenerator):
         col_stds = _column_stds(X)
         rng = self.random_generator
 
-        # Selector firing: masks evaluated on the ORIGINAL (un-expanded)
+        # Selector realization: masks evaluated on the ORIGINAL (un-expanded)
         # rows, then replicated to the expansion (each seed row's copies
-        # either all fire or all stay clean). Quantile thresholds are
+        # either all are selected or all stay clean). Quantile thresholds are
         # computed on the un-expanded input by construction.
-        field = fired(X, selector, rng)
+        field = get_selected_fields(X, selector, rng)
         field_expanded = np.repeat(field, n_copies, axis=0)
 
         # Expand: each seed row -> n_copies copies (n_copies=1 keeps the shape).
         rows = np.repeat(X, n_copies, axis=0)
 
-        # Inject noise ONLY at the fired rows of each target.
+        # Inject noise ONLY at the selected rows of each target.
         affected = np.zeros(rows.shape[0], dtype=bool)
         for i, col in enumerate(targets):
             mask = field_expanded[:, i]
@@ -111,7 +111,7 @@ class CausalNoiseGenerator(CausalGenerator):
 
         # Recompute the descendants of the AFFECTED rows through the
         # structural equations (Pearl surgery): descendant = f(new parents)
-        # + fresh noise. Intervene receives ALL target names: unfired
+        # + fresh noise. Intervene receives ALL target names: unselected
         # target nodes stay pinned at their (possibly noisy) current
         # values while their strict descendants recompute from the pinned
         # parents. Unaffected rows are left untouched.
@@ -137,7 +137,7 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
 
     A selector is required and owns the intervention targets: the
     selector's ``columns`` (column positions) are the nodes where the
-    noise is injected, and its firing rule decides which rows are
+    noise is injected, and its selection rule decides which rows are
     perturbed.
 
     Parameters
@@ -204,10 +204,10 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
         col_stds = _column_stds(X)
         rng = self.random_generator
 
-        field = fired(X, selector, rng)
+        field = get_selected_fields(X, selector, rng)
         affected = field.any(axis=1)
 
-        # Inject noise ONLY at the fired rows of each target.
+        # Inject noise ONLY at the selected rows of each target.
         noise = np.zeros(X.shape)
         for i, col in enumerate(targets):
             mask = field[:, i]
@@ -221,7 +221,7 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
 
         # Recompute the AFFECTED rows through the structural equations
         # (Pearl surgery): descendant = f(new parents) + fresh noise.
-        # Intervene receives ALL target names: every fired row is
+        # Intervene receives ALL target names: every selected row is
         # affected (additive model), so every target node is noisy.
         affected_rows = np.flatnonzero(affected)
         if affected_rows.size:

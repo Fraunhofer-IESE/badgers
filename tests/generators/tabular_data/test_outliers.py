@@ -12,9 +12,9 @@ from badgers.core.sampling import (
     UniformOutOfDistributionSampler,
     ZScoreSampler,
 )
-from badgers.core.selectors import AlwaysSelector, CountSelector, fired
+from badgers.core.selectors import AlwaysSelector, CountSelector, get_selected_fields
 from badgers.core.utils import random_sign
-from badgers.generators.tabular_data.outliers._firing import iter_firing_groups
+from badgers.generators.tabular_data.outliers._selection import iter_selection_groups
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
 from badgers.generators.tabular_data.outliers.distribution_sampling import (
     ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
@@ -148,7 +148,7 @@ def test_zscore__delegates_to_sampler_math():
     """Outlier rows equal the selector-flow replay on the same stream.
 
     Pins the draw order of the new flow: CountSelector row draw, then
-    fired()'s realization draws, then the sampler's signs + exponentials.
+    get_selected_fields()'s realization draws, then the sampler's signs + exponentials.
     The sampler MATH exactness itself is pinned in tests/core/test_sampling.py.
     """
     rng = default_rng(42)
@@ -160,18 +160,18 @@ def test_zscore__delegates_to_sampler_math():
 
     ref_rng = default_rng(0)
     ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
-    ref_field = fired(X, ref_selector, ref_rng)
+    ref_field = get_selected_fields(X, ref_selector, ref_rng)
     ref_targets = list(range(X.shape[1]))
     ref_seeds = np.flatnonzero(ref_field.any(axis=1))
     outliers_ref = X[ref_seeds].astype(np.float64)
-    for group_rows, fired_cols in iter_firing_groups(ref_field, ref_targets, ref_seeds):
-        outliers_ref[np.ix_(group_rows, fired_cols)] = ZScoreSampler(scale=scale).sample(
-            ref_rng, X, fired_cols, group_rows.size)
+    for group_rows, selected_cols in iter_selection_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, selected_cols)] = ZScoreSampler(scale=scale).sample(
+            ref_rng, X, selected_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
 
-def test_zscore__selector_partial_fire_keeps_seed_values():
-    """A column not fired keeps the seed row's own value (oracle)."""
+def test_zscore__selector_partial_selection_keeps_seed_values():
+    """A column not selected keeps the seed row's own value (oracle)."""
     rng = default_rng(0)
     X = rng.normal(size=(40, 3))
     mask0 = np.zeros(40, dtype=bool)
@@ -183,10 +183,10 @@ def test_zscore__selector_partial_fire_keeps_seed_values():
     labels = generator.get_outliers_labels()
     assert not labels[:len(X)].any()
     assert labels[len(X):].all()
-    # unfired columns keep the seed row's values exactly
+    # unselected columns keep the seed row's values exactly
     np.testing.assert_array_equal(outliers[:, 1:], X[:5, 1:])
     np.testing.assert_array_equal(outliers[:, 2:], X[:5, 2:])
-    # fired column is beyond 3 sigma of its column
+    # selected column is beyond 3 sigma of its column
     stds = X.std(axis=0)
     assert np.all(np.abs(outliers[:, 0] - X[:, 0].mean()) > 3.0 * stds[0])
 
@@ -202,8 +202,8 @@ def test_zscore__explicit_count_selector():
     labels = generator.get_outliers_labels()
     assert labels[:40].sum() == 0 and labels[40:].all()
     outliers = Xt[40:]
-    # the fired rows (selector's own draw, replayed on an equal-seeded
-    # selector) are the seeds: the unfired columns keep the seed values
+    # the selected rows (selector's own draw, replayed on an equal-seeded
+    # selector) are the seeds: the unselected columns keep the seed values
     seeds = np.flatnonzero(ref_selector(X, targets=[0])[0])
     assert seeds.size == 6
     np.testing.assert_array_equal(outliers[:, 1:], X[seeds, 1:])
@@ -284,13 +284,13 @@ def test_hypersphere__delegates_to_sampler_math():
 
     ref_rng = default_rng(0)
     ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
-    ref_field = fired(X, ref_selector, ref_rng)
+    ref_field = get_selected_fields(X, ref_selector, ref_rng)
     ref_targets = list(range(X.shape[1]))
     ref_seeds = np.flatnonzero(ref_field.any(axis=1))
     outliers_ref = X[ref_seeds].astype(np.float64)
-    for group_rows, fired_cols in iter_firing_groups(ref_field, ref_targets, ref_seeds):
-        outliers_ref[np.ix_(group_rows, fired_cols)] = HypersphereSampler(scale=scale).sample(
-            ref_rng, X, fired_cols, group_rows.size)
+    for group_rows, selected_cols in iter_selection_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, selected_cols)] = HypersphereSampler(scale=scale).sample(
+            ref_rng, X, selected_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
 
@@ -357,13 +357,13 @@ def test_hypercube__delegates_to_sampler_math():
 
     ref_rng = default_rng(0)
     ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
-    ref_field = fired(X, ref_selector, ref_rng)
+    ref_field = get_selected_fields(X, ref_selector, ref_rng)
     ref_targets = list(range(X.shape[1]))
     ref_seeds = np.flatnonzero(ref_field.any(axis=1))
     outliers_ref = X[ref_seeds].astype(np.float64)
-    for group_rows, fired_cols in iter_firing_groups(ref_field, ref_targets, ref_seeds):
-        outliers_ref[np.ix_(group_rows, fired_cols)] = UniformOutOfDistributionSampler(
-            expansion=expansion).sample(ref_rng, X, fired_cols, group_rows.size)
+    for group_rows, selected_cols in iter_selection_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, selected_cols)] = UniformOutOfDistributionSampler(
+            expansion=expansion).sample(ref_rng, X, selected_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
     # the expansion=0 default path through the relaxed sampler: exact bounding box
@@ -542,8 +542,8 @@ def test_direct_four__default_count_is_ten(gen_class, kwargs):
 
 
 @pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__selector_oracle_unfired_cells(gen_class, kwargs):
-    """Unfired cells of an appended row equal the seed row's values."""
+def test_direct_four__selector_oracle_unselected_cells(gen_class, kwargs):
+    """Unselected cells of an appended row equal the seed row's values."""
     rng = default_rng(0)
     X = rng.normal(size=(40, 3))
     mask0 = np.zeros(40, dtype=bool)
@@ -555,7 +555,7 @@ def test_direct_four__selector_oracle_unfired_cells(gen_class, kwargs):
     assert outliers.shape == (5, 3)
     np.testing.assert_array_equal(outliers[:, 1:], X[:5, 1:])
     np.testing.assert_array_equal(outliers[:, 2:], X[:5, 2:])
-    # fired cells were overwritten (not seed copies)
+    # selected cells were overwritten (not seed copies)
     assert not np.array_equal(outliers[:, 0], X[:5, 0])
 
 
@@ -567,7 +567,7 @@ def test_independent_histograms__selector_keys_choose_synthesized_columns():
     rng = default_rng(0)
     X = rng.normal(size=(60, 3))
     generator = IndependentHistogramsGenerator(random_generator=default_rng(1))
-    # a CountSelector fires only 3 rows — proof the mask is discarded: the
+    # a CountSelector selects only 3 rows — proof the mask is discarded: the
     # output still appends n_outliers FULL rows
     Xt = generator.generate(
         X.copy(), n_outliers=10, bins=5,

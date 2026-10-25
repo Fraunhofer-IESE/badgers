@@ -13,18 +13,18 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   ``ClassSelector``, ``ProportionalSelector``. Variable names and the
   selector-side ``column_mapping`` are gone; read columns (``class_column``,
   ``column``, ``driver``) are independent int positions. Value-free presets
-  return firing decisions (bool masks; ``AlwaysSelector``'s constant
+  return selection decisions (bool masks; ``AlwaysSelector``'s constant
   scalar ``1.0`` realizes to all-true); value-driven presets return ``[0, 1]``
-  firing specs (float scalar or ``(n,)`` array) that generators realize with
+  selection specs (float scalar or ``(n,)`` array) that generators realize with
     the single rule ``rng.random(n) < spec``. Direct generators no longer take
     ``column_mapping`` — ``AdditiveNoiseGenerator.generate(X, distribution,
     noise_std=1.0, *, selector=None)``. Causal generators' call-time targets
     are owned by the selector itself: its ``columns`` (column positions) are
     the intervention targets, so ``perturbation_nodes`` is gone from their
     signatures.
-  - **Wave 2: the ``fired()`` field unification and selector-owned causal targets.**
+  - **Wave 2: the ``get_selected_fields()`` field unification and selector-owned causal targets.**
     The three realization helpers collapse into one —
-    ``badgers.core.selectors.fired(X, selector, rng)`` returns the narrow bool
+    ``badgers.core.selectors.get_selected_fields(X, selector, rng)`` returns the narrow bool
     field ``(n_rows, n_targets)`` (column ``i`` ↔ the selector's ``i``-th
     target); row-level union is ``field.any(axis=1)`` (``fired_mask`` and
     ``fired_rows`` are deleted). All causal generators now require a selector
@@ -34,22 +34,22 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
     is replaced by ``shift_amount`` (deterministic signed shift, scalar or
     dict keyed by column position), and ``CausalNoiseGenerator.noise_std`` is
     scalar-or-dict-by-position as well. ``CausalOutlierPropagationGenerator``
-    now requires a selector (per-cell pinning: firing masks a single cell per
+    now requires a selector (per-cell pinning: the selection pins a single cell per
     selected row, pure-bootstrap rows are labeled ``False``, and rows sharing
-    a firing pattern are perturbed as one group).
+    a selection pattern are perturbed as one group).
 - **Wave 3: the outliers generators consume selectors; outlier rows are seeded from real rows.**
   All six tabular outliers generators take a selector and realize it through the
-  shared firing field. ``CausalOutlierPropagationGenerator.generate(X, selector,
-  *, out_of_distribution_sampler=None)``: the selector is required and fires on
-  ``X`` — the fired rows are appended as COPIES (an unfired cell keeps the seed
-  row's value; descendants of fired targets recompute through the DGP; labels are
+  shared selection field. ``CausalOutlierPropagationGenerator.generate(X, selector,
+  *, out_of_distribution_sampler=None)``: the selector is required and realizes on
+  ``X`` — the selected rows are appended as COPIES (an unselected cell keeps the seed
+  row's value; descendants of selected targets recompute through the DGP; labels are
   all ``True``); ``n_outliers`` and ``within_distribution_sampler`` are removed
   (``CountSelector([x], count=10)`` replaces ``n_outliers=10``). The direct
   generators (``HyperCubeSampling``, ``ZScoreSamplingGenerator``,
-  ``HypersphereSamplingGenerator``) make selectors the only firing mechanism:
+  ``HypersphereSamplingGenerator``) make selectors the only selection mechanism:
   ``n_outliers`` is only the DEFAULT count (``selector=None`` builds an internal
   ``CountSelector``, default 10), passing both raises, and appended rows are
-  copies of fired rows with fired cells overwritten by the same samplers as
+  copies of selected rows with selected cells overwritten by the same samplers as
   before (same-seed values shift: the selector machinery consumes draws first).
   The low-density trio (``IndependentHistogramsGenerator``,
   ``HistogramSamplingGenerator``, ``LowDensitySamplingGenerator``) uses selector
@@ -64,7 +64,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   generated object `Xt` — the old `y` parameter and the two-tuple return are gone
   (a hard break, no deprecation shims). Every selector is called as `selector(X)` and
   returns the per-column ``dict[int, spec]`` mapping (positions keyed; bool masks
-  from value-free presets, ``[0, 1]`` firing specs from value-driven presets).
+  from value-free presets, ``[0, 1]`` selection specs from value-driven presets).
   `Pipeline.generate(X, params=None)`
   threads each single-output step into the next. The `preprocess_inputs` decorators
   wrap `generate(self, X, **kwargs)`. Benchmark scenario factories return one `X`.
@@ -121,8 +121,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   restricts the noise to a column subset.
 - **`CausalAdditiveNoiseGenerator`** (new, causal): same swappable
   distribution at the perturbation nodes, with descendant recomputation
-  via the DGP (`dgp.intervene` — Pearl surgery). Row firing is delegated
-  to a `selector` (default: every row fires); strictly in-place (no
+  via the DGP (`dgp.intervene` — Pearl surgery). Row selection is delegated
+  to a `selector` (default: every row is selected); strictly in-place (no
   `n_copies`).
 - **`GaussianNoiseGenerator` removed (breaking).** It is a strict special
   case of the new `AdditiveNoiseGenerator`: replace
@@ -155,15 +155,15 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   an observation-layer defect — it only hides cells (writes NaN) and does
   NOT cascade to descendants. The `missingness_rule` mechanism parameter,
   the on-demand DGP fit, and the `any`/`all` NaN-propagation passes are
-  removed; the fire mask comes from a `selector` object (see the selector
+  removed; the selection comes from a `selector` object (see the selector
   bullet below). Signature:
   `generate(X, perturbation_nodes=None, selector=None)`.
 - **String `mechanism` flags replaced by `selector` objects (breaking).**
-  The row-firing parameters of the causal defect generators
+  The row-selection parameters of the causal defect generators
   (`CausalDriftGenerator`, `CausalMissingnessGenerator`,
   `CausalNoiseGenerator`, `CausalAdditiveNoiseGenerator`) are now a single
   `selector=` parameter holding a callable from
-  `badgers.core.selectors`; `None` defaults to "every row fires"
+  `badgers.core.selectors`; `None` defaults to "every row is selected"
   (`AlwaysSelector` semantics). The `mechanism`/`mechanism_cause`/
   `mechanism_rate` strings and the `_fire_masks` string dispatcher are
   removed. Migration (`pos...` = the perturbation nodes' column
@@ -191,8 +191,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   int position in `X` and `proportions` = `{class_value: proportion}`.
   Class columns are columns of `X`:
   selection reads only `X` (the class column is the selector's
-  `class_column` int position). The selector's fire mask is the standard
-  contract (True = deficit); the generator's deficit is DROPPING the fired
+  `class_column` int position). The selector's selection is the standard
+  contract (True = deficit); the generator's deficit is DROPPING the selected
   rows (subsampling), so the output is smaller than the input. Classes
   absent from `proportions` are kept as-is; proportions are shares of the
   total row count, clipped to the rows available in each class. The class
@@ -225,7 +225,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   A selector's per-row value may be a float in ``[0, 1]`` — the
   PROBABILITY that the deficit is applied — where boolean masks remain
   the degenerate (deterministic) case. Realization belongs to the
-  consuming generator (a modifying consumer fires Bernoulli-wise, a
+  consuming generator (a modifying consumer is realized Bernoulli-wise, a
   resampling consumer uses the scores as selection weights); a preset's
   own rng only draws its spec (see the index-contract bullet above). The
   ``ProportionalSelector([pos], column=pos)`` preset returns
@@ -257,7 +257,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `class_column` int position). Signature:
   `generate(X, *, selector=None, shift_std=0.1)`. The selector is
   REQUIRED (`selector=None` raises) — a per-class drift has no class-free
-  default; fire masks are OR-ed. `shift_std` is now a float (one
+  default; selection masks are OR-ed. `shift_std` is now a float (one
   independent draw magnitude per class value) or a dict
   `{class_value: std}`; entries are SIGNED (`|std|` = draw scale,
   sign = direction). The per-dimension 2D-array form is removed
@@ -295,7 +295,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   class column itself is never noised — the old implementation rebuilt
   the output's last column as class labels, silently corrupting it (bug
   fixed). Signature: `generate(X, *, selector=None,
-  noise_std_per_class=dict())`; fired rows whose class value is absent
+  noise_std_per_class=dict())`; selected rows whose class value is absent
   from the dict receive no noise.
 - **`do()` and `ScaledEdgeDGP` are removed from the public API.** They are
   replaced by the intervention/edition surface on the DGP protocol itself
@@ -383,7 +383,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   Discovers the distinct
   values from the data (no manual class enumeration), raises
   `ValueError` on class values absent from the column (typo protection),
-  and fires exactly `min(int(prop * n_rows), n_rows_in_class)` rows per
+  and selects exactly `min(int(prop * n_rows), n_rows_in_class)` rows per
   listed class (partial mappings are legitimate: unlisted classes are
   kept). The class column is a column of `X`, given as the
   `class_column` int position
@@ -442,21 +442,21 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   old `0.1*col_std` fallback is gone).
 - **Causal defect family** (four generators sharing `CausalGenerator`, an
   explicit `fit(X, graph, column_mapping)` phase followed by `generate(...)`
-  with `selector=` row firing):
+  with `selector=` row selection):
   `CausalDriftGenerator` (single systematic shift, recomputed downstream),
   `CausalNoiseGenerator` (per-edge noise injection, `noise_std`),
   `CausalImbalanceGenerator` (quantile-range truncation (pure subset,
-  descendants untouched) or explicit `selector=` — fired rows dropped), `CausalMissingnessGenerator` (m-graph missingness
+  descendants untouched) or explicit `selector=` — selected rows dropped), `CausalMissingnessGenerator` (m-graph missingness
   with `any`/`all` propagation, optional observation-graph derivation).
 - **`pymc` optional extra** (renamed from `causal`; `pip install
   "badgers[pymc]"`) — only needed for building the PyMC SCM passed to
   `PyMCSCMDGP`.
 
-- **`TopQuantileSelector`** preset (`badgers.core.selectors`): fires rows at
+- **`TopQuantileSelector`** preset (`badgers.core.selectors`): selects rows at
   or above the ``quantile`` of a column — self mode (own column) or driver
   mode (a driver column, optionally broadcast to all selected variables).
   Deterministic (no rng); thresholds computed on the called rows or on a
-  separate ``stats`` row set (for generators firing expanded rows against
+  separate ``stats`` row set (for generators realizing expanded rows against
   the original columns' statistics). All intensity parameters are now
   CONSTRUCTOR arguments of the presets (``rate=`` for
   ``BernoulliSelector``/``ExactCountSelector``, ``quantile=`` for
@@ -468,7 +468,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 - **`CausalImbalanceGenerator` now accepts an explicit `selector=`**
   (additive; the old `quantile_range` rule remains the `selector=None`
-  default): the rows FIRED by the selector are dropped (subsampling
+  default): the rows SELECTED by the selector are dropped (subsampling
   polarity, union over the selector's variables);
   `perturbation_nodes`/`quantile_range` are ignored when a selector is
   given, and `perturbation_nodes` is no longer required in selector
@@ -529,13 +529,22 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   constant drift shift, edge correlation/std preservation, class counts,
   NaN counts, repeat/drop lengths), and causal-outlier plots using
   ``get_outliers_labels()``.
+- **``fired()`` renamed to ``get_selected_fields()`` (breaking rename, no
+  shim).** Same contract and behavior — narrow bool field
+  ``(n_rows, len(targets))`` (column ``i`` ↔ the selector's ``i``-th
+  target), ``selector=None`` → all-true WITHOUT consuming rng draws, single
+  realization rule ``rng.random(n) < spec``. The selector layer migrates to
+  the select/selected vocabulary in code and docstrings; the outliers
+  plumbing module ``_firing.py`` becomes ``_selection.py`` with helpers
+  ``select_and_seed`` (was ``fire_and_seed``) and ``iter_selection_groups``
+  (was ``iter_firing_groups``).
 
 ### Documentation
 
 - **New "Understanding badgers" concepts notebook**
   (`tutorials/concepts/Badgers-Concepts.ipynb`): a step-by-step
   introduction — module structure, generator instantiation with an rng,
-  `generate()`, shape rules (appending / firing / subsampling), the
+  `generate()`, shape rules (appending / selection / subsampling), the
   in-place mutation contract ("pass `X.copy()`"), the X-only contract
   (target-like data as columns of `X`), selectors, DGP backends and
   pipelines.
@@ -571,7 +580,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   at that position (documented in the docstring). Same-seed outputs change (different draw
   mechanism).
 - **`GaussianNoiseClassesGenerator` no longer silently skips unconfigured
-  classes (contract change).** A fired class value absent from
+  classes (contract change).** A selected class value absent from
   ``noise_std_per_class`` now raises ``ValueError`` (previously it silently
   received no noise — documented-and-tested partial mappings are gone; pass a
   zero std explicitly to keep a class noise-free). The dict keys are
@@ -584,9 +593,9 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   argument — the selector owns the class information. The class column is
   resolved from the selector's ``class_column`` (``ClassSelector``, typical);
   a selector that exposes no class column and an out-of-range position both
-  raise ``ValueError`` (the previous "all fired rows treated as one class"
+  raise ``ValueError`` (the previous "all selected rows treated as one class"
   fallback is gone). The dict ``shift_std``/``shift`` knobs follow the same
-  contract as ``noise_std_per_class``: a fired class value absent from the
+  contract as ``noise_std_per_class``: a selected class value absent from the
   dict raises (no more silent skip), keys are dtype-normalized (plain-int keys
   work for a float-encoded class column), wrong-kind keys raise.
 - **``selector=None`` now means "the relevant default selector" where one
@@ -598,8 +607,8 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   the per-class drift/noise generators need a selector that owns the class
   column, the causal generators need the user's intervention targets, and
   ``RandomSamplingTargetsGenerator`` needs the user's deficit scores;
-  ``RandomSamplingClassesGenerator`` keeps its documented no-op ("fires
-  nowhere"). Realization change in ``fired()``: constant scalar specs
+  ``RandomSamplingClassesGenerator`` keeps its documented no-op ("selects
+  nowhere"). Realization change in ``get_selected_fields()``: constant scalar specs
   (exactly ``0.0``/``1.0``) are realized deterministically WITHOUT a
   ``rng`` draw (fractional scalars and bool arrays still draw). Results
   per selector are identical, but same-seed downstream draws shift for

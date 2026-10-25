@@ -32,7 +32,7 @@ __all__ = [
 
 
 class AlwaysSelector:
-    """Selector: every row fires, for every target column.
+    """Selector: every row is selected, for every target column.
 
     The trivial, value- and rng-free rule -- the degenerate rule "apply
     the deficit everywhere". Emits the uniform spec ``1.0`` per target.
@@ -70,7 +70,7 @@ class BernoulliSelector:
     columns : int or sequence of int
         Column positions this selector covers.
     rate : float, in [0, 1]
-        Per-cell firing probability.
+        Per-cell selection probability.
     rng : numpy.random.Generator or None, default=None
         Random generator used for the draws.
     """
@@ -174,7 +174,7 @@ class CountSelector:
     columns : int or sequence of int
         Column positions this selector covers.
     count : int
-        Number of rows to fire; must be an int >= 0 and <= the number
+        Number of rows to select; must be an int >= 0 and <= the number
         of rows of the ``X`` passed at call time.
     rng : numpy.random.Generator or None, default=None
         Random generator used for the row draws.

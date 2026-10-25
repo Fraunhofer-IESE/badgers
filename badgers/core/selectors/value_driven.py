@@ -27,10 +27,10 @@ __all__ = [
 
 
 class TopQuantileSelector:
-    """Selector: fires rows where the column value is >= its quantile.
+    """Selector: selects rows where the column value is >= its quantile.
 
     Deterministic rule: threshold = ``np.quantile(X[:, driver], quantile)``
-    (``driver=None``: the column's own threshold). A row fires when the
+    (``driver=None``: the column's own threshold). A row is selected when the
     driver value is ``>= threshold``; the same mask is returned under
     every target.
 
@@ -72,7 +72,7 @@ class TopQuantileSelector:
 
 
 class ClassSelector:
-    """Selector: fires a fixed share of the rows of each listed class.
+    """Selector: selects a fixed share of the rows of each listed class.
 
     Reads the class labels from ``class_column`` ONCE; for every class
     value in ``proportions`` exactly ``min(int(share * n_rows),
@@ -89,7 +89,7 @@ class ClassSelector:
     class_column : int
         Position of the column holding the class labels.
     proportions : dict mapping class_value -> float in [0, 1]
-        Share of the TOTAL row count fired per class value.
+        Share of the TOTAL row count selected per class value.
     rng : numpy.random.Generator or None, default=None
         Random generator used for the draws.
     """
@@ -146,7 +146,7 @@ class ClassCountSelector:
     class labels from ``class_column`` ONCE; for every class value in
     ``counts`` exactly that many rows of the class are drawn WITHOUT
     REPLACEMENT (uniform) and the union mask is returned under every
-    target. Classes absent from ``counts`` fire nothing; a count for a
+    target. Classes absent from ``counts`` select nothing; a count for a
     class value missing from ``X`` raises (typo protection), and a count
     above the class size raises (an explicit count is a request, not a
     share -- unlike :class:`ClassSelector`'s share clipping).
@@ -158,7 +158,7 @@ class ClassCountSelector:
     class_column : int
         Position of the column holding the class labels.
     counts : dict mapping class_value -> int
-        Exact number of rows fired per class value (ints >= 0).
+        Exact number of rows selected per class value (ints >= 0).
     rng : numpy.random.Generator or None, default=None
         Random generator used for the row draws.
     """

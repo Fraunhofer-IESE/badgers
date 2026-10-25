@@ -7,8 +7,8 @@ the defect injection and propagation, and manage their OWN labels: each
 generator stores the per-row defect labels of its last generated output
 and exposes them through a public getter (e.g. ``get_outliers_labels()``).
 
-Firing (which rows get the defect) is realized by
-``badgers.core.selectors.fired``; generators import and call it
+Selection (which rows get the defect) is realized by
+``badgers.core.selectors.get_selected_fields``; generators import and call it
 themselves. The DGP's ``column_mapping`` is the ONLY name↔position
 bridge: generators speak column positions, and ``_node_names``
 translates them back at the intervene boundary.

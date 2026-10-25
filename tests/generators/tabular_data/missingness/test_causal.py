@@ -1,6 +1,6 @@
 """Tests for CausalMissingnessGenerator (observation layer, chooser-only).
 
-Semantics: NaN is written ONLY at the fired cells of the selector's
+Semantics: NaN is written ONLY at the selected cells of the selector's
 target columns. No descendant cascade -- missingness is a property of the
 measurement, not of the world.
 """
@@ -18,7 +18,7 @@ from badgers.generators.tabular_data.missingness.causal import (
 )
 
 
-def test_generate__always_fires_everywhere(chain_data, make_gcm_dgp):
+def test_generate__always_selects_everywhere(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
@@ -120,8 +120,8 @@ def test_generate__observed_mar_depends_on_cause(chain_data, make_gcm_dgp):
     assert np.all(np.isfinite(Xt[:, 2]))
 
 
-def test_generate__multi_node_only_fired_cells(chain_data, make_gcm_dgp):
-    # Perturb TWO nodes: each column gets NaN only where IT fired.
+def test_generate__multi_node_only_selected_cells(chain_data, make_gcm_dgp):
+    # Perturb TWO nodes: each column gets NaN only where IT selected.
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
@@ -177,7 +177,7 @@ def test_generate__reproducible_with_explicit_rng(chain_data, make_gcm_dgp):
 
 
 def test_generate__all_nan_input_edge(chain_data, make_gcm_dgp):
-    # A fully NaN input column: firing writes NaN again (idempotent), no
+    # A fully NaN input column: selected cells are written NaN again (idempotent), no
     # crash, no other column touched.
     X, graph, column_mapping = chain_data
     gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(2))

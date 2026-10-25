@@ -4,7 +4,7 @@ import numpy as np
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired
+from badgers.core.selectors import get_selected_fields
 from badgers.core.utils import normalize_proba
 
 
@@ -30,7 +30,7 @@ class ImbalanceGenerator(GeneratorMixin):
 
         :return: A boolean array aligned with the rows of the LAST input
             passed to ``generate()``; ``True`` marks a row on which the
-            deficit fired (the row was dropped from the output), ``False``
+            deficit applied (the row was dropped from the output), ``False``
             a row that is part of the generated output.
         :raises RuntimeError: if ``generate()`` has not been called yet.
         """
@@ -73,7 +73,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
     @preprocess_inputs
     def generate(self, X, selector=None):
         """
-        Drops the rows fired by the selector (subsampling deficit),
+        Drops the rows selected by the selector (subsampling deficit),
         per-class: exactly ``int(prop * n_rows)`` rows of each listed class
         are removed, classes absent from the mapping are kept.
 
@@ -82,7 +82,7 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         :param selector: A selector (e.g.
                          :class:`badgers.core.selectors.ClassSelector`)
                          deciding which rows are dropped. ``None`` = the
-                         relevant default: a selector that fires nowhere
+                         relevant default: a selector that selects nothing
                          (no rows dropped). The class variable is a
                          column of ``X`` (read from the selector's
                          ``class_column``).
@@ -92,10 +92,10 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         if selector is None:
             self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
             return X
-        # a row is dropped if fired in any class column
-        firing = fired(X, selector, self.random_generator).any(axis=1)
-        Xt = X[~firing, :]
-        self.imbalance_labels_ = firing
+        # a row is dropped if selected in any class column
+        selected = get_selected_fields(X, selector, self.random_generator).any(axis=1)
+        Xt = X[~selected, :]
+        self.imbalance_labels_ = selected
         return Xt
 
 
@@ -114,7 +114,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
     continuous column (e.g. ``ProportionalSelector``) gives the
     value-weighted resample of the removed ``RandomSamplingFeaturesGenerator``,
     while a BOOLEAN selector over a discrete class column (e.g.
-    ``ClassSelector``) gives an exact per-class subsample (the fired rows
+    ``ClassSelector``) gives an exact per-class subsample (the selected rows
     are dropped).
 
     With ``replace=True`` (default) rows may be DUPLICATED -- the classic
@@ -181,7 +181,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
                 "(lower the selector's deficit probabilities)"
             )
         # Boolean scores (all 0/1) are DETERMINISTIC: realize them as an
-        # exact subsample of the rows that never fire (deficit proba 0) --
+        # exact subsample of the rows that are never selected (deficit proba 0) --
         # a weighted draw without replacement of size n would draw every
         # index once, zero-weight rows included.
         if np.isin(deficit_proba, (0.0, 1.0)).all():
@@ -189,9 +189,9 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             if size is not None and size < len(kept):
                 kept = self.random_generator.choice(kept, size=size, replace=False)
             Xt = X[kept, :]
-            firing = np.ones(X.shape[0], dtype=bool)
-            firing[kept] = False
-            self.imbalance_labels_ = firing
+            selected = np.ones(X.shape[0], dtype=bool)
+            selected[kept] = False
+            self.imbalance_labels_ = selected
             return Xt
         # Fractional scores: normalize the keep weights into a probability
         # vector and resample from them.
@@ -201,7 +201,7 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             replace=replace,
         )
         Xt = X[n, :]
-        firing = np.ones(X.shape[0], dtype=bool)
-        firing[n] = False
-        self.imbalance_labels_ = firing
+        selected = np.ones(X.shape[0], dtype=bool)
+        selected[n] = False
+        self.imbalance_labels_ = selected
         return Xt

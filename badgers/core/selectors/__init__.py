@@ -34,10 +34,10 @@ Exact-count presets (``CountSelector``, ``ClassCountSelector``) bind a
 requested ROW count at construction -- the machinery behind the outliers
 generators' count knobs.
 
-MODIFYING consumers preserve the input's shape and only ALTER the fired
+MODIFYING consumers preserve the input's shape and only ALTER the selected
 cells (missingness, noise, outliers, ...); SUBSAMPLING consumers
-(imbalance) DROP the fired rows, so their output is smaller than the
-input. The contract itself is only "which rows fire, on which columns".
+(imbalance) DROP the selected rows, so their output is smaller than the
+input. The contract itself is only "which rows are selected, on which columns".
 All data used to determine selection, including class and driver
 columns, is supplied as ``X``; there is no separate target argument.
 
@@ -47,7 +47,7 @@ presets, split along the one constructor-contract difference they have
 (value-free presets never read ``X``, value-driven presets read column
 positions).
 """
-from .base import Selector, fired, resolve_class_column
+from .base import Selector, get_selected_fields, resolve_class_column
 from .value_driven import (
     ClassCountSelector,
     ClassSelector,
@@ -58,7 +58,7 @@ from .value_free import AlwaysSelector, BernoulliSelector, CountSelector, ExactC
 
 __all__ = [
     "Selector",
-    "fired",
+    "get_selected_fields",
     "resolve_class_column",
     "AlwaysSelector",
     "BernoulliSelector",

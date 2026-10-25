@@ -407,8 +407,8 @@ def test_generate__selector_none_raises(rng):
         generator.generate(X, None)
 
 
-def test_generate__per_cell_pinning_partial_fire(rng):
-    """Rows fired only on one target: that cell is OOD, the other target
+def test_generate__per_cell_pinning_partial_selection(rng):
+    """Rows selected only on one target: that cell is OOD, the other target
     is recomputed through the SCM surgery (per-cell pinning); labels are
     True for every appended row (no pure-bootstrap rows exist)."""
     graph = nx.DiGraph()
@@ -416,20 +416,20 @@ def test_generate__per_cell_pinning_partial_fire(rng):
     coefs = {("X", "Y"): 0.0}
     X, column_mapping = _generate_linear_data(
         graph, n_samples=100, rng=rng, coefficients=coefs)
-    fire_x = np.zeros(100, dtype=bool)
-    fire_x[[0, 1, 2]] = True
-    fire_y = np.zeros(100, dtype=bool)
-    fire_y[[0, 2, 3]] = True
+    sel_x = np.zeros(100, dtype=bool)
+    sel_x[[0, 1, 2]] = True
+    sel_y = np.zeros(100, dtype=bool)
+    sel_y[[0, 2, 3]] = True
     generator = CausalOutlierPropagationGenerator(
         random_generator=rng, dgp=_world(graph, X, column_mapping))
-    Xt = generator.generate(X, lambda X_, targets=None: {0: fire_x, 1: fire_y})
+    Xt = generator.generate(X, lambda X_, targets=None: {0: sel_x, 1: sel_y})
     assert Xt.shape == (104, 2)
     labels = generator.get_outliers_labels()
     np.testing.assert_array_equal(labels[:100], np.zeros(100, dtype=bool))
-    assert labels[100:].all()  # every appended row fired somewhere
+    assert labels[100:].all()  # every appended row selected somewhere
     stds = X.std(axis=0)
     # appended rows are the seeds in increasing X-row order: 0, 1, 2, 3
-    # row 101 fires only on X -> its Y cell is recomputed, not pinned
+    # row 101 selects only on X -> its Y cell is recomputed, not pinned
     only_x = 101
     assert abs(Xt[only_x, 0] - X[:, 0].mean()) > 3.0 * stds[0]
     pred_y = float(
@@ -638,7 +638,7 @@ def test_generate__column_mapping_int_nodes_raises(rng):
 
 
 def test_generate__count_zero_generates_nothing(rng):
-    """An empty firing selects no seeds: X is returned unchanged."""
+    """An empty selection seeds nothing: X is returned unchanged."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
     X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)
@@ -650,8 +650,8 @@ def test_generate__count_zero_generates_nothing(rng):
     assert not labels.any()
 
 
-def test_generate__seeds_are_copies_of_fired_rows(rng):
-    """Unfired non-descendant cells keep the seed row's own values."""
+def test_generate__seeds_are_copies_of_selected_rows(rng):
+    """Unselected non-descendant cells keep the seed row's own values."""
     graph = nx.DiGraph()
     graph.add_edges_from([("A", "B")])
     coefs = {("A", "B"): 0.0}
@@ -660,7 +660,7 @@ def test_generate__seeds_are_copies_of_fired_rows(rng):
     generator = CausalOutlierPropagationGenerator(
         random_generator=rng, dgp=_world(graph, X, column_mapping))
     Xt = generator.generate(X, CountSelector([0], count=5, rng=rng))
-    # A is the fired root; B recomputes (descendant); the appended rows
+    # A is the selected root; B recomputes (descendant); the appended rows
     # are 5 distinct real rows' copies
     assert Xt.shape == (105, 2)
     assert np.allclose(Xt[:100], X)
@@ -669,7 +669,7 @@ def test_generate__seeds_are_copies_of_fired_rows(rng):
 
 
 def test_generate__value_driven_selector_reads_X(rng):
-    """A value-driven selector seeds the rows it fires on X."""
+    """A value-driven selector seeds the rows it selects on X."""
     graph = nx.DiGraph()
     graph.add_edges_from([("X", "Y")])
     X, column_mapping = _generate_linear_data(graph, n_samples=100, rng=rng)

@@ -1,6 +1,6 @@
 ﻿"""Causal missingness generator (observation layer).
 
-Chooser-only: injects missingness (NaN) at the cells fired by the
+Chooser-only: injects missingness (NaN) at the cells selected by the
 selector. The deficit does NOT cascade to descendants -- missingness is a
 property of the measurement process, not of the world (NO intervene: the
 DGP world is never re-evaluated).
@@ -13,7 +13,7 @@ DGP world is never re-evaluated).
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired
+from badgers.core.selectors import get_selected_fields
 from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.causal._base import CausalGenerator
 
@@ -39,7 +39,7 @@ class CausalMissingnessGenerator(CausalGenerator):
         ``BernoulliSelector`` = MCAR, ``TopQuantileSelector`` with
         ``driver`` = MAR, self mode = MNAR, ``ExactCountSelector``,
         ``AlwaysSelector``, or any callable with the same signature.
-        Its ``columns`` are the missingness targets; the cells it fires
+        Its ``columns`` are the missingness targets; the cells it selects
         are written NaN.
     """
 
@@ -50,7 +50,7 @@ class CausalMissingnessGenerator(CausalGenerator):
 
         A boolean vector aligned with the rows of the last generated
         output: True for rows that contain at least one missing value
-        (deficit fired), False for original rows.
+        (deficit applied), False for original rows.
         """
         return self._get_deficit_labels()
 
@@ -60,11 +60,11 @@ class CausalMissingnessGenerator(CausalGenerator):
         X,
         selector,
     ):
-        """Inject missingness at the fired cells (observation-layer).
+        """Inject missingness at the selected cells (observation-layer).
 
-        Chooser-only: a Selector decides WHICH cells fire (e.g. value-blind
+        Chooser-only: a Selector decides WHICH cells are selected (e.g. value-blind
         Bernoulli, own-value top-quantile, or driver top-quantile); the
-        generator writes NaN at the fired cells. NO propagation: the
+        generator writes NaN at the selected cells. NO propagation: the
         deficit does not cascade to descendants (observation semantics --
         missingness is a property of the measurement, not of the world).
         """
@@ -77,10 +77,10 @@ class CausalMissingnessGenerator(CausalGenerator):
         targets = list(_resolve_targets(selector, X, None))
         rng = self.random_generator
 
-        # The selector decides the affected cells: the firing field is
+        # The selector decides the affected cells: the selected field is
         # realized for ALL rows at once (vectorized; value-driven rules
         # read the un-mutated data).
-        field = fired(X, selector, rng)
+        field = get_selected_fields(X, selector, rng)
         affected = np.zeros(X.shape[0], dtype=bool)
         for i, col in enumerate(targets):
             mask = field[:, i]
