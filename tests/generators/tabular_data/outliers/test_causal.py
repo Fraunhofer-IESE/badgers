@@ -5,6 +5,10 @@ import numpy as np
 import pytest
 
 from badgers.core.dgp.backends.gcm_scm import GcmSCMDGP
+from badgers.core.sampling import (
+    IndependentHistogramSampler,
+    JointHistogramSampler,
+)
 from badgers.core.selectors import (
     AlwaysSelector,
     CountSelector,
@@ -683,5 +687,43 @@ def test_generate__value_driven_selector_reads_X(rng):
     # the pinned cells are beyond 3 sigma of the column
     stds = X.std(axis=0)
     assert np.all(np.abs(Xt[100:, 0] - X[:, 0].mean()) > 3.0 * stds[0])
+
+
+@pytest.mark.parametrize("sampler_factory", [
+    pytest.param(
+        lambda: IndependentHistogramSampler(bins=5),
+        id="independent-histogram"),
+    pytest.param(
+        lambda: JointHistogramSampler(bins=5, threshold_low_density=0.2),
+        id="joint-histogram"),
+])
+def test_generate__histogram_samplers_propagate_x_to_y(sampler_factory):
+    """Both histogram OOD samplers plug into the causal generator as-is:
+    the sampled X cells are pinned and Y follows the fitted mechanism."""
+    data_rng = np.random.default_rng(70)
+    graph = nx.DiGraph([("X", "Y")])
+    X, column_mapping = _generate_linear_data(
+        graph, n_samples=160, rng=data_rng)
+    seed = 71
+    expected_x = sampler_factory().sample(
+        np.random.default_rng(seed), X, [column_mapping["X"]], len(X))
+    generator = CausalOutlierPropagationGenerator(
+        random_generator=np.random.default_rng(seed),
+        dgp=_world(graph, X, column_mapping))
+
+    Xt = generator.generate(
+        X, AlwaysSelector([column_mapping["X"]]),
+        out_of_distribution_sampler=sampler_factory())
+
+    assert Xt.shape == (2 * len(X), 2)
+    np.testing.assert_array_equal(Xt[:len(X)], X)
+    np.testing.assert_allclose(
+        Xt[len(X):, column_mapping["X"]], expected_x[:, 0])
+    beta = np.linalg.lstsq(X[:, [column_mapping["X"]]],
+                           X[:, column_mapping["Y"]], rcond=None)[0][0]
+    np.testing.assert_allclose(
+        Xt[len(X):, column_mapping["Y"]],
+        beta * Xt[len(X):, column_mapping["X"]],
+        atol=0.5)
 
 
