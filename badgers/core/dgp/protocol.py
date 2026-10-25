@@ -72,6 +72,20 @@ class DGP(Protocol):
         """
         ...
 
+    def structural(self, node: Hashable, parent_values: np.ndarray,
+                   rng: np.random.Generator, n: int) -> np.ndarray:
+        """Compose ONE node's values for a cascade: deterministic part +
+        noise.
+
+        Default (``DGPMixin``): the additive composition
+        ``response(parent_values) + draw_noise(node, rng, n)``. Backends
+        whose mechanisms are not additive override it — e.g. the gcm
+        backend delegates the composition to the mechanism's own
+        ``evaluate(parents, noise)`` (rounded discrete predictions, class
+        CDFs) while still drawing the noise with ``rng``.
+        """
+        ...
+
     def sample(self, rng: np.random.Generator, n: int) -> np.ndarray:
         """Tier 2: sample ``n`` joint rows from the fitted graph."""
         ...

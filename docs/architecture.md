@@ -355,7 +355,15 @@ python -m benchmarks compare --baseline v0.0.13
    empirical). `fit(X)` is a provided topological loop. The DGP is
    **immutable and rngless**: every stochastic method takes the caller's
    `rng`; nothing retains training data.
-3. **Deficit algebra** (written once, backend-blind): the generic
+3. **Cascade composition** (the `structural` hook, default in `DGPMixin`):
+   `structural(node, parent_values, rng, n)` composes ONE node's values
+   for a cascade as `response(parent_values) + draw_noise(node, rng, n)`.
+   Backends whose mechanisms are not additive override it — the gcm
+   backend delegates to the mechanism's own
+   `evaluate(parents, noise)` (rounded discrete predictions, class CDFs)
+   while badgers still draws the noise. `sample`/`intervene` never
+   compose the two views themselves.
+4. **Deficit algebra** (written once, backend-blind): the generic
    `DGPMixin` cascade — `intervene(rows, nodes, values=None, *, rng=None)`
    (Pearl surgery on given rows: fix the nodes, recompute ALL descendants
    in topological order with fresh noise; intervened nodes stay pinned)

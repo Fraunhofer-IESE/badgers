@@ -311,3 +311,78 @@ def test_intervene_discrete_node():
     )
     np.testing.assert_allclose(rows[:, 1], 1.0)
     assert np.all(np.isfinite(rows))
+
+
+# ---- structural delegation (dowhy owns the composition math) ------------
+
+
+def _build_count_scm():
+    """A (count root) -> C (DiscreteAdditiveNoiseModel on A)."""
+    graph = nx.DiGraph([("A", "C")])
+    cm = gcm.StructuralCausalModel(graph)
+    cm.set_causal_mechanism("A", gcm.EmpiricalDistribution())
+    cm.set_causal_mechanism(
+        "C",
+        gcm.DiscreteAdditiveNoiseModel(prediction_model=create_linear_regressor()),
+    )
+    return cm
+
+
+def _count_data(n=500, seed=0):
+    rng = np.random.default_rng(seed)
+    A = rng.integers(0, 5, size=n).astype(float)
+    C = np.round(A + rng.normal(0, 0.4, size=n))
+    return np.column_stack([A, C])
+
+
+def test_discrete_anm_values_are_integral():
+    """Regression: the deterministic part of a DiscreteAdditiveNoiseModel
+    is the ROUNDED prediction — structural must delegate to dowhy's
+    evaluate (round(predict) + noise), not raw predict + residuals (the
+    old translation layer produced fractional garbage)."""
+    data = _count_data()
+    dgp = GcmSCMDGP(_build_count_scm()).fit(data)
+    Xs = dgp.sample(np.random.default_rng(0), 200)
+    assert np.all(Xs[:, 1] == np.floor(Xs[:, 1]))
+    # response: the deterministic part is the rounded prediction
+    parents = np.array([[0.5], [1.7], [3.2]])
+    det = dgp.response("C", parents)
+    assert np.all(det == np.floor(det))
+
+
+def test_discrete_anm_intervene_recompute_stays_integral():
+    # do(A = 2): C recomputed through the discrete mechanism
+    data = _count_data()
+    dgp = GcmSCMDGP(_build_count_scm()).fit(data)
+    rows = data[:40].copy()
+    out = dgp.intervene(
+        rows, ["A"], [np.full(40, 2.0)], rng=np.random.default_rng(0)
+    )
+    np.testing.assert_allclose(out[:, 0], 2.0)
+    assert np.all(out[:, 1] == np.floor(out[:, 1]))
+
+
+def test_structural_matches_additive_composition_for_anm():
+    # for a continuous ANM the delegated evaluate(parents, noise) must be
+    # byte-equivalent to the mixin's additive default composition
+    data = _chain_data()
+    dgp = GcmSCMDGP(_build_scm()).fit(data)
+    parents = data[:20, [1]]
+    out = dgp.structural("C", parents, np.random.default_rng(0), 20)
+    expected = (
+        dgp.response("C", parents)
+        + dgp.draw_noise("C", np.random.default_rng(0), 20)
+    )
+    np.testing.assert_array_equal(out, expected)
+
+
+def test_structural_classifier_matches_response_draw_noise():
+    # the delegated ClassifierFCM.evaluate must reproduce the direct
+    # response/draw_noise class draws exactly (same CDF math, same rng)
+    data = _discrete_data()
+    dgp = GcmSCMDGP(_build_discrete_scm()).fit(data)
+    parents = data["A"].to_numpy()[:50].reshape(-1, 1)
+    out = dgp.structural("D", parents, np.random.default_rng(0), 50)
+    det = dgp.response("D", parents)  # zeros + pending capture
+    classes = dgp.draw_noise("D", np.random.default_rng(0), 50)
+    np.testing.assert_array_equal(out, det + classes)

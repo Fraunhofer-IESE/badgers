@@ -340,8 +340,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `dowhy.gcm.StructuralCausalModel` into badgers — mechanism fitting is
   delegated to `gcm.fit`, sampling and interventions run on the generic
   protocol with caller-provided rngs. Supports `AdditiveNoiseModel`
-  (non-root), `EmpiricalDistribution` (root) and `ClassifierFCM`
-  (non-root discrete nodes with numeric-encoded classes).
+  (non-root), `DiscreteAdditiveNoiseModel` (non-root count nodes —
+  discrete predictions are rounded so the composition stays integral),
+  `EmpiricalDistribution` (root) and `ClassifierFCM` (non-root discrete
+  nodes with numeric-encoded classes). Cascade composition is delegated
+  to the mechanism's own `evaluate(parents, noise)` via the DGP's
+  `structural` hook — badgers draws the noise, dowhy owns the math.
 - **New DGP backend `PyMCSCMDGP` (pymc extra)**: plug a user-built PyMC
   causal model into badgers — structural nodes are observed RVs whose
   distribution parameters carry the structural functions; mechanism
@@ -369,6 +373,10 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   one operation, `fit_node(node, parents, data)`, and expose
   `response(node, parent_values)` and `draw_noise(node, rng, n)`;
   `sample(rng, n)` is tier 2 and no generator depends on it.
+  Cascades compose each node through the `structural(node,
+  parent_values, rng, n)` hook (default: the additive composition
+  `response + draw_noise`; backends with non-additive mechanisms
+  override it — `GcmSCMDGP` delegates to dowhy's `evaluate`).
 - **`pick_parameters` hook** (`DGPMixin`): called once at the top of the
   generic `sample`/`intervene` cascades; returns the DGP instance whose
   mechanisms drive the batch (ONE coherent parameter set per call).
