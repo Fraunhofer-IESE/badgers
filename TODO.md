@@ -297,7 +297,7 @@ referenceable as R1..R14 in review discussions.
   deterministic parameter is renamed `shift_std` → `shift`, matching
   `FixedShiftClassesGenerator.generate(X, shift)` (the random counterparts keep `shift_std`
   correctly). No deprecation shim — the old kwarg now raises a TypeError like any unknown
-  keyword. All tests and the Drift tutorial updated.
+  keyword. All tests and the Drift tutorial updated (commit `1a20d83`).
 - **R8** Validation style: bare `assert` (vanishes under `python -O`) in outliers/missingness/
   text/time-series generators (`assert expansion >= 0`, `assert 0 <= percentage_missing <= 1`,
   `assert bins > 0`, ...) vs explicit `raise ValueError` in `AdditiveNoiseGenerator` and
