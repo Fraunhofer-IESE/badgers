@@ -6,6 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.selectors import AlwaysSelector, fired, resolve_class_column
+from badgers.core.selectors.base import _resolve_targets
 
 
 class NoiseGenerator(GeneratorMixin):
@@ -210,14 +211,10 @@ class AdditiveNoiseGenerator(NoiseGenerator):
 
         # Realized firing per the selector's own column scope; cells not
         # fired (or in columns the selector does not cover) get no noise.
-        # A bare user callable without a ``columns`` attribute covers
-        # every column of X (fired() resolves call-time targets the same
-        # way -- keep in sync).
+        # The call-time targets come from the same shared rule fired()
+        # uses internally (defaults + range/int validation).
         field = fired(X, selector, self.random_generator)
-        covered = getattr(selector, "columns", None)
-        if covered is None:
-            # same default as _resolve_targets in badgers/core/selectors/base.py -- keep in sync
-            covered = range(X.shape[1])
+        covered = _resolve_targets(selector, X, None)
         full = np.zeros(X.shape, dtype=bool)
         full[:, list(covered)] = field
         noise[~full] = 0.0
