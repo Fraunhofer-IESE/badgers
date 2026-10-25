@@ -590,6 +590,73 @@ def test_independent_histograms__default_path_unchanged():
     np.testing.assert_array_equal(Xt1, Xt2)
 
 
+# --- delegation parity: generators must reproduce the shared samplers ---
+
+
+def _independent_histogram_reference(X, columns, n_samples, bins, seed):
+    """Seeded oracle reproducing the pre-delegation per-column algorithm."""
+    rng = default_rng(seed)
+    out = np.zeros((n_samples, len(columns)), dtype=float)
+    for j, column in enumerate(columns):
+        hist, bin_edges = np.histogram(X[:, column], bins=bins)
+        inv_density = 1 - hist / np.max(hist)
+        p = inv_density / np.sum(inv_density)
+        indices = rng.choice(bins, p=p, size=n_samples, replace=True)
+        out[:, j] = rng.uniform(low=bin_edges[indices], high=bin_edges[indices + 1])
+    return out
+
+
+def _joint_histogram_reference(X, columns, n_samples, bins, threshold, seed):
+    """Seeded oracle reproducing the pre-delegation joint algorithm."""
+    rng = default_rng(seed)
+    scaler = StandardScaler().fit(X[:, columns])
+    standardized = scaler.transform(X[:, columns])
+    hist, edges = np.histogramdd(standardized, density=False, bins=bins)
+    norm_hist = hist / np.max(hist)
+    low_density_coordinates = list(zip(*np.where(norm_hist <= threshold)))
+    coords = np.array(
+        rng.choice(low_density_coordinates, n_samples, replace=True), dtype=int)
+    out = np.zeros((n_samples, len(columns)), dtype=float)
+    for j in range(len(columns)):
+        bin_indices = coords[:, j]
+        bin_width = edges[j][bin_indices + 1] - edges[j][bin_indices]
+        out[:, j] = (
+            edges[j][bin_indices] + rng.uniform(0, 1, size=n_samples) * bin_width)
+    return scaler.inverse_transform(out)
+
+
+def test_independent_histograms_generator__delegates_to_sampler():
+    """Appended target values equal IndependentHistogramSampler's output."""
+    X = default_rng(0).normal(size=(80, 2))
+    generator = IndependentHistogramsGenerator(random_generator=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), n_outliers=12, bins=5, selector=AlwaysSelector([0]))
+    expected = _independent_histogram_reference(X, [0], 12, bins=5, seed=1)
+    np.testing.assert_array_equal(Xt[:len(X)], X)
+    np.testing.assert_allclose(Xt[len(X):, 0], expected[:, 0])
+    assert np.isin(Xt[len(X):, 1], X[:, 1]).all()
+    labels = generator.get_outliers_labels()
+    assert labels.shape == (92,)
+    assert labels[:80].sum() == 0 and labels[80:].all()
+
+
+def test_histogram_sampling_generator__delegates_to_sampler():
+    """Appended target values equal JointHistogramSampler's output."""
+    X = default_rng(0).normal(size=(80, 2))
+    generator = HistogramSamplingGenerator(random_generator=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), n_outliers=12, bins=6, threshold_low_density=0.25,
+        selector=AlwaysSelector([0]))
+    expected = _joint_histogram_reference(
+        X, [0], 12, bins=6, threshold=0.25, seed=1)
+    np.testing.assert_array_equal(Xt[:len(X)], X)
+    np.testing.assert_allclose(Xt[len(X):, 0], expected[:, 0])
+    assert np.isin(Xt[len(X):, 1], X[:, 1]).all()
+    labels = generator.get_outliers_labels()
+    assert labels.shape == (92,)
+    assert labels[:80].sum() == 0 and labels[80:].all()
+
+
 @pytest.mark.parametrize("gen_class,kwargs", [
     (IndependentHistogramsGenerator, {"bins": 3}),
     (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),

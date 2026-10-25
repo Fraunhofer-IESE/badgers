@@ -5,7 +5,11 @@ from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.sampling import InstanceSampler
+from badgers.core.sampling import (
+    IndependentHistogramSampler,
+    InstanceSampler,
+    JointHistogramSampler,
+)
 from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.outliers import OutliersGenerator
 
@@ -80,22 +84,9 @@ class IndependentHistogramsGenerator(OutliersGenerator):
         n_features = X.shape[1]
         outliers = np.empty((n_outliers, n_features), dtype=X.dtype)
 
-        # Compute independent histograms for each synthesized feature
-        for col in targets:
-            hist, bin_edges = np.histogram(X[:, col], bins=bins)
-
-            # Compute inverse density and sampling probabilities
-            inv_density = 1 - hist / np.max(hist)
-            p = inv_density / np.sum(inv_density)
-
-            # Generate bin indices for this feature
-            indices = rng.choice(bins, p=p, size=n_outliers, replace=True)
-
-            # Uniform sampling from selected bins
-            outliers[:, col] = rng.uniform(
-                low=bin_edges[indices],
-                high=bin_edges[indices + 1]
-            )
+        # Synthesize values from low-density histogram bins per column
+        outliers[:, targets] = IndependentHistogramSampler(bins=bins).sample(
+            rng, X, targets, n_outliers)
 
         # Fill the columns the selector did not synthesize with real values
         unselected = [c for c in range(n_features) if c not in targets]
@@ -171,54 +162,25 @@ class HistogramSamplingGenerator(OutliersGenerator):
             return X
         rng = self.random_generator
         n_features = X.shape[1]
-        if len(targets) > 5:
-            raise NotImplementedError('So far this generator only supports tabular data with at most 5 columns to synthesize')
-        # standardize X
-        scaler = StandardScaler()
-        scaler.fit(X)
-        Xt = scaler.transform(X)
 
-        # compute the histogram of the synthesized columns
-        hist, edges = np.histogramdd(Xt[:, targets], density=False, bins=bins)
-        # normalize - use max only (min is always 0 for histogram counts)
-        norm_hist = hist / np.max(hist)
-        # get coordinates of the histogram where the density is low (below a certain threshold)
-        hist_coords_low_density = np.where(norm_hist <= threshold_low_density)
-        low_density_coordinates = list(zip(*hist_coords_low_density))
-        if len(low_density_coordinates) == 0:
-            raise ValueError(f"Could not find regions of low density. Maybe threshold {threshold_low_density} is too high!")
-        # randomly pick some coordinates in the histogram where the density is low
-        hist_coords_random = rng.choice(low_density_coordinates, n_outliers, replace=True)
+        # Synthesize the target columns jointly from low-density histogram
+        # bins (the shared OOD sampler raises if more than 5 columns are
+        # requested or if no low-density region is found)
+        outliers = np.empty((n_outliers, n_features), dtype=X.dtype)
+        outliers[:, targets] = JointHistogramSampler(
+            bins=bins, threshold_low_density=threshold_low_density).sample(
+            rng, X, targets, n_outliers)
 
-        # Vectorized outlier generation: one bin per synthesized column
-        n_out = hist_coords_random.shape[0]
-        outliers = np.empty((n_out, n_features), dtype=Xt.dtype)
-
-        for j, col in enumerate(targets):
-            # Get bin indices for this dimension from the random coordinates
-            bin_indices = hist_coords_random[:, j]
-            # Sample uniformly within each selected bin
-            bin_width = edges[j][bin_indices + 1] - edges[j][bin_indices]
-            random_offsets = rng.uniform(0, 1, size=n_out)
-            outliers[:, col] = edges[j][bin_indices] + random_offsets * bin_width
-
-        # Fill the columns the selector did not synthesize, in STANDARDIZED
-        # space so the single inverse transform below restores real values
+        # Fill the columns the selector did not synthesize with real values
         unselected = [c for c in range(n_features) if c not in targets]
         if unselected:
             outliers[:, unselected] = InstanceSampler().sample(
-                rng, Xt, unselected, n_out)
-
-        # in case we only have 1 outlier, reshape the array to match sklearn convention
-        if outliers.shape[0] == 1:
-            outliers = outliers.reshape(1, -1)
-
-        outliers = scaler.inverse_transform(outliers)
+                rng, X, unselected, n_outliers)
 
         # Append outliers to original data
         Xt = np.vstack([X, outliers])
 
-        self._set_outlier_labels(len(X), n_out)
+        self._set_outlier_labels(len(X), n_outliers)
         return Xt
 
 

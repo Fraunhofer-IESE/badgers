@@ -342,6 +342,17 @@ python -m benchmarks compare --baseline v0.0.13
 
 **Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.
 
+### ADR-6: Low-Density Value Synthesis Reuses Shared OOD Samplers (2026-10-25)
+
+**Decision:** The histogram-based outlier generators delegate their value synthesis to the reusable OOD samplers in `badgers.core.sampling`:
+
+- `IndependentHistogramsGenerator` → `IndependentHistogramSampler` (per-column low-density histogram bins)
+- `HistogramSamplingGenerator` → `JointHistogramSampler` (standardize → histogramdd → low-density bins → inverse-transform; supports at most 5 synthesized columns)
+
+Generators keep their responsibilities outside synthesis: count validation, selector-key target resolution, zero-outlier short-circuit, `InstanceSampler` bootstrap of unselected columns (in real space), row appending, and label bookkeeping. The KDE-based `LowDensitySamplingGenerator` is intentionally not delegated.
+
+**Rationale:** The histogram algorithms are useful beyond this pair of generators (e.g., for custom pipelines); exposing them as samplers avoids code duplication while the seeded delegation-parity tests in `test_outliers.py` guarantee bit-for-bit identical synthesis to the former inline implementations.
+
 ## Causal defect family: three-layer design
 
 1. **Structure** (static, user-provided): the structural `nx.DiGraph` (latent
