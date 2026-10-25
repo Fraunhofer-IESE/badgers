@@ -85,8 +85,9 @@ class RandomShiftGenerator(DriftGenerator):
         # check that if shift_std is an array, it is of length == X.shape[1]
         shift_std = np.asarray(shift_std, dtype=float)
         if shift_std.ndim == 1 and shift_std.size > 1:
-            assert shift_std.size == X.shape[
-                1], f"shift_std length ({shift_std.size}) must equal number of features in X ({X.shape[1]})"
+            if shift_std.size != X.shape[1]:
+                raise ValueError(
+                    f"shift_std length ({shift_std.size}) must equal number of features in X ({X.shape[1]})")
         if selector is None:
             # the relevant default: shift every row of every column
             selector = AlwaysSelector(columns=range(X.shape[1]))
@@ -151,8 +152,9 @@ class FixedShiftGenerator(DriftGenerator):
         """
         shift = np.asarray(shift, dtype=float)
         if shift.ndim == 1 and shift.size > 1:
-            assert shift.size == X.shape[
-                1], f"shift length ({shift.size}) must equal number of features in X ({X.shape[1]})"
+            if shift.size != X.shape[1]:
+                raise ValueError(
+                    f"shift length ({shift.size}) must equal number of features in X ({X.shape[1]})")
         if selector is None:
             # the relevant default: shift every row of every column
             selector = AlwaysSelector(columns=range(X.shape[1]))

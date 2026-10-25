@@ -98,19 +98,19 @@ class StructuredOutlierGenerator(OutliersGenerator):
         preprocessor=None,
     ):
         if preprocessor is None:
-            assert dimension_reduction_transformer is not None, (
-                "either dimension_reduction_transformer or preprocessor "
-                "must be given"
-            )
-            assert hasattr(
-                dimension_reduction_transformer,
-                'inverse_transform'), \
-                f'the decomposition transformer class must implement the inverse_transform function.' \
-                f'\nUnfortunately the class {dimension_reduction_transformer} does not'
+            if dimension_reduction_transformer is None:
+                raise ValueError(
+                    "either dimension_reduction_transformer or preprocessor "
+                    "must be given")
+            if not hasattr(dimension_reduction_transformer, 'inverse_transform'):
+                raise ValueError(
+                    f'the decomposition transformer class must implement the inverse_transform function.'
+                    f'\nUnfortunately the class {dimension_reduction_transformer} does not')
         else:
-            assert hasattr(preprocessor, 'inverse_transform'), \
-                f'the preprocessor must implement the inverse_transform function.' \
-                f'\nUnfortunately the class {preprocessor} does not'
+            if not hasattr(preprocessor, 'inverse_transform'):
+                raise ValueError(
+                    f'the preprocessor must implement the inverse_transform function.'
+                    f'\nUnfortunately the class {preprocessor} does not')
         if outlier_generator is not None:
             super().__init__(random_generator=outlier_generator.random_generator)
         else:

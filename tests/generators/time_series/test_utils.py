@@ -5,9 +5,9 @@ from badgers.generators.time_series.utils import generate_random_patterns_indice
 
 
 def test_generate_random_patterns_indices__no_patterns_raises():
-    """generate_random_patterns_indices raises AssertionError for n_patterns=0."""
+    """generate_random_patterns_indices raises ValueError for n_patterns=0."""
     rng = np.random.default_rng(0)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generate_random_patterns_indices(
             random_generator=rng, signal_size=100, n_patterns=0,
             min_width_pattern=5, max_width_patterns=10,
@@ -65,13 +65,13 @@ def test_generate_random_patterns_indices__tight_capacity_boundary():
 
 
 def test_generate_random_patterns_indices__capacity_exceeded_raises():
-    """A signal too small for n_patterns full-width patterns raises AssertionError.
+    """A signal too small for n_patterns full-width patterns raises ValueError.
 
     Regression test for the off-by-one guard: n_patterns=2, max=6, signal_size=11
     passed the old guard but crashed inside rng.integers with high <= 0.
     """
     rng = np.random.default_rng(0)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generate_random_patterns_indices(
             random_generator=rng, signal_size=11, n_patterns=2,
             min_width_pattern=1, max_width_patterns=6,

@@ -57,7 +57,8 @@ class NodesMissingCompletelyAtRandom(MissingGenerator):
         :return: The modified graph with missing nodes.
         :rtype: nx.Graph
         """
-        assert 0 < percentage_missing < 1
+        if not 0 < percentage_missing < 1:
+            raise ValueError(f"percentage_missing must be in (0, 1), got {percentage_missing}")
         if not isinstance(X, nx.Graph):
             raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
 
@@ -103,7 +104,8 @@ class EdgesMissingCompletelyAtRandom(MissingGenerator):
         :return: The modified graph with missing edges.
         :rtype: nx.Graph
         """
-        assert 0 < percentage_missing < 1
+        if not 0 < percentage_missing < 1:
+            raise ValueError(f"percentage_missing must be in (0, 1), got {percentage_missing}")
         if not isinstance(X, nx.Graph):
             raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
 

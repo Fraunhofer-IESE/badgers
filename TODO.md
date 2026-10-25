@@ -298,13 +298,16 @@ referenceable as R1..R14 in review discussions.
   `FixedShiftClassesGenerator.generate(X, shift)` (the random counterparts keep `shift_std`
   correctly). No deprecation shim — the old kwarg now raises a TypeError like any unknown
   keyword. All tests and the Drift tutorial updated (commit `1a20d83`).
-- **R8** Validation style: bare `assert` (vanishes under `python -O`) in outliers/missingness/
-  text/time-series generators (`assert expansion >= 0`, `assert 0 <= percentage_missing <= 1`,
-  `assert bins > 0`, ...) vs explicit `raise ValueError` in `AdditiveNoiseGenerator` and
-  `CausalNoiseGenerator`. Also stale docstrings claiming counts are "capped at len(X)" where the
-  code raises (distribution_sampling x3, low-density trio, `UniformInstanceAttributeSampling`,
-  `HistogramSamplingGenerator`); `instance_sampling.py` still references `UniformInstanceSampling`
-  in a docstring (the class was renamed `UniformInstanceAttributeSampling`).
+- **R8** ✅ FIXED (2026-10-25, ruling: "A — full sweep"): all 30 bare parameter-validation
+  `assert` statements in outliers/missingness/text/graph/time-series generators and core utils
+  are now explicit `raise ValueError(...)` with descriptive messages (bare asserts vanish under
+  `python -O`, so validation silently disappeared there). Contract change: AssertionError →
+  ValueError at these sites; the 8 tests pinning the old type were rewritten. The stale
+  docstrings claiming counts are "capped at len(X)" where the code actually raises (also wrong
+  for the internal CountSelector fallback) were corrected to "must not exceed len(X) (a larger
+  count raises)" — distribution_sampling x3, low-density trio x3 + `_resolve_count_and_targets`,
+  instance_sampling. The `UniformInstanceSampling` docstring reference was already resolved
+  (only `UniformInstanceAttributeSampling` exists).
 - **R9** Ground-truth attribute zoo (superset of TODO item 6): direct families use
   `<family>_labels_` (`outlier_labels_`, `imbalance_labels_`), the causal base uses
   `deficit_labels_` while `CausalOutlierPropagationGenerator` additionally keeps its own

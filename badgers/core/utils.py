@@ -47,7 +47,8 @@ def random_spherical_coordinate(random_generator: numpy.random.Generator = defau
     :param radius: the radius of the hypersphere
     :return: an array of shape (`size`,) containing the values of the point generated
     """
-    assert size > 0
+    if size <= 0:
+        raise ValueError(f"size must be a positive integer, got {size}")
     if size == 1:
         x = random_sign(random_generator, size=(1,)) * radius
     elif size == 2:
@@ -93,7 +94,8 @@ def random_spherical_coordinates(
         An array of shape ``(n_samples, size)`` where each row is a point
         on the hypersphere with the corresponding radius from ``radii``.
     """
-    assert size > 0
+    if size <= 0:
+        raise ValueError(f"size must be a positive integer, got {size}")
     n_samples = len(radii)
 
     if size == 1:

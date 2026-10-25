@@ -107,7 +107,9 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
         :type percentage_missing: float
         :return: The modified input features `Xt` with introduced missing values.
         """
-        assert 0 <= percentage_missing <= 1
+        if not 0 <= percentage_missing <= 1:
+            raise ValueError(
+                f"percentage_missing must be in [0, 1], got {percentage_missing}")
         # Route the row selection through the shared ExactCountSelector
         # preset (uniform draws, exact count per column) and write the
         # NaNs from the returned {column: bool-mask} dict.
@@ -155,7 +157,9 @@ class DummyMissingAtRandom(MissingValueGenerator):
         :type percentage_missing: float
         :return: The modified input features `Xt` with introduced missing values.
         """
-        assert 0 <= percentage_missing <= 1
+        if not 0 <= percentage_missing <= 1:
+            raise ValueError(
+                f"percentage_missing must be in [0, 1], got {percentage_missing}")
         # Route the row selection through the shared ExactCountSelector
         # preset. The soft coupling (per-column driver drawn uniformly
         # among the OTHER columns) enters via per-row weights; the driver
@@ -205,7 +209,9 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
         :type percentage_missing: float
         :return: The modified input features `Xt` with introduced missing values.
         """
-        assert 0 <= percentage_missing <= 1
+        if not 0 <= percentage_missing <= 1:
+            raise ValueError(
+                f"percentage_missing must be in [0, 1], got {percentage_missing}")
         # Route the row selection through the shared ExactCountSelector
         # preset. The self-coupling (probability of missing grows with the
         # own value) enters via per-row weights.

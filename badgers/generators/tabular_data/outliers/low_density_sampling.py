@@ -16,7 +16,8 @@ def _resolve_count_and_targets(X, n_outliers, selector):
 
     The selector's KEYS choose the synthesized columns (its mask is
     discarded and the selector is never invoked); ``selector=None`` means
-    all columns. The count is capped at the dataset size.
+    all columns. The count must not exceed the dataset size (a larger
+    count raises).
     """
     if n_outliers < 0:
         raise ValueError(f"n_outliers must be a positive count, got {n_outliers}")
@@ -57,8 +58,8 @@ class IndependentHistogramsGenerator(OutliersGenerator):
 
         The selector's keys choose the columns where the synthesis happens
         (its mask is discarded); the remaining columns of the appended rows
-        are per-cell bootstrap copies of real X values. Requested counts
-        are capped at ``len(X)``.
+        are per-cell bootstrap copies of real X values. The requested count
+        must not exceed ``len(X)`` (a larger count raises).
 
         :param X: the input features (pandas DataFrame or numpy array).
         :param n_outliers: The number of outliers to generate
@@ -68,7 +69,8 @@ class IndependentHistogramsGenerator(OutliersGenerator):
             its KEYS (columns) are the synthesized columns.
         :return: The augmented feature matrix with added outliers.
         """
-        assert bins > 0
+        if bins <= 0:
+            raise ValueError(f"bins must be a positive count, got {bins}")
         targets = _resolve_count_and_targets(X, n_outliers, selector)
         if n_outliers == 0:
             self._set_outlier_labels(len(X), 0)
@@ -147,8 +149,8 @@ class HistogramSamplingGenerator(OutliersGenerator):
         The selector's keys choose the columns where the synthesis happens —
         the joint histogram is computed over the synthesized columns only
         (its mask is discarded); the remaining columns of the appended rows
-        are per-cell bootstrap copies of real X values. Requested counts
-        are capped at ``len(X)``.
+        are per-cell bootstrap copies of real X values. The requested count
+        must not exceed ``len(X)`` (a larger count raises).
 
         :param X: the input features
         :param n_outliers: The number of outliers to generate
@@ -159,8 +161,11 @@ class HistogramSamplingGenerator(OutliersGenerator):
             its KEYS (columns) are the synthesized columns.
         :return:
         """
-        assert bins > 0
-        assert 0 < threshold_low_density < 1
+        if bins <= 0:
+            raise ValueError(f"bins must be a positive count, got {bins}")
+        if not 0 < threshold_low_density < 1:
+            raise ValueError(
+                f"threshold_low_density must be in (0, 1), got {threshold_low_density}")
         targets = _resolve_count_and_targets(X, n_outliers, selector)
         if n_outliers == 0:
             self._set_outlier_labels(len(X), 0)
@@ -252,8 +257,8 @@ class LowDensitySamplingGenerator(OutliersGenerator):
         The selector's keys choose the columns where the synthesis happens —
         the density is estimated on the synthesized columns only (its mask
         is discarded); the remaining columns of the appended rows are
-        per-cell bootstrap copies of real X values. Requested counts are
-        capped at ``len(X)``.
+        per-cell bootstrap copies of real X values. The requested count
+        must not exceed ``len(X)`` (a larger count raises).
 
         :param X: the input features
         :param n_outliers: The number of outliers to generate
@@ -264,8 +269,11 @@ class LowDensitySamplingGenerator(OutliersGenerator):
             its KEYS (columns) are the synthesized columns.
         :return:
         """
-        assert 0 < threshold_low_density < 1
-        assert max_samples > 0
+        if not 0 < threshold_low_density < 1:
+            raise ValueError(
+                f"threshold_low_density must be in (0, 1), got {threshold_low_density}")
+        if max_samples <= 0:
+            raise ValueError(f"max_samples must be a positive count, got {max_samples}")
         targets = _resolve_count_and_targets(X, n_outliers, selector)
         if n_outliers == 0:
             self._set_outlier_labels(len(X), 0)

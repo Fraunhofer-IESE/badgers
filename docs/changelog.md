@@ -589,6 +589,20 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   shift=...)``); the random counterparts keep ``shift_std`` correctly.
   No deprecation shim — passing ``shift_std=`` raises a ``TypeError``
   like any unknown keyword.
+- **Parameter validation switched from bare ``assert`` to ``raise
+  ValueError`` (contract change).** All 30 bare `assert` validations across
+  the outliers, missingness, text, graph, time-series generators and core
+  utils (e.g. ``assert expansion >= 0``, ``assert 0 <= percentage_missing <=
+  1``, ``assert bins > 0``, ``assert size > 0``) are now explicit
+  ``ValueError``s with descriptive messages — bare asserts silently vanish
+  under ``python -O``. Code catching ``AssertionError`` at these sites must
+  catch ``ValueError`` instead (8 tests updated).
+- **Stale "capped at len(X)" docstrings corrected.** The outlier generators'
+  docstrings claimed a requested outlier count is capped at the dataset size
+  where the code actually raises (also true of the internal ``CountSelector``
+  fallback). Wording is now "The count must not exceed ``len(X)`` (a larger
+  count raises)" — ``distribution_sampling`` (3 sites), the low-density trio
+  (3 sites + ``_resolve_count_and_targets``) and ``instance_sampling``.
 
 ## dev_0_0_14 (released)
 

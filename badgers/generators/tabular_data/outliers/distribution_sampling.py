@@ -50,8 +50,8 @@ class HyperCubeSampling(OutliersGenerator):
         fired by the selector is overwritten with a value uniform in the
         (possibly expanded) data bounding box
         (:class:`badgers.core.sampling.UniformOutOfDistributionSampler`).
-        A column not fired keeps the seed row's own value. Requested counts
-        are capped at ``len(X)``.
+        A column not fired keeps the seed row's own value. The requested
+        count must not exceed ``len(X)`` (a larger count raises).
 
         How to set the values for expansion.
         Per default expansion = 0, this means the hypercube will cover all the instances using min and max as boundaries
@@ -82,7 +82,8 @@ class HyperCubeSampling(OutliersGenerator):
                 "n_outliers is only the default count (no selector): pass "
                 "n_outliers without a selector, or give the count inside "
                 "the selector")
-        assert expansion >= 0
+        if expansion < 0:
+            raise ValueError(f"expansion must be >= 0, got {expansion}")
 
         if selector is None:
             selector = CountSelector(
@@ -138,7 +139,8 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         value from :class:`badgers.core.sampling.ZScoreSampler` (a random
         sign and ``3 + exponential(scale)`` standard deviations from the
         column mean). A column not fired keeps the seed row's own value.
-        Requested counts are capped at ``len(X)``.
+        The requested count must not exceed ``len(X)`` (a larger count
+        raises).
 
         :param X: the input features (pandas DataFrame or numpy array).
         :param n_outliers: The default number of outliers when no selector
@@ -158,7 +160,8 @@ class ZScoreSamplingGenerator(OutliersGenerator):
                 "n_outliers is only the default count (no selector): pass "
                 "n_outliers without a selector, or give the count inside "
                 "the selector")
-        assert scale > 0
+        if scale <= 0:
+            raise ValueError(f"scale must be > 0, got {scale}")
 
         if selector is None:
             selector = CountSelector(
@@ -212,8 +215,8 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         fired by the selector is overwritten with a hypersphere point
         (:class:`badgers.core.sampling.HypersphereSampler`, radius
         ``3 + exponential(scale)`` in standardized space). A column not
-        fired keeps the seed row's own value. Requested counts are capped
-        at ``len(X)``.
+        fired keeps the seed row's own value. The requested count must not
+        exceed ``len(X)`` (a larger count raises).
 
         :param X: the input features (pandas DataFrame or numpy array).
         :param n_outliers: The default number of outliers when no selector
@@ -233,7 +236,8 @@ class HypersphereSamplingGenerator(OutliersGenerator):
                 "n_outliers is only the default count (no selector): pass "
                 "n_outliers without a selector, or give the count inside "
                 "the selector")
-        assert scale > 0
+        if scale <= 0:
+            raise ValueError(f"scale must be > 0, got {scale}")
 
         if selector is None:
             selector = CountSelector(

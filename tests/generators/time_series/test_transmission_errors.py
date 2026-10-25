@@ -7,10 +7,10 @@ from badgers.generators.time_series.transmission_errors import RandomTimeSwitchG
 
 
 def test_random_time_switch__no_switch_raises():
-    """RandomTimeSwitchGenerator raises AssertionError for n_switches=0."""
+    """RandomTimeSwitchGenerator raises ValueError for n_switches=0."""
     X = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).reshape(-1, 1)
     generator = RandomTimeSwitchGenerator(random_generator=default_rng(seed=0))
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generator.generate(X.copy(), n_switches=0)
 
 
@@ -36,10 +36,10 @@ def test_random_time_switch__single_switch_frame():
 
 
 def test_random_repeat__no_repeat_raises():
-    """RandomRepeatGenerator raises AssertionError for n_repeats=0."""
+    """RandomRepeatGenerator raises ValueError for n_repeats=0."""
     X = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).reshape(-1, 1)
     generator = RandomRepeatGenerator(random_generator=default_rng(seed=0))
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generator.generate(X.copy(), n_repeats=0, min_nb_repeats=2, max_nb_repeats=3)
 
 
@@ -53,10 +53,10 @@ def test_random_repeat__two_repeats():
 
 
 def test_local_regions_random_repeat__no_repeat_raises():
-    """LocalRegionsRandomRepeatGenerator raises AssertionError for n_repeats=0."""
+    """LocalRegionsRandomRepeatGenerator raises ValueError for n_repeats=0."""
     X = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).reshape(-1, 1)
     generator = LocalRegionsRandomRepeatGenerator(random_generator=default_rng(seed=0))
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generator.generate(X.copy(), n_repeats=0, min_nb_repeats=2, max_nb_repeats=3)
 
 
@@ -91,10 +91,10 @@ def test_local_regions_random_repeat__many_repeats_many_regions():
 
 
 def test_random_drop__no_drop_raises():
-    """RandomDropGenerator raises AssertionError for n_drops=0."""
+    """RandomDropGenerator raises ValueError for n_drops=0."""
     X = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).reshape(-1, 1)
     generator = RandomDropGenerator(random_generator=default_rng(0))
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generator.generate(X.copy(), n_drops=0)
 
 
@@ -107,10 +107,10 @@ def test_random_drop__single_drop():
 
 
 def test_local_regions_random_drop__no_drop_raises():
-    """LocalRegionsRandomDropGenerator raises AssertionError for n_drops=0."""
+    """LocalRegionsRandomDropGenerator raises ValueError for n_drops=0."""
     X = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).reshape(-1, 1)
     generator = LocalRegionsRandomDropGenerator(random_generator=default_rng(0))
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generator.generate(X.copy(), n_drops=0, n_regions=0)
 
 

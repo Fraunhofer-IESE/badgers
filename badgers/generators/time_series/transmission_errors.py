@@ -62,7 +62,8 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
         :param n_switches: An integer specifying the number of random switches to introduce in X.
         :return: The modified input time series data with random switches applied.
         """
-        assert n_switches > 0, 'n_switches should be strictly greater than 0'
+        if n_switches <= 0:
+            raise ValueError(f"n_switches should be strictly greater than 0, got {n_switches}")
 
         self.switch_indices_ = self.random_generator.choice(len(X) - 1, size=n_switches, replace=False)
         # Vectorized: swap all pairs at once via .values indexing
@@ -107,7 +108,8 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
         :param max_nb_repeats: An integer specifying the maximum number of times a value can be repeated.
         :return: The modified input time series data with random repetitions applied (length increased).
         """
-        assert n_repeats > 0, 'n_repeats should be strictly greater than 0'
+        if n_repeats <= 0:
+            raise ValueError(f"n_repeats should be strictly greater than 0, got {n_repeats}")
 
         # generate indices for repeats
         self.repeats_ = [(i, l) for i, l in zip(
@@ -158,7 +160,8 @@ class RandomDropGenerator(TransmissionErrorGenerator):
         :param n_drops: An integer specifying the number of random drops to introduce in X.
         :return: The modified input time series data with random drops applied (length decreased).
         """
-        assert n_drops > 0, 'n_drops should be strictly greater than 0'
+        if n_drops <= 0:
+            raise ValueError(f"n_drops should be strictly greater than 0, got {n_drops}")
 
         # generate indices for drops
         self.drops_indices_ = self.random_generator.choice(len(X), size=n_drops, replace=False, shuffle=False)
@@ -202,7 +205,8 @@ class LocalRegionsRandomDropGenerator(TransmissionErrorGenerator):
         :param max_width_regions: An integer specifying the maximum width of the time regions (intervals).
         :return: The modified input time series data with random drops applied within specific time regions (length decreased).
         """
-        assert n_drops > 0, 'n_drops should be strictly greater than 0'
+        if n_drops <= 0:
+            raise ValueError(f"n_drops should be strictly greater than 0, got {n_drops}")
 
         # generate probability for where to drop points
         self.drops_probabilities_ = get_patterns_uniform_probability(
@@ -258,7 +262,8 @@ class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
         :param max_width_regions: An integer specifying the maximum width of the time regions (intervals).
         :return: The modified input time series data with random repetitions applied within specific time regions (length increased).
         """
-        assert n_repeats > 0, 'n_repeats should be strictly greater than 0'
+        if n_repeats <= 0:
+            raise ValueError(f"n_repeats should be strictly greater than 0, got {n_repeats}")
 
         # generate probability for where to drop points
         self.repeats_probabilities_ = get_patterns_uniform_probability(

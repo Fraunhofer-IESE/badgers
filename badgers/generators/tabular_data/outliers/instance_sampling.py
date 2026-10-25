@@ -19,8 +19,8 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
 
     The generator has no seed rows, so a selector has nothing to fire on:
     ``selector`` is accepted for API uniformity but IGNORED (a warning is
-    emitted; ``n_outliers`` remains the only count knob). Requested counts
-    are capped at the dataset size.
+    emitted; ``n_outliers`` remains the only count knob). The count must
+    not exceed the dataset size (a larger count raises).
     """
 
     def __init__(self, random_generator=default_rng(seed=0)):
@@ -53,7 +53,8 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
             raise ValueError(
                 f"n_outliers must not exceed the number of rows of X "
                 f"({len(X)}), got {n_outliers}")
-        assert n_outliers > 0
+        if n_outliers <= 0:
+            raise ValueError(f"n_outliers must be a positive count, got {n_outliers}")
 
         outliers = InstanceSampler().sample(
             self.random_generator, X, columns=list(range(X.shape[1])),

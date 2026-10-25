@@ -337,15 +337,13 @@ def test_hypercube__expansion_positive_respects_range():
 
 
 def test_hypercube__expansion_negative_raises():
-    """Negative expansion should trigger an assertion error."""
+    """Negative expansion raises ValueError (no bare asserts: validation
+    must survive python -O)."""
     rng = default_rng(0)
     X = rng.normal(size=(100, 10))
     generator = HyperCubeSampling(random_generator=default_rng(0))
-    try:
+    with pytest.raises(ValueError, match="expansion"):
         generator.generate(X.copy(), n_outliers=10, expansion=-0.1)
-        assert False, "Expected AssertionError"
-    except AssertionError:
-        pass
 
 
 def test_hypercube__delegates_to_sampler_math():

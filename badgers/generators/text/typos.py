@@ -130,7 +130,8 @@ class LeetSpeakGenerator(TyposGenerator):
                                   This probability applies to each letter in each word independently.
         :return: The list of transformed words in leet speak.
         """
-        assert 0 <= replacement_proba <= 1
+        if not 0 <= replacement_proba <= 1:
+            raise ValueError(f"replacement_proba must be in [0, 1], got {replacement_proba}")
         Xt = [
             ''.join([self.randomly_replace_letter(l, replacement_proba=replacement_proba) for l in word])
             for word in X
@@ -174,7 +175,8 @@ class SwapCaseGenerator(TyposGenerator):
                                This probability applies to each letter in each word independently.
         :return: The list of words with randomly swapped letter cases.
         """
-        assert 0 <= swapcase_proba <= 1
+        if not 0 <= swapcase_proba <= 1:
+            raise ValueError(f"swapcase_proba must be in [0, 1], got {swapcase_proba}")
         Xt = [
             ''.join([self.randomly_swapcase_letter(l, swapcase_proba=swapcase_proba) for l in word])
             for word in X
