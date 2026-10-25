@@ -219,7 +219,7 @@ so that specifications/requirements can be derived directly from them.
 
 Findings from reading every generator (tabular, causal, time_series, graph, text)
 and probing the suspected bugs at runtime. The bugs and API inconsistencies found
-(R1–R9, R12–R15) are all fixed; details and commit hashes are recorded in
+(R1–R9, R11–R15) are all fixed; details and commit hashes are recorded in
 [docs/changelog.md](docs/changelog.md). Remaining refactor opportunities below.
 
 ## Refactor opportunities (no behavior change)
