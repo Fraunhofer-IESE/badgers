@@ -69,8 +69,11 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
                          the class column position. Required (a per-class
                          rule has no class-free default).
         :param noise_std_per_class: A dictionary mapping class values to the
-            noise standard deviation for that class. Fired rows whose class
-            value is absent from the dict receive no noise.
+            noise standard deviation for that class. Every class value
+            present among the fired rows must have an entry (a missing
+            class value raises ``ValueError``); the keys are normalized
+            against the class column's dtype, so plain-int keys work for a
+            float-encoded class column.
         :return: The noisy input features.
         """
         if selector is None:
@@ -106,10 +109,28 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
         # fit, transform
         scaler.fit(X)
         Xt = scaler.transform(X)
+        # normalize the dict keys against the class column's dtype (a
+        # plain-int key works for a float-encoded class column and vice
+        # versa; wrong-kind keys, e.g. strings for numeric classes, raise)
+        if noise_std_per_class:
+            keys = list(noise_std_per_class.keys())
+            try:
+                normalized = np.asarray(keys, dtype=X[:, class_col].dtype)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"noise_std_per_class keys {keys} cannot be compared "
+                    f"with the class column values (dtype "
+                    f"{X[:, class_col].dtype})"
+                ) from exc
+            noise_std_per_class = dict(zip(normalized, noise_std_per_class.values()))
         # noise per class value among the fired rows
         for value in np.unique(X[firing, class_col]):
             if value not in noise_std_per_class:
-                continue
+                raise ValueError(
+                    f"noise_std_per_class has no entry for the fired class "
+                    f"value {value!r} (class column {class_col}); entries: "
+                    f"{sorted(noise_std_per_class)}"
+                )
             noise_std = noise_std_per_class[value]
             rows = firing & (X[:, class_col] == value)
             noise = self.random_generator.normal(

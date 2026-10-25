@@ -256,15 +256,12 @@ referenceable as R1..R14 in review discussions.
   `rng.choice(..., replace=False)`) and `changepoints` is reported sorted by index with the
   documented composition semantics (each reported change IS the realized level jump at that
   position) (commit `7787279`). Same-seed outputs changed (different draw mechanism).
-- **R4** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py):
-  `GaussianNoiseClassesGenerator.generate` looks up `noise_std_per_class[value]` with the class
-  value read from `X` while the user's dict keys may have another dtype — the lookup goes through
-  `if value not in noise_std_per_class: continue`, so float/int key mismatches SILENTLY SKIP the
-  class (verified: int column + float keys still applies the std because `3.0 == 3` hashes equal,
-  but a str/np-key mismatch or float columns holding non-representable labels would not — same
-  float/int fragility the drift `*Classes` pair avoids via `resolve_class_column`; see P21/P22
-  probes). Fix: normalize the lookup keys, or route through `resolve_class_column`-style
-  coercion, and raise (not `continue`) when a fired class has no configured std.
+- **R4** ✅ FIXED (2026-10-25): every class value present among the fired rows must now have an
+  entry in `noise_std_per_class` (missing → `ValueError`, was silent skip); dict keys are
+  normalized against the class column's dtype (plain-int keys work for a float-encoded class
+  column; wrong-kind keys, e.g. strings for numeric classes, raise instead of silently
+  disabling the noise) (commit `443daba`). Contract change: the documented-and-tested
+  "absent class = no noise" partial-mapping behavior is gone.
 
 ## API inconsistencies (same concept, different spelling)
 

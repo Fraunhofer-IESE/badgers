@@ -548,6 +548,14 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   replacement) and reported sorted by index; each reported change is the realized level jump
   at that position (documented in the docstring). Same-seed outputs change (different draw
   mechanism).
+- **`GaussianNoiseClassesGenerator` no longer silently skips unconfigured
+  classes (contract change).** A fired class value absent from
+  ``noise_std_per_class`` now raises ``ValueError`` (previously it silently
+  received no noise — documented-and-tested partial mappings are gone; pass a
+  zero std explicitly to keep a class noise-free). The dict keys are
+  normalized against the class column's dtype: plain-int keys work for a
+  float-encoded class column, and keys of a wrong kind (e.g. strings for
+  numeric classes) raise instead of silently disabling the noise.
 
 ## dev_0_0_14 (released)
 
