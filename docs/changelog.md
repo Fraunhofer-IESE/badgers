@@ -535,6 +535,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   integer``. The draw is now cast to ``int``; the signature documents
   ``start=None`` (random start in the first half of the signal) and ``end=None``
   (trend lasts until the end).
+- **`generate_random_patterns_indices` capacity guard off by one.**
+  The pattern-position helper (``RandomlySpacedLinearTrends``, ``LocalNoiseGenerator``,
+  ``RandomlySpacedLocalNoiseGenerator``, value-drop generators) passed a signal of size 11
+  with 2 patterns of max width 6 — then crashed inside ``rng.integers`` with
+  ``high <= 0``. The guard is now ``max_width_patterns * n_patterns <= signal_size``
+  (each equal-length segment must hold one full-width pattern).
 
 ## dev_0_0_14 (released)
 

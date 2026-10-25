@@ -247,11 +247,11 @@ referenceable as R1..R14 in review discussions.
   `RandomlySpacedLinearTrends` (already uses per-column slopes arrays) for a similar scalar path.
   Fix candidate: broadcast the 1-D ramp against `X.shape[1]` (e.g. reshape + `np.ones`, or
   `np.broadcast_to`).
-- **R2** [utils.py](badgers/generators/time_series/utils.py): `generate_random_patterns_indices`
-  guard `assert (max_width_patterns - 1) * n_patterns < signal_size` is off by one (high is
-  exclusive in `rng.integers`): `n_patterns=2, max=6, signal_size=11` passes the assert but then
-  crashes with `ValueError: high <= 0` (verified). Fix: `assert max_width_patterns * n_patterns
-  <= signal_size`.
+- **R2** ✅ FIXED (2026-10-25): the capacity guard is now
+  `max_width_patterns * n_patterns <= signal_size` (commit `3995c79`); regression tests for the
+  exact boundary (works) and the previously-crashing 11-signal call (now raises). Note the guard
+  is a conservative budget for the SEGMENT structure (each segment must hold a full-width
+  pattern), not a tight packing condition.
 - **R3** [changepoints.py](badgers/generators/time_series/changepoints.py):
   `RandomChangeInMeanGenerator.generate` draws all changepoint indices from
   `integers(0.05n, 0.95n)` — duplicates possible (verified: 14 duplicates in 40 draws). Fixes
