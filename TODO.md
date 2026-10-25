@@ -241,12 +241,12 @@ and probing the suspected bugs at runtime. The bugs and API inconsistencies foun
   dict-by-position via `_param_by_target`) — the non-causal generators mix the same two shapes
   (`noise_std` scalar multiplier vs `noise_std_per_class`/`shift_std` dict-by-class). Survey
   recorded in the R12 discussion of 2026-10-27; details in
-  [docs/changelog.md](docs/changelog.md).
+  [docs/changelog.md](docs/changelog.md). (commit `68888d4`)
 - **R13 ✅ FIXED** all generator constructors: `random_generator` is a REQUIRED parameter (no
   default) — the old `default_rng(seed=0)` default was evaluated once at import, so instances
   built without an rng shared one Generator object and advanced each other's streams. All
   docstring default texts reworded; tests, notebooks, README and experiments updated. Details in
-  [docs/changelog.md](docs/changelog.md).
+  [docs/changelog.md](docs/changelog.md). (commit `68888d4`)
 - **R14 ✅ FIXED** cosmetics: graph missingness raises `TypeError` for non-`nx.Graph` input;
   `import warnings` moved to module top in [causal/_base.py](badgers/generators/tabular_data/causal/_base.py);
   the "thant" typo in [utils.py](badgers/generators/time_series/utils.py) and its obscure
@@ -255,4 +255,4 @@ and probing the suspected bugs at runtime. The bugs and API inconsistencies foun
   `SwapLettersGenerator` no longer mutates the input list (it returns a new one, like the other
   text generators); copy-paste docstrings fixed (drift base says "shift", ts
   `MissingValuesGenerator` says "missing values"). Details in
-  [docs/changelog.md](docs/changelog.md).
+  [docs/changelog.md](docs/changelog.md). (commit `68888d4`)
