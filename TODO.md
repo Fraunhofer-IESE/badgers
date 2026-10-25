@@ -125,13 +125,14 @@ so that specifications/requirements can be derived directly from them.
 - **Current** ([outliers/](badgers/generators/tabular_data/outliers)): 8 classical generators.
   Since the 0.0.15 refactor the three distribution-based ones (`ZScoreSamplingGenerator`,
   `HypersphereSamplingGenerator`, `HyperCubeSampling`) delegate to the core Samplers in
-  [badgers/core/sampling.py](badgers/core/sampling.py) (logic defined ONCE there, per the
-  acceptance criteria below); `StructuredOutlierGenerator` remains the reduce → sample →
-  inverse-transform composition wrapper. Still inlining their strategies:
+  [badgers/core/sampling.py](badgers/core/sampling.py)   (logic defined ONCE there, per the acceptance criteria below); `StructuredOutlierGenerator` remains the reduce → sample →
+  inverse-transform composition wrapper. The histogram generators
+  (`IndependentHistogramsGenerator`, `HistogramSamplingGenerator`) delegate to the new
+  `IndependentHistogramSampler`/`JointHistogramSampler` core samplers (bit-for-bit identical seeded
+  synthesis, see changelog). Still inlining their strategies:
   `UniformInstanceAttributeSampling`/`VarianceInstanceSampling` (instance recombination) and the
-  histogram trio (`IndependentHistogramsGenerator`, `HistogramSamplingGenerator`,
-  `LowDensitySamplingGenerator`) — the KDE and histogram-dimension Sampler implementations listed
-  in the acceptance criteria do not exist yet.
+  KDE-based `LowDensitySamplingGenerator` — the KDE low-density Sampler implementation listed
+  in the acceptance criteria does not exist yet.
 - **Target**: one outlier generator appending `n_outliers` rows produced by a pluggable core
   Sampler (out-of-distribution point generation); the histogram/KDE/low-density strategies become
   new Sampler implementations in `badgers/core/sampling.py`; `StructuredOutlierGenerator` remains
@@ -156,8 +157,9 @@ so that specifications/requirements can be derived directly from them.
 - **Implementation status**: partially done (updated 2026-10-25, generator review) — the three
   distribution-based generators now construct the core Samplers instead of duplicating their math
   (`select_and_seed` in [outliers/_selection.py](badgers/generators/tabular_data/outliers/_selection.py)
-  realizes the selector/`n_outliers` count and seeds the anchor rows). Remaining gaps: the
-  histogram/KDE strategies are still generator-local (no core Sampler), the count-resolution
+  realizes the selector/`n_outliers` count and seeds the anchor rows). The two histogram
+  generators delegate to the new histogram core Samplers (`55502c4`, `caeb0e7`). Remaining gaps: the
+  KDE strategy is still generator-local (no core Sampler), the count-resolution
   helper `_resolve_count_and_targets` in
   [low_density_sampling.py](badgers/generators/tabular_data/outliers/low_density_sampling.py)
   duplicates the `select_and_seed` contract for the selector-keys convention, and the open decisions
