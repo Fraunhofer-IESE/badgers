@@ -118,6 +118,21 @@ class CausalGenerator(GeneratorMixin):
         # RuntimeError when no output has been generated yet.
         self.deficit_labels_ = None
 
+    def _get_deficit_labels(self) -> np.ndarray:
+        """Shared body of the per-family ``get_<deficit>_labels()`` getters.
+
+        Returns ``self.deficit_labels_`` (the boolean per-row field filled
+        by ``generate()``); raises ``RuntimeError`` when no output has
+        been generated yet. The error message names the family through
+        ``self.deficit_name``.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                f"{self.deficit_name.capitalize()} labels are only "
+                "available after calling generate()."
+            )
+        return self.deficit_labels_
+
     # -- DGP plumbing -------------------------------------------------------
 
     def use_dgp(self, dgp):

@@ -53,12 +53,7 @@ class CausalImbalanceGenerator(CausalGenerator):
         output: True for rows that carry the imbalance deficit (the kept
         subset), False for... none (all kept rows are affected).
         """
-        if self.deficit_labels_ is None:
-            raise RuntimeError(
-                "Imbalance labels are only available after calling "
-                "generate()."
-            )
-        return self.deficit_labels_
+        return self._get_deficit_labels()
 
     @preprocess_inputs
     def generate(

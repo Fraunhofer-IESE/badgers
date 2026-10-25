@@ -18,6 +18,39 @@ def test_global_additive_linear_trend__matches_expected():
     np.testing.assert_array_equal(Xt, expected_Xt)
 
 
+def test_global_additive_linear_trend__scalar_slope_applies_to_every_column():
+    """Scalar slope: the same per-row ramp is applied to every column of X.
+
+    Regression: a scalar slope previously crashed on non-square X
+    (ValueError: could not broadcast) and silently applied the ramp along
+    COLUMNS on square X (n == n_cols).
+    """
+    rng = default_rng(seed=0)
+    generator = GlobalAdditiveLinearTrendGenerator(random_generator=rng)
+    X = np.zeros(shape=(10, 3))
+
+    Xt = generator.generate(X, slope=2.0)
+
+    expected = np.tile(np.linspace(0, 2.0 * 10, 10).reshape(-1, 1), 3)
+    np.testing.assert_array_equal(Xt, expected)
+
+
+def test_global_additive_linear_trend__scalar_slope_square_x_is_rowwise():
+    """Scalar slope on square X (n == n_cols): the ramp runs along ROWS.
+
+    Regression: the old code broadcast the 1-D ramp along columns, so each
+    row j received the constant value ramp[j] — a transposed trend.
+    """
+    rng = default_rng(seed=0)
+    generator = GlobalAdditiveLinearTrendGenerator(random_generator=rng)
+    X = np.zeros(shape=(6, 6))
+
+    Xt = generator.generate(X, slope=1.0)
+
+    expected = np.tile(np.linspace(0, 6.0, 6).reshape(-1, 1), 6)
+    np.testing.assert_array_equal(Xt, expected)
+
+
 def test_additive_linear_trend__matches_expected():
     """AdditiveLinearTrendGenerator produces expected trend in specified range."""
     rng = default_rng(seed=0)
@@ -40,6 +73,42 @@ def test_additive_linear_trend__matches_expected():
 
     Xt = generator.generate(X, slope=slope, start=3, end=7)
     np.testing.assert_array_equal(Xt, expected_Xt)
+
+
+def test_additive_linear_trend__scalar_slope_applies_to_every_column():
+    """Scalar slope: the same per-row ramp is applied to every column of X.
+
+    Regression: a scalar slope previously crashed on non-square X
+    (ValueError: could not broadcast ... (n,) into (n,2)) and silently
+    applied the ramp along COLUMNS on square X (n == n_cols).
+    """
+    rng = default_rng(seed=0)
+    generator = AdditiveLinearTrendGenerator(random_generator=rng)
+    X = np.zeros(shape=(10, 3))
+
+    Xt = generator.generate(X, slope=2.0, start=3, end=7)
+
+    ramp = np.linspace(0, 2.0 * (7 - 3), 7 - 3).reshape(-1, 1)
+    expected = np.zeros(shape=(10, 3))
+    expected[3:7, :] = ramp
+    expected[7:, :] = ramp[-1, :]
+    np.testing.assert_array_equal(Xt, expected)
+
+
+def test_additive_linear_trend__scalar_slope_square_x_is_rowwise():
+    """Scalar slope on square X (n == n_cols): the ramp runs along ROWS.
+
+    Regression: the old code broadcast the 1-D ramp along columns inside the
+    (n == n_cols) slice assignment, transposing the trend instead of crashing.
+    """
+    rng = default_rng(seed=0)
+    generator = AdditiveLinearTrendGenerator(random_generator=rng)
+    X = np.zeros(shape=(8, 8))
+
+    Xt = generator.generate(X, slope=1.0, start=0, end=8)
+
+    expected = np.tile(np.linspace(0, 8.0, 8).reshape(-1, 1), 8)
+    np.testing.assert_array_equal(Xt, expected)
 
 
 def test_additive_linear_trend__default_start_end():

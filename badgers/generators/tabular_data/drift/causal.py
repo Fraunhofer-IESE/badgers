@@ -63,11 +63,7 @@ class CausalDriftGenerator(CausalGenerator):
         output: True for rows that carry the drift deficit, False for
         original rows.
         """
-        if self.deficit_labels_ is None:
-            raise RuntimeError(
-                "Drift labels are only available after calling generate()."
-            )
-        return self.deficit_labels_
+        return self._get_deficit_labels()
 
     @preprocess_inputs
     def generate(

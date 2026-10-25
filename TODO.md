@@ -308,15 +308,19 @@ referenceable as R1..R14 in review discussions.
   count raises)" — distribution_sampling x3, low-density trio x3 + `_resolve_count_and_targets`,
   instance_sampling. The `UniformInstanceSampling` docstring reference was already resolved
   (only `UniformInstanceAttributeSampling` exists). (commit `2ac0651`)
-- **R9** Ground-truth attribute zoo (superset of TODO item 6): direct families use
-  `<family>_labels_` (`outlier_labels_`, `imbalance_labels_`), the causal base uses
-  `deficit_labels_` while `CausalOutlierPropagationGenerator` additionally keeps its own
-  `outlier_labels_` (two attributes for one concept), missingness has only cell-level
-  `missing_values_indices_`, drift/noise direct generators report nothing, time-series exposes raw
-  lists with five different shapes (`outliers_indices_`, `missing_indices_`, `changepoints`,
-  `patterns_indices_`, `drops_indices_`...), and every causal generator hand-copies an identical
-  `get_*_labels()` getter that only differs in the error message. Item 6's acceptance criteria
-  already prescribe the fix (one labels mixin on the shared base + per-family aliases).
+- **R9** ✅ FIXED (2026-10-25, ruling: "A — DRY"): the five hand-copied
+  `get_*_labels()` getters (drift, missingness, imbalance, noise x2) now delegate to one shared
+  `CausalGeneratorBase._get_deficit_labels()` in [causal/_base.py](badgers/generators/tabular_data/causal/_base.py);
+  the per-family public getters keep their docstrings and return values, and the error message
+  comes from the (previously unused) `deficit_name` class attribute. `CausalOutlierPropagationGenerator`
+  keeps its own `outlier_labels_` getter (different backing attribute and semantics — appended
+  rows, not deficit rows); unifying it belongs to TODO item 6's labels mixin.
+- **R15** ✅ FIXED (2026-10-25, ruling: "A — broadcast fix"): a scalar `slope` in
+  `AdditiveLinearTrendGenerator` and `GlobalAdditiveLinearTrendGenerator` is now broadcast so the
+  same per-row ramp is applied to every column of X (matching the array-slope path). Previously a
+  scalar slope crashed on non-square X (`ValueError: could not broadcast ... (n,) into (n,2)`)
+  and silently applied the ramp along COLUMNS on square X (n == n_cols). Array-slope outputs are
+  unchanged; regression tests pin the fixed behavior (commit — see hash below).
 
 ## Refactor opportunities (no behavior change)
 

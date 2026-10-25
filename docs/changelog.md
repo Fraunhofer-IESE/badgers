@@ -603,6 +603,19 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   fallback). Wording is now "The count must not exceed ``len(X)`` (a larger
   count raises)" — ``distribution_sampling`` (3 sites), the low-density trio
   (3 sites + ``_resolve_count_and_targets``) and ``instance_sampling``.
+- **Scalar ``slope`` in the time-series trend generators is broadcast to
+  every column (bug fix).** ``AdditiveLinearTrendGenerator`` and
+  ``GlobalAdditiveLinearTrendGenerator`` previously crashed with a scalar
+  slope on non-square X (``ValueError: could not broadcast ... (n,) into
+  (n,2)``) and silently applied the ramp along COLUMNS on square X
+  (n == n_cols) — a transposed trend. A scalar slope now applies the same
+  per-row ramp to every column (the documented behavior, consistent with the
+  array-slope path, whose outputs are unchanged).
+- **The five hand-copied causal ``get_*_labels()`` getters are unified**
+  (internal refactor, no behavior change): drift, missingness, imbalance and
+  both noise generators now delegate to one shared helper on the causal base
+  (``_get_deficit_labels``); the error message is derived from each
+  generator's ``deficit_name``.
 
 ## dev_0_0_14 (released)
 

@@ -55,12 +55,15 @@ class GlobalAdditiveLinearTrendGenerator(TrendsGenerator):
 
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
         :param slope: The slope of the trend (increase per time unit). Can be a single float value or a list of slopes
-                      for each feature in X.
+                      for each feature in X. A single value applies the same trend to every column of X.
         :type slope: float or list
         :return: The transformed signal Xt (X + linear trend).
         """
 
         offset = np.linspace(0, slope * len(X), len(X))
+        if offset.ndim == 1:
+            # scalar slope: the same per-row ramp is applied to every column of X
+            offset = offset[:, np.newaxis]
         Xt = X + offset
         return Xt
 
@@ -86,7 +89,7 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
 
         :param X: The input signal to be transformed, expected to be a 2D array where each row represents a time step.
         :param slope: The slope of the trend (increase per time unit). Can be a single float value or a list of slopes
-                      for each feature in X.
+                      for each feature in X. A single value applies the same trend to every column of X.
         :type slope: float or list
         :param start: The starting index of the segment to apply the trend.
                       When None (default), a starting index is drawn uniformly at random
@@ -108,7 +111,11 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
         # - from "start" to "end": linear trend with slope "slope",
         # - from "end" on: the last value
         offset = np.zeros(shape=X.shape)
-        offset[start:end, :] = np.linspace(0, slope * (end - start), end - start)
+        ramp = np.linspace(0, slope * (end - start), end - start)
+        if ramp.ndim == 1:
+            # scalar slope: the same per-row ramp is applied to every column of X
+            ramp = ramp[:, np.newaxis]
+        offset[start:end, :] = ramp
         offset[end:, :] = offset[end - 1, :]
 
         Xt = X + offset

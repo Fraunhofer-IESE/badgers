@@ -63,11 +63,7 @@ class CausalNoiseGenerator(CausalGenerator):
         output: True for rows that carry the noise deficit, False for
         original rows.
         """
-        if self.deficit_labels_ is None:
-            raise RuntimeError(
-                "Noise labels are only available after calling generate()."
-            )
-        return self.deficit_labels_
+        return self._get_deficit_labels()
 
     @preprocess_inputs
     def generate(
@@ -177,11 +173,7 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
         output: True for rows that carry the noise deficit, False for
         original rows.
         """
-        if self.deficit_labels_ is None:
-            raise RuntimeError(
-                "Noise labels are only available after calling generate()."
-            )
-        return self.deficit_labels_
+        return self._get_deficit_labels()
 
     @preprocess_inputs
     def generate(
