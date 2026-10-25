@@ -583,6 +583,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   per selector are identical, but same-seed downstream draws shift for
   callers whose selectors produce constant scalar specs (e.g. the new
   ``AlwaysSelector`` defaults).
+- **``FixedShiftGenerator.generate`` renames ``shift_std`` → ``shift``
+  (breaking).** The deterministic generator's parameter now matches the
+  paired per-class generator (``FixedShiftClassesGenerator.generate(X,
+  shift=...)``); the random counterparts keep ``shift_std`` correctly.
+  No deprecation shim — passing ``shift_std=`` raises a ``TypeError``
+  like any unknown keyword.
 
 ## dev_0_0_14 (released)
 

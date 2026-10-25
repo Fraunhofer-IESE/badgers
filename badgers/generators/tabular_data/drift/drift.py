@@ -113,8 +113,8 @@ class FixedShiftGenerator(DriftGenerator):
     :class:`RandomShiftGenerator`.
 
     Data are first standardized (mean = 0, var = 1), then each column is
-    translated by exactly ``shift_std``: the ith column becomes
-    `$x_i \leftarrow x_i + \text{shift\_std}_i$`. No random number is drawn,
+    translated by exactly ``shift``: the ith column becomes
+    `$x_i \leftarrow x_i + \text{shift}_i$`. No random number is drawn,
     so repeated calls with the same input return the same output.
     """
 
@@ -123,13 +123,13 @@ class FixedShiftGenerator(DriftGenerator):
         super().__init__(random_generator=None)
 
     @preprocess_inputs
-    def generate(self, X, shift_std: Union[float, np.array, list] = 0.1, *, selector=None):
+    def generate(self, X, shift: Union[float, np.array, list] = 0.1, *, selector=None):
         r"""
         Deterministically shift the rows fired by the selector, by exactly
-        ``shift_std`` per column.
+        ``shift`` per column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param shift_std: Shift applied to each column. A single float (applied to all columns)
+        :param shift: Shift applied to each column. A single float (applied to all columns)
                           or an array of floats (one per column). The value is the shift in
                           units of column standard deviation (data are standardized first):
                           a positive entry moves the column up, a negative entry moves it
@@ -149,10 +149,10 @@ class FixedShiftGenerator(DriftGenerator):
                          column (every row is shifted).
         :return: The modified feature matrix `X'`.
         """
-        shift_std = np.asarray(shift_std, dtype=float)
-        if shift_std.ndim == 1 and shift_std.size > 1:
-            assert shift_std.size == X.shape[
-                1], f"shift_std length ({shift_std.size}) must equal number of features in X ({X.shape[1]})"
+        shift = np.asarray(shift, dtype=float)
+        if shift.ndim == 1 and shift.size > 1:
+            assert shift.size == X.shape[
+                1], f"shift length ({shift.size}) must equal number of features in X ({X.shape[1]})"
         if selector is None:
             # the relevant default: shift every row of every column
             selector = AlwaysSelector(columns=range(X.shape[1]))
@@ -160,15 +160,15 @@ class FixedShiftGenerator(DriftGenerator):
         scaler = StandardScaler()
         scaler.fit(X)
         Xt = scaler.transform(X)
-        # exact shift per column: |shift_std| magnitude, sign(shift_std) direction
-        shift = np.broadcast_to(shift_std, (X.shape[1],))
+        # exact shift per column: |shift| magnitude, sign(shift) direction
+        shifts = np.broadcast_to(shift, (X.shape[1],))
         # add shift to the FIRED rows only (masks computed on the un-mutated input).
         # Deterministic generator: realizing the selector's specs consumes an
         # rng, but the shift itself draws nothing -- bind a fixed private
         # stream so repeated calls return the same output.
         rng = self.random_generator if self.random_generator is not None else default_rng(0)
         rows = np.flatnonzero(fired(X, selector, rng).any(axis=1))
-        Xt[rows] += shift
+        Xt[rows] += shifts
         # inverse transform
         return scaler.inverse_transform(Xt)
 

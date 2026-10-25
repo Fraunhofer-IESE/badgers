@@ -93,7 +93,7 @@ def test_fixed_shift__selector_none_matches_whole_data_shift(tabular_data):
     """selector=None keeps the backward-compatible behavior: every row shifts."""
     X = np.asarray(tabular_data, dtype=float)
     generator = FixedShiftGenerator()
-    Xt = generator.generate(X.copy(), shift_std=1.0, selector=None)
+    Xt = generator.generate(X.copy(), shift=1.0, selector=None)
     delta = Xt - X
     np.testing.assert_allclose(delta, np.broadcast_to(delta[0], delta.shape), atol=1e-8)
 
@@ -103,7 +103,7 @@ def test_fixed_shift__selector_restricts_shifted_rows(tabular_data):
     X = np.asarray(tabular_data, dtype=float)
     selector = TopQuantileSelector([0], 0, 0.8)
     generator = FixedShiftGenerator()
-    Xt = generator.generate(X.copy(), shift_std=1.0, selector=selector)
+    Xt = generator.generate(X.copy(), shift=1.0, selector=selector)
     fired = selector(X)[0]
     assert fired.any() and not fired.all()
     np.testing.assert_allclose(Xt[~fired], X[~fired], atol=1e-12)
@@ -117,8 +117,8 @@ def test_fixed_shift__deterministic_with_selector(tabular_data):
     """FixedShiftGenerator with a selector stays reproducible."""
     X = np.asarray(tabular_data, dtype=float)
     generator = FixedShiftGenerator()
-    Xt1 = generator.generate(X.copy(), shift_std=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
-    Xt2 = generator.generate(X.copy(), shift_std=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
+    Xt1 = generator.generate(X.copy(), shift=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
+    Xt2 = generator.generate(X.copy(), shift=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
     np.testing.assert_array_equal(Xt1, Xt2)
 
 
@@ -127,9 +127,9 @@ def test_fixed_shift__selector_none_is_relevant_default_selector(tabular_data):
     every column. The explicit and default paths are identical."""
     X = np.asarray(tabular_data, dtype=float)
     generator = FixedShiftGenerator()
-    Xt_none = generator.generate(X.copy(), shift_std=1.0, selector=None)
+    Xt_none = generator.generate(X.copy(), shift=1.0, selector=None)
     Xt_default = generator.generate(
-        X.copy(), shift_std=1.0, selector=AlwaysSelector(range(X.shape[1])))
+        X.copy(), shift=1.0, selector=AlwaysSelector(range(X.shape[1])))
     np.testing.assert_array_equal(Xt_none, Xt_default)
 
 
@@ -309,14 +309,14 @@ def test_random_shift_classes__signed_shift_std_is_direction(tabular_data_labele
 
 
 def test_fixed_shift__deterministic_and_exact(tabular_data):
-    """FixedShiftGenerator shifts each column by exactly shift_std, reproducibly."""
+    """FixedShiftGenerator shifts each column by exactly shift, reproducibly."""
     X = tabular_data
     X_np = np.asarray(X, dtype=float)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
     shift = np.linspace(1.0, -1.0, n_features)
     generator = FixedShiftGenerator()
-    Xt1 = generator.generate(X=X_np.copy(), shift_std=shift)
-    Xt2 = generator.generate(X=X_np.copy(), shift_std=shift)
+    Xt1 = generator.generate(X=X_np.copy(), shift=shift)
+    Xt2 = generator.generate(X=X_np.copy(), shift=shift)
     np.testing.assert_array_equal(Xt1, Xt2)  # deterministic
     delta = Xt1 - X_np
     expected = shift * X_np.std(axis=0, ddof=0)  # StandardScaler uses population std

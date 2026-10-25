@@ -293,10 +293,11 @@ referenceable as R1..R14 in review discussions.
   no draws and keep the old draw-free None path's stream alignment — pinned causal-noise test
   seed updated for the shifted stream. Default-vs-explicit equivalence tests added for all
   three generators plus two fired() contract tests (commit `abb4199`).
-- **R7** `FixedShiftGenerator.generate(X, shift_std)` — `shift_std` names a DETERMINISTIC
-  parameter (the std is just used as the shift); `FixedShiftClassesGenerator.generate(X, shift)`
-  names the same concept differently. Rename to `shift` (breaking; with deprecation shim) or
-  document.
+- **R7** ✅ FIXED (2026-10-25, ruling: "hard rename"): `FixedShiftGenerator.generate`'s
+  deterministic parameter is renamed `shift_std` → `shift`, matching
+  `FixedShiftClassesGenerator.generate(X, shift)` (the random counterparts keep `shift_std`
+  correctly). No deprecation shim — the old kwarg now raises a TypeError like any unknown
+  keyword. All tests and the Drift tutorial updated.
 - **R8** Validation style: bare `assert` (vanishes under `python -O`) in outliers/missingness/
   text/time-series generators (`assert expansion >= 0`, `assert 0 <= percentage_missing <= 1`,
   `assert bins > 0`, ...) vs explicit `raise ValueError` in `AdditiveNoiseGenerator` and
