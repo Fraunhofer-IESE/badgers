@@ -348,6 +348,13 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ### Added
 
+- **New OOD samplers `IndependentHistogramSampler` and `JointHistogramSampler`**
+  (`badgers.core.sampling`, factory names ``"independent_histogram"`` and
+  ``"histogram"``) — per-column and joint low-density histogram sampling,
+  extracted from the outlier generators `IndependentHistogramsGenerator` and
+  `HistogramSamplingGenerator`, which now delegate to them with bit-for-bit
+  identical seeded synthesis and plug into the causal outlier generator as-is
+  (`55502c4`, `caeb0e7`, `9054f30`).
 - **Exact-count selector presets**: ``CountSelector(columns, count, rng)`` —
   exactly ``count`` distinct rows with one shared mask under every target
   (``count > len(X)`` raises); ``ClassCountSelector(columns, class_column,
