@@ -199,30 +199,30 @@ def test_random_shift_classes__explicit_variables(tabular_data_labeled):
     assert np.allclose(Xt[:, 1:], Xc[:, 1:])          # everything else untouched
 
 
-def test_random_shift_classes__explicit_class_column_int(tabular_data_labeled):
-    """class_column as int works even with a selector without a class_column attribute."""
+def test_random_shift_classes__selector_without_class_column_raises(tabular_data_labeled):
+    """The selector owns the class information: a selector that does not
+    expose a class_column (e.g. BernoulliSelector) raises instead of the old
+    "all fired rows are one class" fallback."""
     Xc = np.asarray(tabular_data_labeled)
     selector = BernoulliSelector([0], rate=1.0, rng=default_rng(1))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
-    Xt = generator.generate(Xc.copy(), selector=selector, shift_std=2.0, class_column=Xc.shape[1] - 1)
-    Xt = np.asarray(Xt)
-    assert np.allclose(Xt[:, -1], Xc[:, -1])          # class column untouched
-    assert not np.allclose(Xt[:, :-1], Xc[:, :-1])    # feature columns shifted
+    with pytest.raises(ValueError, match="class_column"):
+        generator.generate(Xc.copy(), selector=selector, shift_std=1.0)
 
 
-def test_random_shift_classes__explicit_class_column_invalid_raises(tabular_data_labeled):
-    """An invalid class_column (a name or an out-of-range position) raises ValueError."""
+def test_random_shift_classes__selector_out_of_range_class_column_raises(tabular_data_labeled):
+    """A selector whose class_column is out of range raises instead of the
+    old one-class fallback."""
     Xc = np.asarray(tabular_data_labeled)
-    selector = BernoulliSelector([0], rate=1.0, rng=default_rng(1))
+    selector = ClassSelector([0], class_column=Xc.shape[1], proportions={0: 1.0}, rng=default_rng(1))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
-    with pytest.raises(ValueError, match="valid column position"):
-        generator.generate(Xc.copy(), selector=selector, shift_std=1.0, class_column="cls")
-    with pytest.raises(ValueError, match="valid column position"):
-        generator.generate(Xc.copy(), selector=selector, shift_std=1.0, class_column=Xc.shape[1])
+    with pytest.raises(ValueError, match="not a valid column position"):
+        generator.generate(Xc.copy(), selector=selector, shift_std=1.0)
 
 
 def test_random_shift_classes__per_class_dict_shift_std(tabular_data_labeled):
-    """Dict shift_std shifts only the listed classes, one draw per class."""
+    """Dict shift_std shifts only the listed classes, one draw per class;
+    a fired class value absent from the dict raises."""
     Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
     classes = np.unique(Xc[:, -1])
@@ -230,11 +230,42 @@ def test_random_shift_classes__per_class_dict_shift_std(tabular_data_labeled):
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
     generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
     shift_std = {classes[0]: 0.5}
-    Xt = generator.generate(Xc.copy(), selector=selector, shift_std=shift_std)
+    with pytest.raises(ValueError, match="no entry for the fired class"):
+        generator.generate(Xc.copy(), selector=selector, shift_std=shift_std)
+    # with an entry for every fired class only the listed class is shifted
+    full = {c: 0.5 if c == classes[0] else 0.0 for c in classes}
+    Xt = generator.generate(Xc.copy(), selector=selector, shift_std=full)
     fired_cls0 = Xc[:, cls_col] == classes[0]
     other = Xc[:, cls_col] != classes[0]
-    assert not np.allclose(Xt[fired_cls0], Xc[fired_cls0])
-    assert np.allclose(Xt[other], Xc[other])
+    assert not np.allclose(np.asarray(Xt)[fired_cls0], Xc[fired_cls0])
+    assert np.allclose(np.asarray(Xt)[other], Xc[other])
+
+
+def test_random_shift_classes__dict_int_keys_float_column(tabular_data_labeled):
+    """Plain-int dict keys work for a float-encoded class column (dtype
+    normalization)."""
+    Xc = np.asarray(tabular_data_labeled)
+    cls_col = Xc.shape[1] - 1
+    classes = np.unique(Xc[:, -1])
+    assert Xc[:, cls_col].dtype == float and set(classes) == {0.0, 1.0, 2.0, 3.0, 4.0}
+    selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
+    generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(Xc.copy(), selector=selector, shift_std={int(c): 0.5 for c in classes})
+    assert not np.allclose(np.asarray(Xt), Xc)
+
+
+def test_random_shift_classes__dict_wrong_kind_keys_raise(tabular_data_labeled):
+    """Keys of a wrong kind (strings for numeric classes) raise instead of
+    silently skipping every class."""
+    Xc = np.asarray(tabular_data_labeled)
+    cls_col = Xc.shape[1] - 1
+    classes = np.unique(Xc[:, -1])
+    selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
+    generator = RandomShiftClassesGenerator(random_generator=default_rng(0))
+    with pytest.raises(ValueError, match="cannot be compared"):
+        generator.generate(
+            Xc.copy(), selector=selector,
+            shift_std={"class_0": 0.5, "class_1": 0.5, "class_2": 0.5, "class_3": 0.5})
 
 
 def test_random_shift_classes__signed_shift_std_is_direction(tabular_data_labeled):
@@ -290,14 +321,55 @@ def test_fixed_shift_classes__deterministic_and_per_class(tabular_data_labeled):
 
 
 def test_fixed_shift_classes__dict_shift_per_class(tabular_data_labeled):
-    """Dict shift applies exact shifts only to the listed classes."""
+    """Dict shift applies exact shifts only to the listed classes; a fired
+    class value absent from the dict raises."""
     Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
     classes = np.unique(Xc[:, -1])
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
     generator = FixedShiftClassesGenerator()
-    Xt = generator.generate(X=Xc.copy(), selector=selector, shift={classes[0]: 1.0})
+    with pytest.raises(ValueError, match="no entry for the fired class"):
+        generator.generate(X=Xc.copy(), selector=selector, shift={classes[0]: 1.0})
+    # with an entry for every fired class only the listed class is shifted
+    Xt = generator.generate(X=Xc.copy(), selector=selector, shift={c: 1.0 if c == classes[0] else 0.0 for c in classes})
     fired = Xc[:, cls_col] == classes[0]
     other = ~fired
     assert not np.allclose(np.asarray(Xt)[fired], Xc[fired])
     assert np.allclose(np.asarray(Xt)[other], Xc[other])
+
+
+def test_fixed_shift_classes__selector_without_class_column_raises(tabular_data_labeled):
+    """The selector owns the class information: a selector that does not
+    expose a class_column raises instead of the old one-class fallback."""
+    Xc = np.asarray(tabular_data_labeled)
+    selector = BernoulliSelector([0], rate=1.0, rng=default_rng(1))
+    generator = FixedShiftClassesGenerator()
+    with pytest.raises(ValueError, match="class_column"):
+        generator.generate(Xc.copy(), selector=selector, shift=1.0)
+
+
+def test_fixed_shift_classes__dict_int_keys_float_column(tabular_data_labeled):
+    """Plain-int dict keys work for a float-encoded class column (dtype
+    normalization)."""
+    Xc = np.asarray(tabular_data_labeled)
+    cls_col = Xc.shape[1] - 1
+    classes = np.unique(Xc[:, -1])
+    assert Xc[:, cls_col].dtype == float and set(classes) == {0.0, 1.0, 2.0, 3.0, 4.0}
+    selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
+    generator = FixedShiftClassesGenerator()
+    Xt = generator.generate(Xc.copy(), selector=selector, shift={int(c): 0.5 for c in classes})
+    assert not np.allclose(np.asarray(Xt), Xc)
+
+
+def test_fixed_shift_classes__dict_wrong_kind_keys_raise(tabular_data_labeled):
+    """Keys of a wrong kind (strings for numeric classes) raise instead of
+    silently skipping every class."""
+    Xc = np.asarray(tabular_data_labeled)
+    cls_col = Xc.shape[1] - 1
+    classes = np.unique(Xc[:, -1])
+    selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
+    generator = FixedShiftClassesGenerator()
+    with pytest.raises(ValueError, match="cannot be compared"):
+        generator.generate(
+            Xc.copy(), selector=selector,
+            shift={"class_0": 0.5, "class_1": 0.5, "class_2": 0.5, "class_3": 0.5})

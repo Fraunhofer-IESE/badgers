@@ -205,21 +205,17 @@ class RandomShiftClassesGenerator(DriftGenerator):
                           sign is the shift direction — a negative entry drifts
                           the class downward. A single float (same magnitude for
                           every class, one independent draw per class) or a dict
-                          ``{class_value: float}``. Fired rows whose class value
-                          is absent from the dict are not shifted.
+                          ``{class_value: float}``. Every class value present
+                          among the fired rows must have an entry (a missing
+                          class value raises ``ValueError``); the keys are
+                          normalized against the class column's dtype, so
+                          plain-int keys work for a float-encoded class column.
         :param variables: Columns to shift, as a list of column positions
                           (ints). Defaults to all columns
                           except the class column — the class column is
                           identification metadata and is never shifted by
                           default (shifting it would move rows away from
                           their class values).
-        :param class_column: The position (int) of the column holding the
-                          class values. The class column groups
-                          the fired rows (one shift per class value) and is
-                          never shifted itself. If omitted, it is recovered
-                          from the selector's ``class_column``; when neither
-                          is available, all fired rows are treated as one
-                          class and every column may be shifted.
         :return: The modified feature matrix `X'`.
         """
         if selector is None:
@@ -231,21 +227,41 @@ class RandomShiftClassesGenerator(DriftGenerator):
         firing = fired(X, selector, self.random_generator).any(axis=1)
         if not firing.any():
             return X
-        # resolve the class column: explicit parameter first, selector sniffing as fallback
-        class_col = class_column
+        # the selector owns the class information: resolve the class column
+        # from the selector's class_column (never a generator parameter)
+        class_col = resolve_class_column(selector, X)
         if class_col is None:
-            class_col = resolve_class_column(selector, X)
-        elif not (isinstance(class_col, (int, np.integer))
-                  and 0 <= class_col < X.shape[1]):
+            # distinguish the two "None" causes: no class_column/column
+            # attribute at all, or an out-of-range position (silent None
+            # from resolve_class_column)
+            col = getattr(selector, "class_column", None)
+            if col is None:
+                col = getattr(selector, "column", None)
+            if col is None:
+                raise ValueError(
+                    "a per-class shift requires a selector exposing "
+                    "class_column (e.g. ClassSelector) to resolve the "
+                    "class column position"
+                )
             raise ValueError(
-                f"class_column {class_col!r} is not a valid column position in X")
-        stds = shift_std if isinstance(shift_std, dict) else None
-        if stds is not None and class_col is None:
-            raise ValueError(
-                "a dict shift_std requires a class column: pass "
-                "class_column (int position) or use a selector "
-                "exposing its class_column"
+                f"the selector's class_column {col} is not a valid column "
+                f"position in X with {X.shape[1]} columns"
             )
+        stds = shift_std if isinstance(shift_std, dict) else None
+        # normalize the dict keys against the class column's dtype (a
+        # plain-int key works for a float-encoded class column and vice
+        # versa; wrong-kind keys, e.g. strings for numeric classes, raise)
+        if stds:
+            keys = list(stds.keys())
+            try:
+                normalized = np.asarray(keys, dtype=X[:, class_col].dtype)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"shift_std keys {keys} cannot be compared "
+                    f"with the class column values (dtype "
+                    f"{X[:, class_col].dtype})"
+                ) from exc
+            stds = dict(zip(normalized, stds.values()))
         # resolve which columns are shifted
         if variables is not None:
             cols = []
@@ -265,18 +281,19 @@ class RandomShiftClassesGenerator(DriftGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
         # one independent shift per class value among the fired rows
-        if class_col is not None:
-            values = np.unique(X[firing, class_col])
-        else:
-            values = np.array([None])
+        values = np.unique(X[firing, class_col])
         for value in values:
             if stds is not None:
                 if value not in stds:
-                    continue
+                    raise ValueError(
+                        f"shift_std has no entry for the fired class "
+                        f"value {value!r} (class column {class_col}); "
+                        f"entries: {sorted(stds)}"
+                    )
                 std = stds[value]
             else:
                 std = shift_std
-            rows = firing if class_col is None else (firing & (X[:, class_col] == value))
+            rows = firing & (X[:, class_col] == value)
             # signed magnitude: |std| is the scale, sign(std) the direction
             shift = self.random_generator.normal(loc=0, scale=abs(std), size=cols.size)
             Xt[np.ix_(rows, cols)] += np.sign(std) * shift
@@ -301,30 +318,28 @@ class FixedShiftClassesGenerator(DriftGenerator):
         super().__init__(random_generator=None)
 
     @preprocess_inputs
-    def generate(self, X, *, selector=None, shift=0.1, variables=None, class_column=None):
+    def generate(self, X, *, selector=None, shift=0.1, variables=None):
         """
         Deterministically shift the rows fired by the selector, one exact
         shift per class value of the class column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
         :param selector: A selector deciding which rows are shifted (required; its masks
-                         are OR-ed to the affected rows).
+                         are OR-ed to the affected rows). The per-class lookup
+                         reads the selector's ``class_column`` to resolve
+                         the class column position.
         :param shift: The exact shift applied to the fired rows of each class, in units of
                       column standard deviation (data are standardized first). A single
                       float (same shift for every class and column), a vector (one entry
                       per shifted column, same for every class), or a dict
-                      ``{class_value: float or vector}`` — fired rows whose class value
-                      is absent from the dict are not shifted.
+                      ``{class_value: float or vector}``. Every class value present
+                      among the fired rows must have an entry (a missing
+                      class value raises ``ValueError``); the keys are
+                      normalized against the class column's dtype, so
+                      plain-int keys work for a float-encoded class column.
         :param variables: Columns to shift, as a list of column positions (ints).
                           Defaults to all columns except the
                           class column.
-        :param class_column: The position (int) of the column holding the class values.
-                             The class column groups the
-                             fired rows (one shift per class value) and is never shifted
-                             itself. If omitted, it is recovered from the selector's
-                             ``class_column``; when neither is available, all fired
-                             rows are treated as one class and every column may be
-                             shifted.
         :return: The modified feature matrix `X'`.
         """
         if selector is None:
@@ -340,21 +355,41 @@ class FixedShiftClassesGenerator(DriftGenerator):
         firing = fired(X, selector, rng).any(axis=1)
         if not firing.any():
             return X
-        # resolve the class column: explicit parameter first, selector sniffing as fallback
-        class_col = class_column
+        # the selector owns the class information: resolve the class column
+        # from the selector's class_column (never a generator parameter)
+        class_col = resolve_class_column(selector, X)
         if class_col is None:
-            class_col = resolve_class_column(selector, X)
-        elif not (isinstance(class_col, (int, np.integer))
-                  and 0 <= class_col < X.shape[1]):
+            # distinguish the two "None" causes: no class_column/column
+            # attribute at all, or an out-of-range position (silent None
+            # from resolve_class_column)
+            col = getattr(selector, "class_column", None)
+            if col is None:
+                col = getattr(selector, "column", None)
+            if col is None:
+                raise ValueError(
+                    "a per-class shift requires a selector exposing "
+                    "class_column (e.g. ClassSelector) to resolve the "
+                    "class column position"
+                )
             raise ValueError(
-                f"class_column {class_col!r} is not a valid column position in X")
-        shifts = shift if isinstance(shift, dict) else None
-        if shifts is not None and class_col is None:
-            raise ValueError(
-                "a dict shift requires a class column: pass "
-                "class_column (int position) or use a selector "
-                "exposing its class_column"
+                f"the selector's class_column {col} is not a valid column "
+                f"position in X with {X.shape[1]} columns"
             )
+        shifts = shift if isinstance(shift, dict) else None
+        # normalize the dict keys against the class column's dtype (a
+        # plain-int key works for a float-encoded class column and vice
+        # versa; wrong-kind keys, e.g. strings for numeric classes, raise)
+        if shifts:
+            keys = list(shifts.keys())
+            try:
+                normalized = np.asarray(keys, dtype=X[:, class_col].dtype)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"shift keys {keys} cannot be compared "
+                    f"with the class column values (dtype "
+                    f"{X[:, class_col].dtype})"
+                ) from exc
+            shifts = dict(zip(normalized, shifts.values()))
         # resolve which columns are shifted
         if variables is not None:
             cols = []
@@ -374,20 +409,21 @@ class FixedShiftClassesGenerator(DriftGenerator):
         scaler.fit(X)
         Xt = scaler.transform(X)
         # one exact shift per class value among the fired rows
-        if class_col is not None:
-            values = np.unique(X[firing, class_col])
-        else:
-            values = np.array([None])
+        values = np.unique(X[firing, class_col])
         for value in values:
             if shifts is not None:
                 if value not in shifts:
-                    continue
+                    raise ValueError(
+                        f"shift has no entry for the fired class "
+                        f"value {value!r} (class column {class_col}); "
+                        f"entries: {sorted(shifts)}"
+                    )
                 shift_value = np.broadcast_to(np.asarray(shifts[value], dtype=float), (cols.size,))
             elif isinstance(shift, np.ndarray) and shift.ndim == 1:
                 shift_value = np.broadcast_to(np.asarray(shift, dtype=float), (cols.size,))
             else:
                 shift_value = np.full(cols.size, float(shift))
-            rows = firing if class_col is None else (firing & (X[:, class_col] == value))
+            rows = firing & (X[:, class_col] == value)
             Xt[np.ix_(rows, cols)] += shift_value
         # inverse transform
         return scaler.inverse_transform(Xt)

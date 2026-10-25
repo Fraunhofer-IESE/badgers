@@ -242,9 +242,13 @@ referenceable as R1..R14 in review discussions.
   `ValueError: could not broadcast input array from shape (n,) into shape (n,2)` (verified;
   the docstring explicitly claims "Can be a single float value or a list of slopes for each
   feature"). With an ARRAY slope the linspace broadcasts fine (the array is inserted on the
-  trailing axis) — the bug is specific to the scalar case. `GlobalAdditiveLinearTrendGenerator`
-  is unaffected (its 1-D offset broadcasts against `X + offset`); check
-  `RandomlySpacedLinearTrends` (already uses per-column slopes arrays) for a similar scalar path.
+  trailing axis) — the bug is specific to the scalar case. WORSE: for SQUARE X (n == n_cols)
+  the scalar path does NOT crash — it silently applies the ramp along COLUMNS instead of rows
+  (each row j gets the constant value ramp[j]; verified). `GlobalAdditiveLinearTrendGenerator`
+  is ALSO affected (verified): scalar slope on (100,2) raises
+  `ValueError: operands could not be broadcast together with shapes (100,2) (100,)`, and on
+  square X it silently applies the ramp along columns. Only the array-slope path is correct
+  in both generators.
   Fix candidate: broadcast the 1-D ramp against `X.shape[1]` (e.g. reshape + `np.ones`, or
   `np.broadcast_to`).
 - **R2** ✅ FIXED (2026-10-25): the capacity guard is now
@@ -265,11 +269,16 @@ referenceable as R1..R14 in review discussions.
 
 ## API inconsistencies (same concept, different spelling)
 
-- **R5** Shared-class generators disagree on knobs:
-  `RandomShiftClassesGenerator.generate(X, selector, shift_std, variables, class_column)` vs
-  `GaussianNoiseClassesGenerator.generate(X, selector, noise_std_per_class)` (no `class_column`
-  resolution helper, no `variables` scope). Per the item-1 open decision above this generator is
-  anyway a candidate for removal/absorption into `AdditiveNoiseGenerator`.
+- **R5** ✅ FIXED (2026-10-25, ruling: "the selector owns the information about the class"):
+  `class_column=` is removed from `RandomShiftClassesGenerator.generate` and
+  `FixedShiftClassesGenerator.generate`; the class column is resolved ONLY from the selector
+  (`resolve_class_column`). A selector that exposes neither `class_column` nor `column` raises
+  (the old "all fired rows treated as one class" fallback is gone), and an out-of-range
+  position raises a clean ValueError — `ClassSelector.__call__` now validates the position
+  itself (the old generator-side check was the only guard; without it the selector crashed
+  with a raw IndexError). Dict knobs follow the R4 contract: a fired class value absent from
+  the dict raises, keys are dtype-normalized, wrong-kind keys raise. Mirror tests added for
+  both generators (commit `eff208b`).
 - **R6** `selector=None` semantics differ per generator: all-rows default (`AdditiveNoiseGenerator`,
   `RandomShiftGenerator`, `FixedShiftGenerator`), silent no-op (`RandomSamplingClassesGenerator`),
   hard error (`RandomSamplingTargetsGenerator`, the `*Classes` drift generators, all causal
@@ -326,3 +335,6 @@ referenceable as R1..R14 in review discussions.
   input list, LeetSpeakGenerator returns a new one); several family base-class docstrings are
   copy-paste from the wrong module (drift base says "add noise", ts `MissingValuesGenerator` says
   "generate point outliers").
+
+
+  # UNIFIY DOCSTINGS!

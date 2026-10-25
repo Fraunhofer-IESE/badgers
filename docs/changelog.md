@@ -556,6 +556,17 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   normalized against the class column's dtype: plain-int keys work for a
   float-encoded class column, and keys of a wrong kind (e.g. strings for
   numeric classes) raise instead of silently disabling the noise.
+- **The per-class drift generators take the class column from the selector
+  (contract change).** ``RandomShiftClassesGenerator`` and
+  ``FixedShiftClassesGenerator`` no longer accept a ``class_column=`` generate
+  argument — the selector owns the class information. The class column is
+  resolved from the selector's ``class_column`` (``ClassSelector``, typical);
+  a selector that exposes no class column and an out-of-range position both
+  raise ``ValueError`` (the previous "all fired rows treated as one class"
+  fallback is gone). The dict ``shift_std``/``shift`` knobs follow the same
+  contract as ``noise_std_per_class``: a fired class value absent from the
+  dict raises (no more silent skip), keys are dtype-normalized (plain-int keys
+  work for a float-encoded class column), wrong-kind keys raise.
 
 ## dev_0_0_14 (released)
 

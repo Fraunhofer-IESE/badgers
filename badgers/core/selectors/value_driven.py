@@ -108,6 +108,10 @@ class ClassSelector:
 
     def __call__(self, X: np.ndarray, targets=None):
         _require_rng(self)
+        if not (0 <= self.class_column < X.shape[1]):
+            raise ValueError(
+                f"the selector's class_column {self.class_column} is not a "
+                f"valid column position in X with {X.shape[1]} columns")
         targets = _resolve_targets(self, X, targets)
         n_rows = X.shape[0]
         col = X[:, self.class_column]
