@@ -45,7 +45,10 @@ so that specifications/requirements can be derived directly from them.
     generator. Note: its per-class `noise_std_per_class` lookup is NOT expressible through a
     selector (a selector decides which rows fire, not the noise magnitude), so a true per-class
     std needs an explicit mechanism (e.g. per-class distribution configs or per-column std).
-  - Decide whether noise generators should expose `get_noise_labels()` like the causal ones.
+  - ~~Decide whether noise generators should expose `get_noise_labels()` like the causal ones.~~
+    DECIDED (2026-10-25, review): the direct generators deliberately report nothing — TODO item 6
+    tracks the uniform getter for every family; adding `get_noise_labels()` now would only add a
+    third convention.
 
 ## 2. MCAR / MAR / MNAR are selection mechanisms — refactor onto selectors
 
@@ -125,16 +128,16 @@ so that specifications/requirements can be derived directly from them.
 
 ## 5. Outliers: refactor around pluggable point-generation objects (core Samplers)
 
-- **Current** ([outliers/](badgers/generators/tabular_data/outliers)): 8 classical generators, each
-  inlining its own out-of-distribution point-generation logic (ZScore, Hypersphere, HyperCube
-  uniform, UniformInstanceAttribute recombination, IndependentHistograms, Histogram dd, KDE
-  LowDensitySampling) plus `StructuredOutlierGenerator` (reduce → sample → inverse-transform
-  wrapper). Meanwhile the CAUSAL outlier generator already delegates to the `Sampler` objects in
-  [badgers/core/sampling.py](badgers/core/sampling.py) — with near-duplicates of the classical
-  logic: `ZScoreSampler` ≈ `ZScoreSamplingGenerator`, `HypersphereSampler` ≈
-  `HypersphereSamplingGenerator`, `UniformOutOfDistributionSampler` ≈ `HyperCubeSampling`
-  (difference: the core one samples strictly BEYOND [min, max], `HyperCubeSampling` samples WITHIN
-  the scaled box, expansion included).
+- **Current** ([outliers/](badgers/generators/tabular_data/outliers)): 8 classical generators.
+  Since the 0.0.15 refactor the three distribution-based ones (`ZScoreSamplingGenerator`,
+  `HypersphereSamplingGenerator`, `HyperCubeSampling`) delegate to the core Samplers in
+  [badgers/core/sampling.py](badgers/core/sampling.py) (logic defined ONCE there, per the
+  acceptance criteria below); `StructuredOutlierGenerator` remains the reduce → sample →
+  inverse-transform composition wrapper. Still inlining their strategies:
+  `UniformInstanceAttributeSampling`/`VarianceInstanceSampling` (instance recombination) and the
+  histogram trio (`IndependentHistogramsGenerator`, `HistogramSamplingGenerator`,
+  `LowDensitySamplingGenerator`) — the KDE and histogram-dimension Sampler implementations listed
+  in the acceptance criteria do not exist yet.
 - **Target**: one outlier generator appending `n_outliers` rows produced by a pluggable core
   Sampler (out-of-distribution point generation); the histogram/KDE/low-density strategies become
   new Sampler implementations in `badgers/core/sampling.py`; `StructuredOutlierGenerator` remains
@@ -156,6 +159,15 @@ so that specifications/requirements can be derived directly from them.
     within-box): one sampler with a flag, or two?
   - Value-level compatibility: must pre-refactor outputs be reproducible bit-for-bit for the same
     seed, or is API compatibility enough?
+- **Implementation status**: partially done (updated 2026-10-25, generator review) — the three
+  distribution-based generators now construct the core Samplers instead of duplicating their math
+  (`fire_and_seed` in [outliers/_firing.py](badgers/generators/tabular_data/outliers/_firing.py)
+  realizes the selector/`n_outliers` count and seeds the anchor rows). Remaining gaps: the
+  histogram/KDE strategies are still generator-local (no core Sampler), the count-resolution
+  helper `_resolve_count_and_targets` in
+  [low_density_sampling.py](badgers/generators/tabular_data/outliers/low_density_sampling.py)
+  duplicates the `fire_and_seed` contract for the selector-keys convention, and the open decisions
+  above are unresolved.
 
 ## 6. All generators must provide a uniform "affected rows" function (ground truth)
 
@@ -208,3 +220,115 @@ so that specifications/requirements can be derived directly from them.
   tested, so the generator can be re-added on top of it — see the
   git history (`docs/tutorials/tabular-data/Edge-Perturbation.ipynb`,
   `badgers/generators/tabular_data/relationship/causal.py`).
+
+# Generator review 2026-10-25 (systematic pass over all 38 generator files)
+
+Findings from reading every generator (tabular, causal, time_series, graph, text)
+and probing the suspected bugs at runtime. Ordered by severity. Item numbers are
+referenceable as R1..R14 in review discussions.
+
+## Bugs (real, reachable)
+
+- **R1** ✅ FIXED (2026-10-25): `AdditiveLinearTrendGenerator.generate` now draws
+  `start = int(...)` and documents the `start=None`/`end=None` semantics (commit
+  `ddc7b8b`); regression test `test_additive_linear_trend__default_start_end` in
+  [test_trends.py](tests/generators/time_series/test_trends.py) asserts the drawn int start
+  (drawn value is unknowable from the output — the ramp's leading 0 lands on the drawn row),
+  the constant positive ramp step, and the final ramp value. Related (separate item R15):
+  the scalar-slope × multi-column broadcast bug in the same slice is NOT fixed by R1.
+- **R15** [trends.py](badgers/generators/time_series/trends.py): `AdditiveLinearTrendGenerator.generate`
+  with a SCALAR `slope` and multi-column `X` crashes: `np.linspace(0, slope * (end - start),
+  end - start)` is 1-D and cannot broadcast into the `(rows, n_cols)` slice assignment →
+  `ValueError: could not broadcast input array from shape (n,) into shape (n,2)` (verified;
+  the docstring explicitly claims "Can be a single float value or a list of slopes for each
+  feature"). With an ARRAY slope the linspace broadcasts fine (the array is inserted on the
+  trailing axis) — the bug is specific to the scalar case. `GlobalAdditiveLinearTrendGenerator`
+  is unaffected (its 1-D offset broadcasts against `X + offset`); check
+  `RandomlySpacedLinearTrends` (already uses per-column slopes arrays) for a similar scalar path.
+  Fix candidate: broadcast the 1-D ramp against `X.shape[1]` (e.g. reshape + `np.ones`, or
+  `np.broadcast_to`).
+- **R2** [utils.py](badgers/generators/time_series/utils.py): `generate_random_patterns_indices`
+  guard `assert (max_width_patterns - 1) * n_patterns < signal_size` is off by one (high is
+  exclusive in `rng.integers`): `n_patterns=2, max=6, signal_size=11` passes the assert but then
+  crashes with `ValueError: high <= 0` (verified). Fix: `assert max_width_patterns * n_patterns
+  <= signal_size`.
+- **R3** [changepoints.py](badgers/generators/time_series/changepoints.py):
+  `RandomChangeInMeanGenerator.generate` draws all changepoint indices from
+  `integers(0.05n, 0.95n)` — duplicates possible (verified: 14 duplicates in 40 draws). Fixes
+  needed: (a) `replace=False` for distinct indices, (b) document the *composition* semantics —
+  currently applied in draw order (earlier `X[idx:] += change` are then re-shifted by later
+  changes), which makes the reported `changepoints` list order-dependent and the "change at idx"
+  not equal to the realized level jump when indices repeat.
+- **R4** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py):
+  `GaussianNoiseClassesGenerator.generate` looks up `noise_std_per_class[value]` with the class
+  value read from `X` while the user's dict keys may have another dtype — the lookup goes through
+  `if value not in noise_std_per_class: continue`, so float/int key mismatches SILENTLY SKIP the
+  class (verified: int column + float keys still applies the std because `3.0 == 3` hashes equal,
+  but a str/np-key mismatch or float columns holding non-representable labels would not — same
+  float/int fragility the drift `*Classes` pair avoids via `resolve_class_column`; see P21/P22
+  probes). Fix: normalize the lookup keys, or route through `resolve_class_column`-style
+  coercion, and raise (not `continue`) when a fired class has no configured std.
+
+## API inconsistencies (same concept, different spelling)
+
+- **R5** Shared-class generators disagree on knobs:
+  `RandomShiftClassesGenerator.generate(X, selector, shift_std, variables, class_column)` vs
+  `GaussianNoiseClassesGenerator.generate(X, selector, noise_std_per_class)` (no `class_column`
+  resolution helper, no `variables` scope). Per the item-1 open decision above this generator is
+  anyway a candidate for removal/absorption into `AdditiveNoiseGenerator`.
+- **R6** `selector=None` semantics differ per generator: all-rows default (`AdditiveNoiseGenerator`,
+  `RandomShiftGenerator`, `FixedShiftGenerator`), silent no-op (`RandomSamplingClassesGenerator`),
+  hard error (`RandomSamplingTargetsGenerator`, the `*Classes` drift generators, all causal
+  generators). Document the three conventions per family, or unify on one.
+- **R7** `FixedShiftGenerator.generate(X, shift_std)` — `shift_std` names a DETERMINISTIC
+  parameter (the std is just used as the shift); `FixedShiftClassesGenerator.generate(X, shift)`
+  names the same concept differently. Rename to `shift` (breaking; with deprecation shim) or
+  document.
+- **R8** Validation style: bare `assert` (vanishes under `python -O`) in outliers/missingness/
+  text/time-series generators (`assert expansion >= 0`, `assert 0 <= percentage_missing <= 1`,
+  `assert bins > 0`, ...) vs explicit `raise ValueError` in `AdditiveNoiseGenerator` and
+  `CausalNoiseGenerator`. Also stale docstrings claiming counts are "capped at len(X)" where the
+  code raises (distribution_sampling x3, low-density trio, `UniformInstanceAttributeSampling`,
+  `HistogramSamplingGenerator`); `instance_sampling.py` still references `UniformInstanceSampling`
+  in a docstring (the class was renamed `UniformInstanceAttributeSampling`).
+- **R9** Ground-truth attribute zoo (superset of TODO item 6): direct families use
+  `<family>_labels_` (`outlier_labels_`, `imbalance_labels_`), the causal base uses
+  `deficit_labels_` while `CausalOutlierPropagationGenerator` additionally keeps its own
+  `outlier_labels_` (two attributes for one concept), missingness has only cell-level
+  `missing_values_indices_`, drift/noise direct generators report nothing, time-series exposes raw
+  lists with five different shapes (`outliers_indices_`, `missing_indices_`, `changepoints`,
+  `patterns_indices_`, `drops_indices_`...), and every causal generator hand-copies an identical
+  `get_*_labels()` getter that only differs in the error message. Item 6's acceptance criteria
+  already prescribe the fix (one labels mixin on the shared base + per-family aliases).
+
+## Refactor opportunities (no behavior change)
+
+- **R10** [drift/drift.py](badgers/generators/tabular_data/drift/drift.py): the Random*/Fixed* and
+  base/Classes variants are near-copies (the Classes pair share ~90% of their body). Item 4's open
+  decision (merge into one generator with a deterministic/random switch) also resolves R5/R7.
+- **R11** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py): the hand-rolled
+  `covered = range(X.shape[1])` fallback carries a "same default as _resolve_targets ... keep in
+  sync" comment — call `_resolve_targets(selector, X, None)` instead of duplicating the default.
+- **R12** [noise/causal.py](badgers/generators/tabular_data/noise/causal.py): causal generator
+  signatures disagree — `CausalNoiseGenerator.generate(selector=None...)` raises at runtime while
+  drift/missingness/outliers declare `selector` as a required parameter; `noise_std` supports
+  dict-by-target only in `CausalNoiseGenerator` (`_param_by_target`) while
+  `CausalAdditiveNoiseGenerator.noise_std` is a plain scalar. Unify (required selector; dict-or-
+  scalar via `_param_by_target` everywhere).
+- **R13** Constructor boilerplate: every generator redefines `__init__` only to re-document and
+  call `super().__init__` — and `default_rng(seed=0)` in the default argument is evaluated ONCE at
+  import, so all instances created without an explicit rng SHARE one Generator object (verified:
+  two `AdditiveNoiseGenerator()` instances advance each other's streams). Latent footgun for
+  users who create several generators and expect independent streams; fix = `None` default +
+  per-instance `default_rng()` (behavior change for anyone relying on the shared stream — needs a
+  changelog note).
+- **R14** Cosmetics: [graph/missingness.py](badgers/generators/graph/missingness.py)
+  raises `NotImplementedError` for non-nx.Graph input (should be `TypeError`);
+  [causal/_base.py](badgers/generators/tabular_data/causal/_base.py) imports `warnings` inside
+  `_column_stds`; [utils.py](badgers/generators/time_series/utils.py) has the typo "thant", a
+  duplicated `:return:` line in `get_patterns_uniform_probability`, and an obscure `for...else`
+  that reads the loop variable after the loop; `MissingAtRandomGenerator` (time_series) is
+  actually MCAR (misnomer); text generators disagree on mutation (SwapLettersGenerator mutates the
+  input list, LeetSpeakGenerator returns a new one); several family base-class docstrings are
+  copy-paste from the wrong module (drift base says "add noise", ts `MissingValuesGenerator` says
+  "generate point outliers").

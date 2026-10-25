@@ -80,7 +80,7 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, slope, start: int, end: int):
+    def generate(self, X, slope, start: int | None = None, end: int | None = None):
         """
         Add a linear trend to a specified segment of the input time-series data.
 
@@ -89,12 +89,15 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
                       for each feature in X.
         :type slope: float or list
         :param start: The starting index of the segment to apply the trend.
+                      When None (default), a starting index is drawn uniformly at random
+                      in the first half of the signal.
         :param end: The ending index of the segment to apply the trend.
+                    When None (default), the trend lasts until the end of the signal.
         :return: The transformed signal Xt (X with the linear trend applied to the specified segment).
         """
         if start is None:
             # when start is not given, it is chosen randomly in the first half of the signal
-            start = self.random_generator.uniform(0, int(0.5 * len(X)))
+            start = int(self.random_generator.uniform(0, int(0.5 * len(X))))
 
         if end is None:
             # when end is not given, the trend will last until the end of the signal

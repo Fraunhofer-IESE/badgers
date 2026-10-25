@@ -527,6 +527,15 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   substantially shortened (the causal part no longer repeats the
   concepts notebook).
 
+### Fixed
+
+- **`AdditiveLinearTrendGenerator` crashes when `start=None` (the default).**
+  The randomly drawn start was a float (`uniform(0, int(0.5 * len(X)))`) and hit
+  numpy slicing → ``TypeError: 'float' object cannot be interpreted as an
+  integer``. The draw is now cast to ``int``; the signature documents
+  ``start=None`` (random start in the first half of the signal) and ``end=None``
+  (trend lasts until the end).
+
 ## dev_0_0_14 (released)
 
 ### Added
