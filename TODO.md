@@ -1,9 +1,3 @@
-# Getting started:
-
-- section 6 shall introduce "SCM" and make it more explicit what hte code is doing (intervenene and sample)
-
-- all links at the end are broken (example: https://fraunhofer-iese.github.io/badgers/tutorials/concepts/tabular-data/Outliers.ipynb shall be https://fraunhofer-iese.github.io/badgers/tutorials/tabular-data/Outliers.ipynb). Maybe move all tutorials (also the ones in docs/dev) to the same folder docs/tutorials and update the links accordingly.
-
 # Refactoring requirements: selector-unification (tabular_data)
 
 Context: a **selector** (`badgers.core.selectors`: `X -> {variable: bool-mask | float score}`,
@@ -224,103 +218,9 @@ so that specifications/requirements can be derived directly from them.
 # Generator review 2026-10-25 (systematic pass over all 38 generator files)
 
 Findings from reading every generator (tabular, causal, time_series, graph, text)
-and probing the suspected bugs at runtime. Ordered by severity. Item numbers are
-referenceable as R1..R14 in review discussions.
-
-## Bugs (real, reachable)
-
-- **R1** ✅ FIXED (2026-10-25): `AdditiveLinearTrendGenerator.generate` now draws
-  `start = int(...)` and documents the `start=None`/`end=None` semantics (commit
-  `ddc7b8b`); regression test `test_additive_linear_trend__default_start_end` in
-  [test_trends.py](tests/generators/time_series/test_trends.py) asserts the drawn int start
-  (drawn value is unknowable from the output — the ramp's leading 0 lands on the drawn row),
-  the constant positive ramp step, and the final ramp value. Related (separate item R15):
-  the scalar-slope × multi-column broadcast bug in the same slice is NOT fixed by R1.
-- **R15** [trends.py](badgers/generators/time_series/trends.py): `AdditiveLinearTrendGenerator.generate`
-  with a SCALAR `slope` and multi-column `X` crashes: `np.linspace(0, slope * (end - start),
-  end - start)` is 1-D and cannot broadcast into the `(rows, n_cols)` slice assignment →
-  `ValueError: could not broadcast input array from shape (n,) into shape (n,2)` (verified;
-  the docstring explicitly claims "Can be a single float value or a list of slopes for each
-  feature"). With an ARRAY slope the linspace broadcasts fine (the array is inserted on the
-  trailing axis) — the bug is specific to the scalar case. WORSE: for SQUARE X (n == n_cols)
-  the scalar path does NOT crash — it silently applies the ramp along COLUMNS instead of rows
-  (each row j gets the constant value ramp[j]; verified). `GlobalAdditiveLinearTrendGenerator`
-  is ALSO affected (verified): scalar slope on (100,2) raises
-  `ValueError: operands could not be broadcast together with shapes (100,2) (100,)`, and on
-  square X it silently applies the ramp along columns. Only the array-slope path is correct
-  in both generators.
-  Fix candidate: broadcast the 1-D ramp against `X.shape[1]` (e.g. reshape + `np.ones`, or
-  `np.broadcast_to`).
-- **R2** ✅ FIXED (2026-10-25): the capacity guard is now
-  `max_width_patterns * n_patterns <= signal_size` (commit `3995c79`); regression tests for the
-  exact boundary (works) and the previously-crashing 11-signal call (now raises). Note the guard
-  is a conservative budget for the SEGMENT structure (each segment must hold a full-width
-  pattern), not a tight packing condition.
-- **R3** ✅ FIXED (2026-10-25): indices are drawn DISTINCT (sampling without replacement via
-  `rng.choice(..., replace=False)`) and `changepoints` is reported sorted by index with the
-  documented composition semantics (each reported change IS the realized level jump at that
-  position) (commit `7787279`). Same-seed outputs changed (different draw mechanism).
-- **R4** ✅ FIXED (2026-10-25): every class value present among the fired rows must now have an
-  entry in `noise_std_per_class` (missing → `ValueError`, was silent skip); dict keys are
-  normalized against the class column's dtype (plain-int keys work for a float-encoded class
-  column; wrong-kind keys, e.g. strings for numeric classes, raise instead of silently
-  disabling the noise) (commit `443daba`). Contract change: the documented-and-tested
-  "absent class = no noise" partial-mapping behavior is gone.
-
-## API inconsistencies (same concept, different spelling)
-
-- **R5** ✅ FIXED (2026-10-25, ruling: "the selector owns the information about the class"):
-  `class_column=` is removed from `RandomShiftClassesGenerator.generate` and
-  `FixedShiftClassesGenerator.generate`; the class column is resolved ONLY from the selector
-  (`resolve_class_column`). A selector that exposes neither `class_column` nor `column` raises
-  (the old "all fired rows treated as one class" fallback is gone), and an out-of-range
-  position raises a clean ValueError — `ClassSelector.__call__` now validates the position
-  itself (the old generator-side check was the only guard; without it the selector crashed
-  with a raw IndexError). Dict knobs follow the R4 contract: a fired class value absent from
-  the dict raises, keys are dtype-normalized, wrong-kind keys raise. Mirror tests added for
-  both generators (commit `eff208b`).
-- **R6** ✅ FIXED (2026-10-25, ruling: "option A — default to a relevant selector"):
-  `selector=None` semantics are now uniform per the relevant-default rule. The three all-rows
-  generators (`AdditiveNoiseGenerator`, `RandomShiftGenerator`, `FixedShiftGenerator`)
-  substitute the documented default `AlwaysSelector(columns=range(X.shape[1]))` — the
-  ad-hoc early-return/fallback paths are gone. Where no relevant default exists, `None`
-  still raises with a per-site rationale (per-class drift/noise generators: the selector owns
-  the class column per R5; causal generators: the selector owns the user's intervention
-  targets; `RandomSamplingTargetsGenerator`: resampling needs the user's deficit scores);
-  `RandomSamplingClassesGenerator` keeps its documented no-op ("fires nowhere"). Supporting
-  change in `fired()`: constant scalar specs (exactly 0.0/1.0) are realized WITHOUT a rng
-  draw (fractional scalars/bool arrays still draw), so the new AlwaysSelector defaults cost
-  no draws and keep the old draw-free None path's stream alignment — pinned causal-noise test
-  seed updated for the shifted stream. Default-vs-explicit equivalence tests added for all
-  three generators plus two fired() contract tests (commit `abb4199`).
-- **R7** ✅ FIXED (2026-10-25, ruling: "hard rename"): `FixedShiftGenerator.generate`'s
-  deterministic parameter is renamed `shift_std` → `shift`, matching
-  `FixedShiftClassesGenerator.generate(X, shift)` (the random counterparts keep `shift_std`
-  correctly). No deprecation shim — the old kwarg now raises a TypeError like any unknown
-  keyword. All tests and the Drift tutorial updated (commit `1a20d83`).
-- **R8** ✅ FIXED (2026-10-25, ruling: "A — full sweep"): all 30 bare parameter-validation
-  `assert` statements in outliers/missingness/text/graph/time-series generators and core utils
-  are now explicit `raise ValueError(...)` with descriptive messages (bare asserts vanish under
-  `python -O`, so validation silently disappeared there). Contract change: AssertionError →
-  ValueError at these sites; the 8 tests pinning the old type were rewritten. The stale
-  docstrings claiming counts are "capped at len(X)" where the code actually raises (also wrong
-  for the internal CountSelector fallback) were corrected to "must not exceed len(X) (a larger
-  count raises)" — distribution_sampling x3, low-density trio x3 + `_resolve_count_and_targets`,
-  instance_sampling. The `UniformInstanceSampling` docstring reference was already resolved
-  (only `UniformInstanceAttributeSampling` exists). (commit `2ac0651`)
-- **R9** ✅ FIXED (2026-10-25, ruling: "A — DRY"): the five hand-copied
-  `get_*_labels()` getters (drift, missingness, imbalance, noise x2) now delegate to one shared
-  `CausalGeneratorBase._get_deficit_labels()` in [causal/_base.py](badgers/generators/tabular_data/causal/_base.py);
-  the per-family public getters keep their docstrings and return values, and the error message
-  comes from the (previously unused) `deficit_name` class attribute. `CausalOutlierPropagationGenerator`
-  keeps its own `outlier_labels_` getter (different backing attribute and semantics — appended
-  rows, not deficit rows); unifying it belongs to TODO item 6's labels mixin. (commit `b142d66`)
-- **R15** ✅ FIXED (2026-10-25, ruling: "A — broadcast fix"): a scalar `slope` in
-  `AdditiveLinearTrendGenerator` and `GlobalAdditiveLinearTrendGenerator` is now broadcast so the
-  same per-row ramp is applied to every column of X (matching the array-slope path). Previously a
-  scalar slope crashed on non-square X (`ValueError: could not broadcast ... (n,) into (n,2)`)
-  and silently applied the ramp along COLUMNS on square X (n == n_cols). Array-slope outputs are
-  unchanged; regression tests pin the fixed behavior (commit `b142d66`).
+and probing the suspected bugs at runtime. The bugs and API inconsistencies found
+(R1–R9, R15) are all fixed; details and commit hashes are recorded in
+[docs/changelog.md](docs/changelog.md). Remaining refactor opportunities below.
 
 ## Refactor opportunities (no behavior change)
 
@@ -353,6 +253,3 @@ referenceable as R1..R14 in review discussions.
   input list, LeetSpeakGenerator returns a new one); several family base-class docstrings are
   copy-paste from the wrong module (drift base says "add noise", ts `MissingValuesGenerator` says
   "generate point outliers").
-
-
-  # UNIFIY DOCSTINGS!
