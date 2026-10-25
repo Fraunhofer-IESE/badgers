@@ -739,6 +739,22 @@ class TestBaseContract:
         # selector=None consumes NO rng draws: the next draws match a fresh generator
         np.testing.assert_array_equal(rng.random(5), default_rng(0).random(5))
 
+    def test_fired_constant_specs_without_rng_draws(self):
+        """Scalar 0.0/1.0 specs are constant decisions: deterministic, no
+        draw consumed (the AlwaysSelector default costs nothing)."""
+        rng = default_rng(0)
+        field = fired(np.zeros((3, 2)), AlwaysSelector([0, 1]), rng)
+        assert field.all()
+        np.testing.assert_array_equal(rng.random(5), default_rng(0).random(5))
+
+    def test_fired_fractional_scalar_spec_still_draws(self):
+        """A fractional scalar spec is a probability: the realization draw
+        is consumed (stream moves)."""
+        rng = default_rng(0)
+        field = fired(np.zeros((1000, 1)), lambda X, targets=None: {0: 0.5}, rng)
+        assert 0.2 < field[:, 0].mean() < 0.8
+        assert not np.array_equal(rng.random(5), default_rng(0).random(5))
+
     def test_fired_narrow_field_only_covers_selector_scope(self):
         X = np.zeros((4, 3))
         field = fired(X, lambda X, targets=None: {1: 1.0}, default_rng(0))

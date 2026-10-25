@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import scipy.stats
 
-from badgers.core.selectors import BernoulliSelector, ClassSelector, TopQuantileSelector
+from badgers.core.selectors import AlwaysSelector, BernoulliSelector, ClassSelector, TopQuantileSelector
 from badgers.generators.tabular_data.noise.noise import AdditiveNoiseGenerator
 
 
@@ -84,6 +84,19 @@ def test_generate__selector_none_matches_whole_data_noise(gen):
     Xt = gen.generate(X, distribution=scipy.stats.norm(scale=0.5), selector=None)
     assert Xt.shape == X.shape
     assert np.std(Xt - X) == pytest.approx(0.5, rel=0.2)
+
+
+def test_generate__selector_none_is_relevant_default_selector():
+    """selector=None IS a relevant default selector: AlwaysSelector over
+    every column. The explicit and default paths are identical."""
+    X = _simple_data(np.random.default_rng(0))
+    g1 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
+    g2 = AdditiveNoiseGenerator(random_generator=np.random.default_rng(0))
+    Xt_none = g1.generate(X.copy(), distribution=scipy.stats.norm(scale=0.5), selector=None)
+    Xt_default = g2.generate(
+        X.copy(), distribution=scipy.stats.norm(scale=0.5),
+        selector=AlwaysSelector(range(X.shape[1])))
+    np.testing.assert_array_equal(Xt_none, Xt_default)
 
 
 def test_generate__selector_restricts_noisy_rows(gen):

@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired, resolve_class_column
+from badgers.core.selectors import AlwaysSelector, fired, resolve_class_column
 
 
 class NoiseGenerator(GeneratorMixin):
@@ -66,8 +66,9 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
                          the class column (typical), or any selector whose
                          masks OR to the fired rows. The per-class lookup
                          reads the selector's ``class_column`` to resolve
-                         the class column position. Required (a per-class
-                         rule has no class-free default).
+                         the class column position. Required (``None``
+                         raises -- a per-class rule has no relevant
+                         default: the selector owns the class column).
         :param noise_std_per_class: A dictionary mapping class values to the
             noise standard deviation for that class. Every class value
             present among the fired rows must have an entry (a missing
@@ -185,8 +186,9 @@ class AdditiveNoiseGenerator(NoiseGenerator):
             (``AlwaysSelector``, ``BernoulliSelector``,
             ``ExactCountSelector``, ``TopQuantileSelector``,
             ``ClassSelector``, ``ProportionalSelector``, or any callable
-            returning ``dict[int, spec]``). ``None`` = every row in every
-            column receives noise (backward compatible).
+            returning ``dict[int, spec]``). ``None`` = the relevant
+            default selector ``AlwaysSelector`` over every column (noise
+            everywhere).
         :return: The noisy input features.
         """
         rvs = getattr(distribution, "rvs", None)
@@ -204,8 +206,8 @@ class AdditiveNoiseGenerator(NoiseGenerator):
         noise = rvs(size=X.shape, random_state=self.random_generator) * noise_std
 
         if selector is None:
-            # All rows, all columns (backward-compatible default)
-            return X + noise
+            # the relevant default: noise on every cell
+            selector = AlwaysSelector(columns=range(X.shape[1]))
 
         # Realized firing per the selector's own column scope; cells not
         # fired (or in columns the selector does not cover) get no noise.

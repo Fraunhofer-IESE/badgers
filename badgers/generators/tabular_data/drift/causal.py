@@ -38,7 +38,9 @@ class CausalDriftGenerator(CausalGenerator):
     generate() parameters (passed via **params)
     ----------
     selector : Selector
-        Row-selection rule from ``badgers.core.selectors`` (REQUIRED).
+        Row-selection rule from ``badgers.core.selectors`` (REQUIRED;
+        ``None`` raises -- there is no relevant default: the selector
+        owns the intervention targets).
         ``AlwaysSelector``, ``BernoulliSelector``, ``ExactCountSelector``,
         ``TopQuantileSelector``, or any callable with the same signature.
         Its ``columns`` are the intervention targets; the rows it fires

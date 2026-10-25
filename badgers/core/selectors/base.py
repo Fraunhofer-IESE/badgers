@@ -134,7 +134,9 @@ def fired(X, selector, rng):
 
     Single realization rule (shared with every consumer):
     ``rng.random(n) < spec``; the mask is decided against the UN-mutated
-    input.
+    input. Constant decisions (a scalar spec of exactly ``0.0`` or
+    ``1.0``) are deterministic and realized WITHOUT consuming rng draws,
+    so default selectors built on ``AlwaysSelector`` cost no draws.
     """
     n_rows, n_cols = X.shape
     if selector is None:
@@ -150,7 +152,12 @@ def fired(X, selector, rng):
         if col in out:
             spec = out[col]
             _check_spec(spec, n_rows)
-            field[:, i] = rng.random(n_rows) < np.broadcast_to(spec, (n_rows,))
+            spec = np.asarray(spec)
+            if spec.ndim == 0 and float(spec) in (0.0, 1.0):
+                # constant decision: deterministic, no rng draw consumed
+                field[:, i] = float(spec)
+            else:
+                field[:, i] = rng.random(n_rows) < np.broadcast_to(spec, (n_rows,))
     return field
 
 

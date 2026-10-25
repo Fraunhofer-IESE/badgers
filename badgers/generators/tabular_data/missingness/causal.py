@@ -33,7 +33,9 @@ class CausalMissingnessGenerator(CausalGenerator):
     generate() parameters (passed via **params)
     ----------
     selector : Selector
-        Row-selection rule from ``badgers.core.selectors`` (REQUIRED).
+        Row-selection rule from ``badgers.core.selectors`` (REQUIRED;
+        ``None`` raises -- there is no relevant default: the selector
+        owns the missingness targets).
         ``BernoulliSelector`` = MCAR, ``TopQuantileSelector`` with
         ``driver`` = MAR, self mode = MNAR, ``ExactCountSelector``,
         ``AlwaysSelector``, or any callable with the same signature.

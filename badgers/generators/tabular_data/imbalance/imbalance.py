@@ -82,8 +82,9 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
         :type X: Union[pandas.DataFrame, numpy.ndarray]
         :param selector: A selector (e.g.
                          :class:`badgers.core.selectors.ClassSelector`)
-                         deciding which rows are dropped. ``None`` =
-                         no-op (all rows kept). The class variable is a
+                         deciding which rows are dropped. ``None`` = the
+                         relevant default: a selector that fires nowhere
+                         (no rows dropped). The class variable is a
                          column of ``X`` (read from the selector's
                          ``class_column``).
         :type selector: callable, optional
@@ -149,7 +150,8 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
             probability proportional to a column), a ``BernoulliSelector``,
             or any callable accepting X and returning ``dict[int, spec]``
             (keys are column positions; the per-row specs are the deficit
-            scores). Required (``None`` raises).
+            scores). Required (``None`` raises -- there is no relevant
+            default: resampling needs the user's deficit scores).
         :param replace: Whether to sample with replacement (default True:
             rows may be duplicated). ``False`` gives a weighted thinning.
         :param size: Number of rows to draw (default: the input row count).

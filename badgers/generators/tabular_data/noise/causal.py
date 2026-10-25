@@ -41,8 +41,10 @@ class CausalNoiseGenerator(CausalGenerator):
     ----------
     selector : Selector
         Row/column selection rule from ``badgers.core.selectors``. Its
-        ``columns`` own the perturbation targets; required (``None`` is
-        rejected). Evaluated on the ORIGINAL (un-expanded) rows.
+        ``columns`` own the perturbation targets; required (``None``
+        raises -- there is no relevant default: the selector owns the
+        perturbation targets). Evaluated on the ORIGINAL (un-expanded)
+        rows.
     n_copies : int, default=1
         Number of noisy copies per seed row (``n -> n * n_copies``).
         ``1`` degenerates to in-place.
@@ -155,8 +157,9 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
     ----------
     selector : Selector
         Row/column selection rule from ``badgers.core.selectors``. Its
-        ``columns`` own the perturbation targets; required (``None`` is
-        rejected).
+        ``columns`` own the perturbation targets; required (``None``
+        raises -- there is no relevant default: the selector owns the
+        perturbation targets).
     distribution : frozen scipy distribution
         Frozen scipy distribution object exposing ``.rvs(size=...,
         random_state=...)`` (e.g. ``scipy.stats.laplace(scale=1)``). Drawn

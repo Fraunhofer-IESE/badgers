@@ -4,7 +4,7 @@ from typing import Union
 import numpy as np
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import fired, resolve_class_column
+from badgers.core.selectors import AlwaysSelector, fired, resolve_class_column
 from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
@@ -77,8 +77,9 @@ class RandomShiftGenerator(DriftGenerator):
                          ``AlwaysSelector`` the scalar ``1.0`` -- value-driven
                          presets ``[0, 1]`` firing specs as ``(n,)`` arrays),
                          realized internally via ``fired`` (row-level
-                         union ``.any(axis=1)``). ``None`` =
-                         every row is shifted (backward compatible).
+                         union ``.any(axis=1)``). ``None`` = the relevant
+                         default selector ``AlwaysSelector`` over every
+                         column (every row is shifted).
         :return: The modified feature matrix `X'`.
         """
         # check that if shift_std is an array, it is of length == X.shape[1]
@@ -86,6 +87,9 @@ class RandomShiftGenerator(DriftGenerator):
         if shift_std.ndim == 1 and shift_std.size > 1:
             assert shift_std.size == X.shape[
                 1], f"shift_std length ({shift_std.size}) must equal number of features in X ({X.shape[1]})"
+        if selector is None:
+            # the relevant default: shift every row of every column
+            selector = AlwaysSelector(columns=range(X.shape[1]))
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
@@ -140,14 +144,18 @@ class FixedShiftGenerator(DriftGenerator):
                          ``AlwaysSelector`` the scalar ``1.0`` -- value-driven
                          presets ``[0, 1]`` firing specs as ``(n,)`` arrays),
                          realized internally via ``fired`` (row-level
-                         union ``.any(axis=1)``). ``None`` =
-                         every row is shifted (backward compatible).
+                         union ``.any(axis=1)``). ``None`` = the relevant
+                         default selector ``AlwaysSelector`` over every
+                         column (every row is shifted).
         :return: The modified feature matrix `X'`.
         """
         shift_std = np.asarray(shift_std, dtype=float)
         if shift_std.ndim == 1 and shift_std.size > 1:
             assert shift_std.size == X.shape[
                 1], f"shift_std length ({shift_std.size}) must equal number of features in X ({X.shape[1]})"
+        if selector is None:
+            # the relevant default: shift every row of every column
+            selector = AlwaysSelector(columns=range(X.shape[1]))
         # normalize X
         scaler = StandardScaler()
         scaler.fit(X)
@@ -197,8 +205,9 @@ class RandomShiftClassesGenerator(DriftGenerator):
                          the class column (typical), or any selector whose
                          masks OR to the fired rows. The per-class lookup
                          reads the selector's ``class_column`` to resolve
-                         the class column position. Required (a per-class
-                         rule has no class-free default).
+                         the class column position. Required (``None``
+                         raises -- a per-class rule has no relevant
+                         default: the selector owns the class column).
         :param shift_std: Standard deviation of the normal distribution from
                           which the shifts are drawn. Entries are SIGNED: the
                           magnitude (``abs``) is the scale of the draw and the
@@ -324,8 +333,11 @@ class FixedShiftClassesGenerator(DriftGenerator):
         shift per class value of the class column.
 
         :param X: Input features, a 2D array-like object (e.g., a Pandas DataFrame or a NumPy array).
-        :param selector: A selector deciding which rows are shifted (required; its masks
-                         are OR-ed to the affected rows). The per-class lookup
+        :param selector: A selector deciding which rows are shifted
+                         (required; ``None`` raises -- a per-class rule has
+                         no relevant default: the selector owns the class
+                         column; its masks are OR-ed to the affected
+                         rows). The per-class lookup
                          reads the selector's ``class_column`` to resolve
                          the class column position.
         :param shift: The exact shift applied to the fired rows of each class, in units of

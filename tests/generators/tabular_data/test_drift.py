@@ -77,6 +77,18 @@ def test_random_shift__always_selector_equals_selector_none(tabular_data):
     np.testing.assert_array_equal(Xt_none, Xt_always)
 
 
+def test_random_shift__selector_none_is_relevant_default_selector(tabular_data):
+    """selector=None IS a relevant default selector: AlwaysSelector over
+    every column. The explicit and default paths are identical."""
+    X = np.asarray(tabular_data, dtype=float)
+    g1 = RandomShiftGenerator(random_generator=default_rng(0))
+    g2 = RandomShiftGenerator(random_generator=default_rng(0))
+    Xt_none = g1.generate(X.copy(), shift_std=0.1, selector=None)
+    Xt_default = g2.generate(
+        X.copy(), shift_std=0.1, selector=AlwaysSelector(range(X.shape[1])))
+    np.testing.assert_array_equal(Xt_none, Xt_default)
+
+
 def test_fixed_shift__selector_none_matches_whole_data_shift(tabular_data):
     """selector=None keeps the backward-compatible behavior: every row shifts."""
     X = np.asarray(tabular_data, dtype=float)
@@ -108,6 +120,17 @@ def test_fixed_shift__deterministic_with_selector(tabular_data):
     Xt1 = generator.generate(X.copy(), shift_std=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
     Xt2 = generator.generate(X.copy(), shift_std=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
     np.testing.assert_array_equal(Xt1, Xt2)
+
+
+def test_fixed_shift__selector_none_is_relevant_default_selector(tabular_data):
+    """selector=None IS a relevant default selector: AlwaysSelector over
+    every column. The explicit and default paths are identical."""
+    X = np.asarray(tabular_data, dtype=float)
+    generator = FixedShiftGenerator()
+    Xt_none = generator.generate(X.copy(), shift_std=1.0, selector=None)
+    Xt_default = generator.generate(
+        X.copy(), shift_std=1.0, selector=AlwaysSelector(range(X.shape[1])))
+    np.testing.assert_array_equal(Xt_none, Xt_default)
 
 
 def test_random_shift__preserves_shape_and_modifies_data(tabular_data):

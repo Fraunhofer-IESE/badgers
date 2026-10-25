@@ -52,7 +52,8 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
     ----------
     selector : Selector
         Row/column selection rule from ``badgers.core.selectors``
-        (REQUIRED: ``None`` is rejected). Its ``columns`` are the
+        (REQUIRED; ``None`` raises -- there is no relevant default: the
+        selector owns the intervention targets). Its ``columns`` are the
         intervention targets of the generated rows; the fired rows of
         ``X`` are the seeds.
     out_of_distribution_sampler : OutOfDistributionSampler or str, default="zscore"
@@ -95,9 +96,10 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
             Input data (the world the outlier rows are seeded from).
         selector : Selector
             Row/column selection rule from ``badgers.core.selectors``
-            (REQUIRED: ``None`` is rejected). Its ``columns`` own the
-            intervention targets; the fired rows of ``X`` are the seeds,
-            so value-driven presets read the original data.
+            (REQUIRED; ``None`` raises -- there is no relevant default:
+            the selector owns the intervention targets). Its ``columns``
+            own the intervention targets; the fired rows of ``X`` are the
+            seeds, so value-driven presets read the original data.
         out_of_distribution_sampler : OutOfDistributionSampler or str, default="zscore"
             Sampling strategy for the pinned target cells.
             A string is resolved via

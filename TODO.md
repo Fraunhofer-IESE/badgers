@@ -279,10 +279,20 @@ referenceable as R1..R14 in review discussions.
   with a raw IndexError). Dict knobs follow the R4 contract: a fired class value absent from
   the dict raises, keys are dtype-normalized, wrong-kind keys raise. Mirror tests added for
   both generators (commit `eff208b`).
-- **R6** `selector=None` semantics differ per generator: all-rows default (`AdditiveNoiseGenerator`,
-  `RandomShiftGenerator`, `FixedShiftGenerator`), silent no-op (`RandomSamplingClassesGenerator`),
-  hard error (`RandomSamplingTargetsGenerator`, the `*Classes` drift generators, all causal
-  generators). Document the three conventions per family, or unify on one.
+- **R6** ✅ FIXED (2026-10-25, ruling: "option A — default to a relevant selector"):
+  `selector=None` semantics are now uniform per the relevant-default rule. The three all-rows
+  generators (`AdditiveNoiseGenerator`, `RandomShiftGenerator`, `FixedShiftGenerator`)
+  substitute the documented default `AlwaysSelector(columns=range(X.shape[1]))` — the
+  ad-hoc early-return/fallback paths are gone. Where no relevant default exists, `None`
+  still raises with a per-site rationale (per-class drift/noise generators: the selector owns
+  the class column per R5; causal generators: the selector owns the user's intervention
+  targets; `RandomSamplingTargetsGenerator`: resampling needs the user's deficit scores);
+  `RandomSamplingClassesGenerator` keeps its documented no-op ("fires nowhere"). Supporting
+  change in `fired()`: constant scalar specs (exactly 0.0/1.0) are realized WITHOUT a rng
+  draw (fractional scalars/bool arrays still draw), so the new AlwaysSelector defaults cost
+  no draws and keep the old draw-free None path's stream alignment — pinned causal-noise test
+  seed updated for the shifted stream. Default-vs-explicit equivalence tests added for all
+  three generators plus two fired() contract tests (commit `ec81a70`).
 - **R7** `FixedShiftGenerator.generate(X, shift_std)` — `shift_std` names a DETERMINISTIC
   parameter (the std is just used as the shift); `FixedShiftClassesGenerator.generate(X, shift)`
   names the same concept differently. Rename to `shift` (breaking; with deprecation shim) or

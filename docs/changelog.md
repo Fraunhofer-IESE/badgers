@@ -567,6 +567,22 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   contract as ``noise_std_per_class``: a fired class value absent from the
   dict raises (no more silent skip), keys are dtype-normalized (plain-int keys
   work for a float-encoded class column), wrong-kind keys raise.
+- **``selector=None`` now means "the relevant default selector" where one
+  exists.** The three all-rows generators — ``AdditiveNoiseGenerator``,
+  ``RandomShiftGenerator`` and ``FixedShiftGenerator`` — substitute
+  ``AlwaysSelector(columns=range(X.shape[1]))`` (noise/shift on every row,
+  the previous implicit behavior, now an explicit documented default).
+  Where no relevant default exists, ``None`` still raises with a rationale:
+  the per-class drift/noise generators need a selector that owns the class
+  column, the causal generators need the user's intervention targets, and
+  ``RandomSamplingTargetsGenerator`` needs the user's deficit scores;
+  ``RandomSamplingClassesGenerator`` keeps its documented no-op ("fires
+  nowhere"). Realization change in ``fired()``: constant scalar specs
+  (exactly ``0.0``/``1.0``) are realized deterministically WITHOUT a
+  ``rng`` draw (fractional scalars and bool arrays still draw). Results
+  per selector are identical, but same-seed downstream draws shift for
+  callers whose selectors produce constant scalar specs (e.g. the new
+  ``AlwaysSelector`` defaults).
 
 ## dev_0_0_14 (released)
 

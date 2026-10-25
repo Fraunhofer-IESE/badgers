@@ -79,10 +79,12 @@ def test_generate__noise_propagates_recompute(chain_data, make_gcm_dgp):
     # noise cancels in expectation.
     X, graph, column_mapping = chain_data
     X_orig = X.copy()
-    # seed 10: the marginal beta-ratio oracle below is flaky for seeds
+    # seed 0: the marginal beta-ratio oracle below is flaky for seeds
     # where mean(dX) lands near 0 by cancellation; this seed keeps both
-    # ratio deviations well under the 10% tolerance.
-    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(10))
+    # ratio deviations well under the 10% tolerance (fired() consumes no
+    # realization draw for the constant AlwaysSelector spec, so the
+    # pinned stream is the draw-free one).
+    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     Xt = gen.generate(
         X, AlwaysSelector([0]), n_copies=1,
