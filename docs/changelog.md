@@ -537,7 +537,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   the select/selected vocabulary in code and docstrings; the outliers
   plumbing module ``_firing.py`` becomes ``_selection.py`` with helpers
   ``select_and_seed`` (was ``fire_and_seed``) and ``iter_selection_groups``
-  (was ``iter_firing_groups``).
+  (was ``iter_firing_groups``). (commit `2621df9`)
 
 ### Documentation
 
