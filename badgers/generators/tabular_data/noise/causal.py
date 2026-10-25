@@ -30,7 +30,7 @@ class CausalNoiseGenerator(CausalGenerator):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (passed via the constructor or use_dgp(); fitted
@@ -69,7 +69,7 @@ class CausalNoiseGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        selector=None,
+        selector,
         n_copies=1,
         noise_std=0.1,
     ):
@@ -142,7 +142,7 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (passed via the constructor or use_dgp(); fitted
@@ -179,7 +179,7 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
     def generate(
         self,
         X,
-        selector=None,
+        selector,
         distribution=None,
         noise_std=1.0,
     ):

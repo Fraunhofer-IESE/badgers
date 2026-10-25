@@ -2,7 +2,6 @@ import abc
 
 import networkx as nx
 import numpy
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 
@@ -12,7 +11,7 @@ class MissingGenerator(GeneratorMixin):
     Base class for missing nodes transformer
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
 
         :param random_generator: A random generator
@@ -32,12 +31,12 @@ class NodesMissingCompletelyAtRandom(MissingGenerator):
     Removes nodes from the graph uniformly at random.
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the missingness generator.
 
         :param random_generator: A NumPy random number generator.
-                               Defaults to a default random number generator seeded with 0.
+                               Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -60,7 +59,7 @@ class NodesMissingCompletelyAtRandom(MissingGenerator):
         if not 0 < percentage_missing < 1:
             raise ValueError(f"percentage_missing must be in (0, 1), got {percentage_missing}")
         if not isinstance(X, nx.Graph):
-            raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
+            raise TypeError('badgers does only support networkx.Graph objects for graphs')
 
         nodes_to_be_removed = self.random_generator.choice(
             X.nodes(),
@@ -79,12 +78,12 @@ class EdgesMissingCompletelyAtRandom(MissingGenerator):
     Removes edges from the graph uniformly at random.
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the missingness generator.
 
         :param random_generator: A NumPy random number generator.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -107,7 +106,7 @@ class EdgesMissingCompletelyAtRandom(MissingGenerator):
         if not 0 < percentage_missing < 1:
             raise ValueError(f"percentage_missing must be in (0, 1), got {percentage_missing}")
         if not isinstance(X, nx.Graph):
-            raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
+            raise TypeError('badgers does only support networkx.Graph objects for graphs')
 
         edges_to_be_removed = self.random_generator.choice(
             X.edges(),

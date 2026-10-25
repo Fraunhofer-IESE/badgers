@@ -2,7 +2,6 @@ import abc
 
 import numpy as np
 from badgers.generators.time_series.utils import generate_random_patterns_indices
-from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
@@ -14,11 +13,11 @@ class NoiseGenerator(GeneratorMixin):
     Base class for transformers that add noise to tabular data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the NoiseGenerator with a specified random generator.
         :param random_generator: An instance of a random number generator from `numpy.random`.
-                                 Default is `default_rng(seed=0)`.
+                                 Required (no default): pass a numpy.random.Generator.
         """
         self.random_generator = random_generator
 
@@ -36,12 +35,12 @@ class NoiseGenerator(GeneratorMixin):
 
 class LocalGaussianNoiseGenerator(NoiseGenerator):
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the LocalGaussianNoiseGenerator with a specified random generator.
 
         :param random_generator: An instance of a random number generator from `numpy.random`.
-                                 Default is `default_rng(seed=0)`.
+                                 Required (no default): pass a numpy.random.Generator.
         """
         super().__init__(random_generator=random_generator)
 
@@ -80,11 +79,11 @@ class LocalGaussianNoiseGenerator(NoiseGenerator):
 
 
 class GlobalGaussianNoiseGenerator(NoiseGenerator):
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the GlobalGaussianNoiseGenerator with a specified random generator.
         :param random_generator: An instance of a random number generator from `numpy.random`.
-                                 Default is `default_rng(seed=0)`.
+                                 Required (no default): pass a numpy.random.Generator.
         """
         super().__init__(random_generator=random_generator)
 

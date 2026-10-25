@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
@@ -14,12 +13,12 @@ class ImbalanceGenerator(GeneratorMixin):
     Base class for transformers that makes tabular data imbalanced
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the ImbalanceGenerator with a specified random number generator.
 
         :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         self.random_generator = random_generator
@@ -61,12 +60,12 @@ class RandomSamplingClassesGenerator(ImbalanceGenerator):
     Randomly samples data points within predefined classes
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), ):
+    def __init__(self, random_generator):
         """
         Initialize the RandomSamplingClassesGenerator with a specified random number generator.
 
         :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -123,12 +122,12 @@ class RandomSamplingTargetsGenerator(ImbalanceGenerator):
     weighted thinning (each row kept at most once).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomSamplingTargetsGenerator with a specified random number generator.
 
         :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)

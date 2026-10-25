@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.base import GeneratorMixin
@@ -14,7 +13,7 @@ class NoiseGenerator(GeneratorMixin):
     Base class for generators that add noise to tabular data.
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the NoiseGenerator with a specified random number generator.
 
@@ -45,7 +44,7 @@ class GaussianNoiseClassesGenerator(NoiseGenerator):
     data is transformed back. The class data lives in a column of ``X``.
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the GaussianNoiseClassesGenerator with a specified random number generator.
 
@@ -154,7 +153,7 @@ class AdditiveNoiseGenerator(NoiseGenerator):
     a global magnitude multiplier on the drawn sample (1.0 = pure raw draw).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the AdditiveNoiseGenerator.
 

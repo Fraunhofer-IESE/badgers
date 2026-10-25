@@ -6,7 +6,7 @@ from badgers.generators.time_series.noise import GlobalGaussianNoiseGenerator, L
 def test_local_gaussian_noise__generates(time_series_sine):
     """LocalGaussianNoiseGenerator preserves shape and modifies data within patterns."""
     X = time_series_sine
-    generator = LocalGaussianNoiseGenerator()
+    generator = LocalGaussianNoiseGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X, noise_std=0.5)
 
     # Shape preserved
@@ -28,7 +28,7 @@ def test_local_gaussian_noise__generates(time_series_sine):
 def test_global_gaussian_noise__generates(time_series_sine):
     """GlobalGaussianNoiseGenerator preserves shape and increases variance."""
     X = time_series_sine
-    generator = GlobalGaussianNoiseGenerator()
+    generator = GlobalGaussianNoiseGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X, noise_std=0.5)
 
     # Shape preserved

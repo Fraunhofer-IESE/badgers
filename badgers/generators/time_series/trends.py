@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.time_series import preprocess_inputs
@@ -13,12 +12,12 @@ class TrendsGenerator(GeneratorMixin):
     Base class for transformers that generate trends in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the TrendsGenerator with a random number generator.
 
         :param random_generator: An instance of a random number generator,
-                                 default is `numpy.random.default_rng(seed=0)`.
+                                 required (no default): pass a numpy.random.Generator.
         """
         self.random_generator = random_generator
 
@@ -39,12 +38,12 @@ class GlobalAdditiveLinearTrendGenerator(TrendsGenerator):
     Add a linear trend to the input time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the GlobalAdditiveLinearTrendGenerator with a random number generator.
 
         :param random_generator: An instance of a random number generator,
-                                 default is `numpy.random.default_rng(seed=0)`.
+                                 required (no default): pass a numpy.random.Generator.
         """
         super().__init__(random_generator=random_generator)
 
@@ -73,12 +72,12 @@ class AdditiveLinearTrendGenerator(TrendsGenerator):
     Add a linear trend to the input time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the AdditiveLinearTrendGenerator with a random number generator.
 
         :param random_generator: An instance of a random number generator,
-                                 default is `numpy.random.default_rng(seed=0)`.
+                                 required (no default): pass a numpy.random.Generator.
         """
         super().__init__(random_generator=random_generator)
 
@@ -128,12 +127,12 @@ class RandomlySpacedLinearTrends(TrendsGenerator):
     Slopes, Tme intervals locations and widths are chosen randomly
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedLinearTrends with a random number generator.
 
         :param random_generator: An instance of a random number generator,
-                                 default is `numpy.random.default_rng(seed=0)`.
+                                 required (no default): pass a numpy.random.Generator.
         """
         super().__init__(random_generator=random_generator)
 

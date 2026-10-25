@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.time_series import preprocess_inputs
@@ -11,7 +10,7 @@ class SeasonsGenerator(GeneratorMixin):
     Base class for transformers that generate seasons in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         :param random_generator: A random number generator instance used for generating random numbers.
         """
@@ -34,7 +33,7 @@ class GlobalAdditiveSinusoidalSeasonGenerator(SeasonsGenerator):
     Add a sinusoidal season to the input time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs

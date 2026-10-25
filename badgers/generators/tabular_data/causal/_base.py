@@ -14,8 +14,9 @@ bridge: generators speak column positions, and ``_node_names``
 translates them back at the intervene boundary.
 """
 
+import warnings
+
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.causal_graph import validate_dag
@@ -28,8 +29,6 @@ def _column_stds(X):
     scale of 1.0 so a drawn offset stays finite -- a NaN-bearing column
     must never silently poison the whole output column (G9b).
     """
-    import warnings
-
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN slice
         std = np.nanstd(X, axis=0)
@@ -63,7 +62,7 @@ class CausalGenerator(GeneratorMixin):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (fitted or unfitted). This is the ONLY structure
@@ -91,10 +90,10 @@ class CausalGenerator(GeneratorMixin):
 
             dgp = GcmSCMDGP(make_gcm_scm(graph, column_mapping)).fit(X)  # fit on clean X
 
-            missingness = CausalMissingnessGenerator(rng=..., dgp=dgp)
+            missingness = CausalMissingnessGenerator(random_generator=..., dgp=dgp)
             Xm = missingness.generate(X, ...)
 
-            drift = CausalDriftGenerator(rng=..., dgp=dgp)  # share
+            drift = CausalDriftGenerator(random_generator=..., dgp=dgp)  # share
             Xt = drift.generate(Xm, ...)
 
         All per-stage scale computations are NaN-safe, so even the lazy
@@ -107,7 +106,7 @@ class CausalGenerator(GeneratorMixin):
     #: Subclasses set this to the deficit name used in labels.
     deficit_name = "causal"
 
-    def __init__(self, random_generator=default_rng(seed=0), dgp=None):
+    def __init__(self, random_generator, dgp=None):
         self.random_generator = random_generator
         self.dgp = dgp
         self.graph = None if dgp is None else dgp.graph

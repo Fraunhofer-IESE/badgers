@@ -323,6 +323,28 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   response_fn, draw_noise=None)` (Q2: an optional noise-law closure).
   Edits return read-only views and never
   mutate the base DGP; they compose by delegation.
+- **Every generator requires an explicit `random_generator` (breaking).**
+  No generator constructor has a random-generator default anymore —
+  `AdditiveNoiseGenerator()` now fails with ``TypeError``; pass one:
+  `AdditiveNoiseGenerator(random_generator=numpy.random.default_rng(0))`.
+  The old `default_rng(seed=0)` default was evaluated ONCE at import
+  time, so all instances constructed without an explicit rng shared ONE
+  Generator object (two generators created without an rng advanced each
+  other's streams). Each generator now owns exactly the stream its user
+  gave it. The two deterministic drift generators
+  (`FixedShiftGenerator`, `FixedShiftClassesGenerator`) take an rng too
+  (realizing the selector's specs consumes one; the shift itself still
+  draws nothing) — repeated calls with the same input return the same
+  output.
+- **Causal generators require the selector as a positional parameter
+  (breaking).** `CausalNoiseGenerator.generate(X, selector, ...)` and
+  `CausalAdditiveNoiseGenerator.generate(X, selector, ...)` no longer
+  default `selector` to ``None``: omitting it is a ``TypeError``, passing
+  ``None`` explicitly raises ``ValueError`` (the selector owns the
+  intervention targets). Same contract as the drift, missingness and
+  outlier causal generators (which already declared it positionally);
+  the one exception is `CausalImbalanceGenerator`'s legacy
+  `selector=None` quantile-range path.
 
 ### Added
 
@@ -616,6 +638,29 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   both noise generators now delegate to one shared helper on the causal base
   (``_get_deficit_labels``); the error message is derived from each
   generator's ``deficit_name``.
+- **``SwapLettersGenerator`` no longer mutates the input list.** The other
+  text generators return a new list, so did this one — the returned list is
+  a copy and the input words are left unchanged (same-seed outputs are
+  identical to before).
+- **Graph missingness generators raise ``TypeError`` for non-`nx.Graph`
+  input** (was ``NotImplementedError`` — nothing is "not implemented yet",
+  the input type is wrong).
+- **Time-series ``MissingAtRandomGenerator`` renamed to
+  ``MissingCompletelyAtRandomGenerator``** (breaking rename, no shim): the
+  generator is MCAR — values are set to NaN uniformly at random, with no
+  dependence on any observed column (the missingness mechanism of the
+  tabular generators is already called ``MissingCompletelyAtRandom``).
+  The benchmark registration is renamed accordingly.
+- **Docstring hygiene sweep.** The drift base-class docstring no longer
+  claims to "add noise" (it shifts data); the time-series
+  ``MissingValuesGenerator`` docstring no longer claims to generate "point
+  outliers" (it generates missing values); the "thant" typo in the
+  two-dimensional-values error message of [utils.py](../..//badgers/generators/time_series/utils.py)
+  is fixed; the obscure ``for...else`` in
+  ``generate_random_patterns_indices`` (its else-body always ran after loop
+  completion and read the leaked loop variable) is restructured to plain
+  code with the same draw order and outputs; the ``import warnings`` inside
+  ``_column_stds`` moved to module top.
 
 ## dev_0_0_14 (released)
 

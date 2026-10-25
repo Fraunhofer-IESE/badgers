@@ -5,20 +5,19 @@ import numpy as np
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.selectors import AlwaysSelector, fired, resolve_class_column
-from numpy.random import default_rng
 from sklearn.preprocessing import StandardScaler
 
 
 class DriftGenerator(GeneratorMixin):
     """
-    Base class for transformers that add noise to tabular data
+    Base class for transformers that shift (drift) tabular data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the drift generator.
         :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         self.random_generator = random_generator
@@ -36,12 +35,12 @@ class RandomShiftGenerator(DriftGenerator):
     The ith columns is simply translated: `$x_i \leftarrow x_i + \epsilon_i$`
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomShiftGenerator.
 
         :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -119,9 +118,15 @@ class FixedShiftGenerator(DriftGenerator):
     so repeated calls with the same input return the same output.
     """
 
-    def __init__(self):
-        """Initialize the FixedShiftGenerator (no random generator needed)."""
-        super().__init__(random_generator=None)
+    def __init__(self, random_generator):
+        """
+        Initialize the FixedShiftGenerator.
+
+        :param random_generator: A NumPy random number generator used to generate
+                                 random numbers.
+        :type random_generator: numpy.random.Generator
+        """
+        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
     def generate(self, X, shift: Union[float, np.array, list] = 0.1, *, selector=None):
@@ -166,9 +171,8 @@ class FixedShiftGenerator(DriftGenerator):
         shifts = np.broadcast_to(shift, (X.shape[1],))
         # add shift to the FIRED rows only (masks computed on the un-mutated input).
         # Deterministic generator: realizing the selector's specs consumes an
-        # rng, but the shift itself draws nothing -- bind a fixed private
-        # stream so repeated calls return the same output.
-        rng = self.random_generator if self.random_generator is not None else default_rng(0)
+        # rng, but the shift itself draws nothing.
+        rng = self.random_generator
         rows = np.flatnonzero(fired(X, selector, rng).any(axis=1))
         Xt[rows] += shifts
         # inverse transform
@@ -185,12 +189,12 @@ class RandomShiftClassesGenerator(DriftGenerator):
     of that class. The class data lives in a column of ``X``.
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomShiftClassesGenerator.
 
         :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -324,9 +328,15 @@ class FixedShiftClassesGenerator(DriftGenerator):
     output.
     """
 
-    def __init__(self):
-        """Initialize the FixedShiftClassesGenerator (no random generator needed)."""
-        super().__init__(random_generator=None)
+    def __init__(self, random_generator):
+        """
+        Initialize the FixedShiftClassesGenerator.
+
+        :param random_generator: A NumPy random number generator used to generate
+                                 random numbers.
+        :type random_generator: numpy.random.Generator
+        """
+        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
     def generate(self, X, *, selector=None, shift=0.1, variables=None):
@@ -363,9 +373,8 @@ class FixedShiftClassesGenerator(DriftGenerator):
                 "column): classes are columns of X."
             )
         # Deterministic generator: realizing the selector's specs consumes an
-        # rng, but the shift itself draws nothing -- bind a fixed private
-        # stream so repeated calls return the same output.
-        rng = self.random_generator if self.random_generator is not None else default_rng(0)
+        # rng, but the shift itself draws nothing.
+        rng = self.random_generator
         firing = fired(X, selector, rng).any(axis=1)
         if not firing.any():
             return X

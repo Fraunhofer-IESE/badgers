@@ -11,7 +11,7 @@ def test_missingness__preserves_shape_and_inserts_nans(tabular_data):
     percentage_missing = 0.1
 
     for cls in MissingValueGenerator.__subclasses__():
-        transformer = cls()
+        transformer = cls(random_generator=np.random.default_rng(0))
         Xt = transformer.generate(X.copy(), percentage_missing=percentage_missing)
         assert Xt.shape[1] == n_features
         assert np.sum(np.isnan(Xt).sum()) == int(percentage_missing * total_cells)

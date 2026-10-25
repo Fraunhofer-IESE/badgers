@@ -27,7 +27,7 @@ class CausalMissingnessGenerator(CausalGenerator):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
 
     generate() parameters (passed via **params)

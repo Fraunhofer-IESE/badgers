@@ -43,7 +43,7 @@ def test_randomly_spaced_patterns__1d_no_overlap():
     n_patterns = 3
     X = np.zeros(shape=100).reshape(-1, 1)
     pattern = Pattern(values=np.array([0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0]))
-    generator = RandomlySpacedPatterns()
+    generator = RandomlySpacedPatterns(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X=X, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
     assert n_patterns == len(generator.patterns_indices_)
     for i in range(n_patterns - 1):
@@ -56,7 +56,7 @@ def test_randomly_spaced_patterns__2d_no_overlap():
     X = np.zeros(shape=(100, 2))
     pattern = Pattern(
         values=np.array([[0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0], [0, -1, -2, -3, -4, -5, -4, -3, -2, -1, 0]]).T)
-    generator = RandomlySpacedPatterns()
+    generator = RandomlySpacedPatterns(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X=X, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
     assert n_patterns == len(generator.patterns_indices_)
     for i in range(n_patterns - 1):
@@ -67,7 +67,7 @@ def test_randomly_spaced_constant_patterns__injects_zeros(time_series_sine):
     """RandomlySpacedConstantPatterns injects constant-zero regions."""
     n_patterns = 3
     X = time_series_sine
-    generator = RandomlySpacedConstantPatterns()
+    generator = RandomlySpacedConstantPatterns(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X=X, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10,
                             constant_value=0)
     assert n_patterns == len(generator.patterns_indices_)
@@ -78,7 +78,7 @@ def test_randomly_spaced_constant_patterns__injects_zeros(time_series_sine):
 def test_randomly_spaced_linear_patterns__interpolates(time_series_sine):
     """RandomlySpacedLinearPatterns linearly interpolates between endpoints."""
     X = time_series_sine
-    generator = RandomlySpacedLinearPatterns()
+    generator = RandomlySpacedLinearPatterns(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X=X, n_patterns=3, min_width_pattern=5, max_width_patterns=10)
     for (start, end) in generator.patterns_indices_:
         for col in range(X.shape[1]):

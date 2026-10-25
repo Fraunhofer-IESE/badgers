@@ -72,7 +72,7 @@ def test_generate__multi_node_intersection(chain_data, make_gcm_dgp):
 
 def test_generate__validation_errors(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
-    gen = CausalImbalanceGenerator()
+    gen = CausalImbalanceGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, perturbation_nodes=["X"])
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))

@@ -168,7 +168,7 @@ def test_generate__unfitted_dgp_is_fitted_lazily(chain_data, make_gcm_dgp):
 
 def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalDriftGenerator()
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, selector=AlwaysSelector([0]))
 

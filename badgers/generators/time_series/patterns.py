@@ -2,7 +2,6 @@ import abc
 from typing import Union
 
 import numpy as np
-from numpy.random import default_rng
 from scipy.interpolate import CubicSpline
 
 from badgers.core.base import GeneratorMixin
@@ -57,7 +56,7 @@ class Pattern:
             values = values.reshape(-1, 1)
         if values.ndim > 2:
             raise ValueError(
-                "Values has more thant 2 dimensions where it is expected to have either 1 or 2!"
+                "Values have more than 2 dimensions where 1 or 2 are expected!"
             )
         self.values = values
         self.interpolation_function = CubicSpline(np.linspace(0, 1, values.shape[0]), values, bc_type='natural')
@@ -71,7 +70,7 @@ class PatternsGenerator(GeneratorMixin):
     Base class for transformers that generate patterns in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the PatternsGenerator with a random number generator.
 
@@ -133,7 +132,7 @@ class RandomlySpacedPatterns(PatternsGenerator):
     Inject given patterns with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedPatterns with a random number generator.
 
@@ -176,7 +175,7 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
     Generates constant patterns of constant value with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedConstantPatterns with a random number generator.
 
@@ -217,7 +216,7 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
     Generates patterns of constant slope (linear) with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedLinearPatterns with a random number generator.
 

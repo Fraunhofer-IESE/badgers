@@ -40,7 +40,7 @@ class CausalOutlierPropagationGenerator(CausalGenerator):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (fitted or unfitted) carrying the graph and

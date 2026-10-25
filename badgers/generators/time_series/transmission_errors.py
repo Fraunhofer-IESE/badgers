@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.time_series import preprocess_inputs
@@ -15,11 +14,11 @@ class TransmissionErrorGenerator(GeneratorMixin):
     Transmission errors are errors that includes values dropped, delay, switching values over time...
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the TransmissionErrorGenerator with a specified random number generator.
 
-        :param random_generator: A random number generator instance (default is a NumPy random generator seeded with 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         self.random_generator = random_generator
 
@@ -42,11 +41,11 @@ class RandomTimeSwitchGenerator(TransmissionErrorGenerator):
                  x'(t) = {x(0), x(1), x(2), ..., x(t+1), x(t), ..., x(n)}
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the RandomTimeSwitchGenerator with a specified random number generator.
 
-        :param random_generator: A random number generator instance (default is a NumPy random generator seeded with 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         super().__init__(random_generator=random_generator)
         self.switch_indices_ = None
@@ -84,11 +83,11 @@ class RandomRepeatGenerator(TransmissionErrorGenerator):
     This simulates a delay in transmission where several values are repeated over time
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the RandomRepeatGenerator with a specified random number generator.
 
-        :param random_generator: A random number generator instance (default is a NumPy random generator seeded with 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         super().__init__(random_generator=random_generator)
         self.repeats_ = None  # to store the indices of the repeats (from the original X) and the length of the repeat
@@ -140,11 +139,11 @@ class RandomDropGenerator(TransmissionErrorGenerator):
     This simulates a problem in transmission where several values are randomly dropped
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the RandomDropGenerator with a specified random number generator.
 
-        :param random_generator: A random number generator instance (default is a NumPy random generator seeded with 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         super().__init__(random_generator=random_generator)
         self.drops_indices_ = None  # to store the indices of the drops
@@ -178,11 +177,11 @@ class LocalRegionsRandomDropGenerator(TransmissionErrorGenerator):
     This simulates a problem in transmission where several values are randomly dropped at specific time intervals (time regions)
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the LocalRegionsRandomDropGenerator with a specified random number generator.
 
-        :param random_generator: A random number generator instance (default is a NumPy random generator seeded with 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         super().__init__(random_generator=random_generator)
         self.drops_indices_ = None  # to store the indices of the drops
@@ -232,11 +231,11 @@ class LocalRegionsRandomRepeatGenerator(TransmissionErrorGenerator):
     This simulates a delay in transmission where several values are repeated over time (in certain time intervals)
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the LocalRegionsRandomRepeatGenerator with a specified random number generator.
 
-        :param random_generator: A random number generator instance (default is a NumPy random generator seeded with 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         super().__init__(random_generator=random_generator)
         self.repeats_ = None  # to store the indices of the repeats (from the original X) and the length of the repeat

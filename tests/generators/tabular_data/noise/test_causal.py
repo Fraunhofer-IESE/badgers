@@ -127,14 +127,18 @@ def test_generate__noise_per_column(chain_data, make_gcm_dgp):
 
 def test_generate__validation_errors(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
-    gen = CausalNoiseGenerator()
+    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, AlwaysSelector([0]))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="n_copies"):
         gen.generate(X, AlwaysSelector([0]), n_copies=0)
-    with pytest.raises(ValueError, match="selector is required"):
+    # the selector is a required positional parameter: omitting it is a
+    # TypeError, passing None explicitly hits the guard (ValueError)
+    with pytest.raises(TypeError):
         gen.generate(X)
+    with pytest.raises(ValueError, match="selector is required"):
+        gen.generate(X, None)
 
 
 def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):

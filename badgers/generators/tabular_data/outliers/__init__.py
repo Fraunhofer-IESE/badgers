@@ -2,7 +2,6 @@ import abc
 
 import numpy as np
 import sklearn.base
-from numpy.random import default_rng
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -20,11 +19,11 @@ class OutliersGenerator(GeneratorMixin):
     row is an outlier (the deficit), ``False`` for an original row.
     """
 
-    def __init__(self, random_generator: np.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the OutliersGenerator with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         self.random_generator = random_generator
         self.outlier_labels_: np.ndarray | None = None

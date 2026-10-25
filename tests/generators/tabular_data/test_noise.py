@@ -23,7 +23,7 @@ def test_gaussian_noise_classes__preserves_shape(tabular_data_labeled):
     y = Xc[:, -1]
     selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.1 for label in np.unique(y)}
-    generator = GaussianNoiseClassesGenerator()
+    generator = GaussianNoiseClassesGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, noise_std_per_class=noise_std_per_class)
     assert len(Xc) == len(Xt)
 
@@ -34,7 +34,7 @@ def test_gaussian_noise_classes__modifies_data(tabular_data_labeled):
     y = Xc[:, -1]
     selector, Xc = _selector(y)
     noise_std_per_class = {label: 0.5 for label in np.unique(y)}
-    generator = GaussianNoiseClassesGenerator()
+    generator = GaussianNoiseClassesGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, noise_std_per_class=noise_std_per_class)
     assert not np.allclose(Xt, Xc)
 
@@ -90,6 +90,6 @@ def test_gaussian_noise_classes__wrong_kind_keys_raise(tabular_data_labeled):
 
 def test_gaussian_noise_classes__selector_none_raises(tabular_data_labeled):
     Xc = np.asarray(tabular_data_labeled)
-    generator = GaussianNoiseClassesGenerator()
+    generator = GaussianNoiseClassesGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(ValueError, match="selector"):
         generator.generate(Xc.copy(), noise_std_per_class={0: 0.1})

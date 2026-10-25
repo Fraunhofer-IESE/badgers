@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.sampling import (
@@ -28,11 +27,11 @@ class HyperCubeSampling(OutliersGenerator):
         https://doi.org/10.1145/3447822
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the HyperCubeSampling with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         super().__init__(random_generator)
 
@@ -117,11 +116,11 @@ class ZScoreSamplingGenerator(OutliersGenerator):
         https://doi.org/10.1145/3447822
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the ZScoreSamplingGenerator with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         super().__init__(random_generator)
 
@@ -194,11 +193,11 @@ class HypersphereSamplingGenerator(OutliersGenerator):
         https://doi.org/10.1145/3447822
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the HypersphereSamplingGenerator with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         super().__init__(random_generator)
 

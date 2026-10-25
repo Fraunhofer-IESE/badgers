@@ -378,10 +378,10 @@ def test_decomposition_and_outlier__generates_correct_shape():
     X = make_blobs(centers=5, n_features=10, n_samples=100)[0]
     n_outliers = 10
     outlier_generators = [
-        ZScoreSamplingGenerator(),
-        HistogramSamplingGenerator(),
-        HypersphereSamplingGenerator(),
-        LowDensitySamplingGenerator(),
+        ZScoreSamplingGenerator(random_generator=np.random.default_rng(0)),
+        HistogramSamplingGenerator(random_generator=np.random.default_rng(0)),
+        HypersphereSamplingGenerator(random_generator=np.random.default_rng(0)),
+        LowDensitySamplingGenerator(random_generator=np.random.default_rng(0)),
     ]
     for outlier_generator in outlier_generators:
         generator = StructuredOutlierGenerator(

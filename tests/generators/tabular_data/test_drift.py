@@ -92,7 +92,7 @@ def test_random_shift__selector_none_is_relevant_default_selector(tabular_data):
 def test_fixed_shift__selector_none_matches_whole_data_shift(tabular_data):
     """selector=None keeps the backward-compatible behavior: every row shifts."""
     X = np.asarray(tabular_data, dtype=float)
-    generator = FixedShiftGenerator()
+    generator = FixedShiftGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X.copy(), shift=1.0, selector=None)
     delta = Xt - X
     np.testing.assert_allclose(delta, np.broadcast_to(delta[0], delta.shape), atol=1e-8)
@@ -102,7 +102,7 @@ def test_fixed_shift__selector_restricts_shifted_rows(tabular_data):
     """Only the rows fired by the selector receive the exact shift."""
     X = np.asarray(tabular_data, dtype=float)
     selector = TopQuantileSelector([0], 0, 0.8)
-    generator = FixedShiftGenerator()
+    generator = FixedShiftGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(X.copy(), shift=1.0, selector=selector)
     fired = selector(X)[0]
     assert fired.any() and not fired.all()
@@ -116,7 +116,7 @@ def test_fixed_shift__selector_restricts_shifted_rows(tabular_data):
 def test_fixed_shift__deterministic_with_selector(tabular_data):
     """FixedShiftGenerator with a selector stays reproducible."""
     X = np.asarray(tabular_data, dtype=float)
-    generator = FixedShiftGenerator()
+    generator = FixedShiftGenerator(random_generator=np.random.default_rng(0))
     Xt1 = generator.generate(X.copy(), shift=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
     Xt2 = generator.generate(X.copy(), shift=1.0, selector=BernoulliSelector([0], rate=0.5, rng=default_rng(1)))
     np.testing.assert_array_equal(Xt1, Xt2)
@@ -126,7 +126,7 @@ def test_fixed_shift__selector_none_is_relevant_default_selector(tabular_data):
     """selector=None IS a relevant default selector: AlwaysSelector over
     every column. The explicit and default paths are identical."""
     X = np.asarray(tabular_data, dtype=float)
-    generator = FixedShiftGenerator()
+    generator = FixedShiftGenerator(random_generator=np.random.default_rng(0))
     Xt_none = generator.generate(X.copy(), shift=1.0, selector=None)
     Xt_default = generator.generate(
         X.copy(), shift=1.0, selector=AlwaysSelector(range(X.shape[1])))
@@ -314,7 +314,7 @@ def test_fixed_shift__deterministic_and_exact(tabular_data):
     X_np = np.asarray(X, dtype=float)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
     shift = np.linspace(1.0, -1.0, n_features)
-    generator = FixedShiftGenerator()
+    generator = FixedShiftGenerator(random_generator=np.random.default_rng(0))
     Xt1 = generator.generate(X=X_np.copy(), shift=shift)
     Xt2 = generator.generate(X=X_np.copy(), shift=shift)
     np.testing.assert_array_equal(Xt1, Xt2)  # deterministic
@@ -328,7 +328,7 @@ def test_fixed_shift_classes__deterministic_and_per_class(tabular_data_labeled):
     Xc = np.asarray(tabular_data_labeled)
     cls_col = Xc.shape[1] - 1
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in np.unique(Xc[:, -1])}, rng=default_rng(0))
-    generator = FixedShiftClassesGenerator()
+    generator = FixedShiftClassesGenerator(random_generator=np.random.default_rng(0))
     Xt1 = generator.generate(X=Xc.copy(), selector=selector, shift=1.0)
     Xt2 = generator.generate(X=Xc.copy(), selector=selector, shift=1.0)
     np.testing.assert_array_equal(Xt1, Xt2)  # deterministic
@@ -350,7 +350,7 @@ def test_fixed_shift_classes__dict_shift_per_class(tabular_data_labeled):
     cls_col = Xc.shape[1] - 1
     classes = np.unique(Xc[:, -1])
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
-    generator = FixedShiftClassesGenerator()
+    generator = FixedShiftClassesGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(ValueError, match="no entry for the fired class"):
         generator.generate(X=Xc.copy(), selector=selector, shift={classes[0]: 1.0})
     # with an entry for every fired class only the listed class is shifted
@@ -366,7 +366,7 @@ def test_fixed_shift_classes__selector_without_class_column_raises(tabular_data_
     expose a class_column raises instead of the old one-class fallback."""
     Xc = np.asarray(tabular_data_labeled)
     selector = BernoulliSelector([0], rate=1.0, rng=default_rng(1))
-    generator = FixedShiftClassesGenerator()
+    generator = FixedShiftClassesGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(ValueError, match="class_column"):
         generator.generate(Xc.copy(), selector=selector, shift=1.0)
 
@@ -379,7 +379,7 @@ def test_fixed_shift_classes__dict_int_keys_float_column(tabular_data_labeled):
     classes = np.unique(Xc[:, -1])
     assert Xc[:, cls_col].dtype == float and set(classes) == {0.0, 1.0, 2.0, 3.0, 4.0}
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
-    generator = FixedShiftClassesGenerator()
+    generator = FixedShiftClassesGenerator(random_generator=np.random.default_rng(0))
     Xt = generator.generate(Xc.copy(), selector=selector, shift={int(c): 0.5 for c in classes})
     assert not np.allclose(np.asarray(Xt), Xc)
 
@@ -391,7 +391,7 @@ def test_fixed_shift_classes__dict_wrong_kind_keys_raise(tabular_data_labeled):
     cls_col = Xc.shape[1] - 1
     classes = np.unique(Xc[:, -1])
     selector = ClassSelector([0], class_column=cls_col, proportions={c: 1.0 for c in classes}, rng=default_rng(0))
-    generator = FixedShiftClassesGenerator()
+    generator = FixedShiftClassesGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(ValueError, match="cannot be compared"):
         generator.generate(
             Xc.copy(), selector=selector,

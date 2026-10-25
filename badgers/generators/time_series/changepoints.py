@@ -1,6 +1,5 @@
 import abc
 
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.time_series import preprocess_inputs
@@ -11,11 +10,11 @@ class ChangePointsGenerator(GeneratorMixin):
     Base class for generators that generate changepoints in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0), ):
+    def __init__(self, random_generator):
         """
         Initialize the ChangePointsGenerator with a given random number generator.
 
-        :param random_generator: A random number generator instance (default is numpy's default_rng with seed 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         self.random_generator = random_generator
         self.changepoints = None
@@ -39,11 +38,11 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
     Generate randomly change in mean changepoints
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomChangeInMeanGenerator with a given random number generator.
 
-        :param random_generator: A random number generator instance (default is numpy's default_rng with seed 0).
+        :param random_generator: A random number generator instance (required; no default).
         """
         super().__init__(random_generator=random_generator)
 

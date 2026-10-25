@@ -27,7 +27,7 @@ class CausalDriftGenerator(CausalGenerator):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator used for the fresh noise drawn during the
         Pearl-surgery recompute of descendant nodes.
     dgp : DGP or None, default=None

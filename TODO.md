@@ -219,7 +219,7 @@ so that specifications/requirements can be derived directly from them.
 
 Findings from reading every generator (tabular, causal, time_series, graph, text)
 and probing the suspected bugs at runtime. The bugs and API inconsistencies found
-(R1–R9, R15) are all fixed; details and commit hashes are recorded in
+(R1–R9, R12–R15) are all fixed; details and commit hashes are recorded in
 [docs/changelog.md](docs/changelog.md). Remaining refactor opportunities below.
 
 ## Refactor opportunities (no behavior change)
@@ -230,26 +230,29 @@ and probing the suspected bugs at runtime. The bugs and API inconsistencies foun
 - **R11** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py): the hand-rolled
   `covered = range(X.shape[1])` fallback carries a "same default as _resolve_targets ... keep in
   sync" comment — call `_resolve_targets(selector, X, None)` instead of duplicating the default.
-- **R12** [noise/causal.py](badgers/generators/tabular_data/noise/causal.py): causal generator
-  signatures disagree — `CausalNoiseGenerator.generate(selector=None...)` raises at runtime while
-  drift/missingness/outliers declare `selector` as a required parameter; `noise_std` supports
-  dict-by-target only in `CausalNoiseGenerator` (`_param_by_target`) while
-  `CausalAdditiveNoiseGenerator.noise_std` is a plain scalar. Unify (required selector; dict-or-
-  scalar via `_param_by_target` everywhere).
-- **R13** Constructor boilerplate: every generator redefines `__init__` only to re-document and
-  call `super().__init__` — and `default_rng(seed=0)` in the default argument is evaluated ONCE at
-  import, so all instances created without an explicit rng SHARE one Generator object (verified:
-  two `AdditiveNoiseGenerator()` instances advance each other's streams). Latent footgun for
-  users who create several generators and expect independent streams; fix = `None` default +
-  per-instance `default_rng()` (behavior change for anyone relying on the shared stream — needs a
-  changelog note).
-- **R14** Cosmetics: [graph/missingness.py](badgers/generators/graph/missingness.py)
-  raises `NotImplementedError` for non-nx.Graph input (should be `TypeError`);
-  [causal/_base.py](badgers/generators/tabular_data/causal/_base.py) imports `warnings` inside
-  `_column_stds`; [utils.py](badgers/generators/time_series/utils.py) has the typo "thant", a
-  duplicated `:return:` line in `get_patterns_uniform_probability`, and an obscure `for...else`
-  that reads the loop variable after the loop; `MissingAtRandomGenerator` (time_series) is
-  actually MCAR (misnomer); text generators disagree on mutation (SwapLettersGenerator mutates the
-  input list, LeetSpeakGenerator returns a new one); several family base-class docstrings are
-  copy-paste from the wrong module (drift base says "add noise", ts `MissingValuesGenerator` says
-  "generate point outliers").
+- **R12 ✅ FIXED** [noise/causal.py](badgers/generators/tabular_data/noise/causal.py): both noise
+  causal generators now declare `generate(X, selector, ...)` — the selector is a required
+  positional parameter like in drift/missingness/outliers (omitting it is a `TypeError`, passing
+  `None` explicitly raises `ValueError`); `CausalImbalanceGenerator`'s legacy `selector=None`
+  quantile-range path is the documented exception. Ruled out for later: extending the required
+  selector to the non-causal per-class generators (they spell it keyword-only `selector=None` +
+  runtime `ValueError`), and unifying the scalar-vs-dict-by-target knobs (`CausalAdditiveNoiseGenerator.noise_std`
+  is still a plain scalar while `CausalNoiseGenerator.noise_std`/`drift shift_amount` support
+  dict-by-position via `_param_by_target`) — the non-causal generators mix the same two shapes
+  (`noise_std` scalar multiplier vs `noise_std_per_class`/`shift_std` dict-by-class). Survey
+  recorded in the R12 discussion of 2026-10-27; details in
+  [docs/changelog.md](docs/changelog.md).
+- **R13 ✅ FIXED** all generator constructors: `random_generator` is a REQUIRED parameter (no
+  default) — the old `default_rng(seed=0)` default was evaluated once at import, so instances
+  built without an rng shared one Generator object and advanced each other's streams. All
+  docstring default texts reworded; tests, notebooks, README and experiments updated. Details in
+  [docs/changelog.md](docs/changelog.md).
+- **R14 ✅ FIXED** cosmetics: graph missingness raises `TypeError` for non-`nx.Graph` input;
+  `import warnings` moved to module top in [causal/_base.py](badgers/generators/tabular_data/causal/_base.py);
+  the "thant" typo in [utils.py](badgers/generators/time_series/utils.py) and its obscure
+  `for...else` (reading the leaked loop variable after the loop) are restructured;
+  `MissingAtRandomGenerator` renamed to `MissingCompletelyAtRandomGenerator` (it is MCAR);
+  `SwapLettersGenerator` no longer mutates the input list (it returns a new one, like the other
+  text generators); copy-paste docstrings fixed (drift base says "shift", ts
+  `MissingValuesGenerator` says "missing values"). Details in
+  [docs/changelog.md](docs/changelog.md).

@@ -2,7 +2,6 @@ import abc
 
 import numpy as np
 import numpy.random
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
@@ -40,7 +39,7 @@ class MissingValueGenerator(GeneratorMixin):
     Base class for missing values transformer
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         :param random_generator: A random generator
         """
@@ -87,11 +86,11 @@ class MissingCompletelyAtRandom(MissingValueGenerator):
     preset (exact-count, optional soft probabilities).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the MissingCompletelyAtRandom class with a specified random generator.
 
-        :param random_generator: A NumPy random number generator instance. Defaults to a new instance of `default_rng` with seed 0.
+        :param random_generator: A NumPy random number generator instance. Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -135,11 +134,11 @@ class DummyMissingAtRandom(MissingValueGenerator):
     preset (exact-count, optional soft probabilities).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the DummyMissingAtRandom class with a specified random generator.
 
-        :param random_generator: A NumPy random number generator instance. Defaults to a new instance of `default_rng` with seed 0.
+        :param random_generator: A NumPy random number generator instance. Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
@@ -187,11 +186,11 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
     preset (exact-count, optional soft probabilities).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initializes the DummyMissingNotAtRandom class with a specified random generator.
 
-        :param random_generator: A NumPy random number generator instance. Defaults to a new instance of `default_rng` with seed 0.
+        :param random_generator: A NumPy random number generator instance. Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)

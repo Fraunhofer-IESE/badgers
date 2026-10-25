@@ -19,14 +19,14 @@ class _Probe(CausalGenerator):
 
 def test_validate_structure__ok(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=_FakeDGP(graph, column_mapping, {}))
     assert gen._validate_structure(X) is None
     assert gen._validate_perturbation_nodes(["X"]) is None
 
 
 def test_validate_structure__missing_dgp_raises(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     # no DGP configured -> the generator has no structure at all
     with pytest.raises(ValueError, match="DGP"):
         gen._validate_structure(X)
@@ -34,42 +34,42 @@ def test_validate_structure__missing_dgp_raises(chain_data):
 
 def test_validate_structure__bad_column_count_raises(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=_FakeDGP(graph, column_mapping, {}))
     with pytest.raises(ValueError, match="columns but graph"):
         gen._validate_structure(X[:, :2])
 
 
 def test_validate_perturbation_nodes__missing_dgp_raises(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(ValueError, match="DGP"):
         gen._validate_perturbation_nodes(["X"])
 
 
 def test_validate_perturbation_nodes__unknown_node_raises(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=_FakeDGP(graph, column_mapping, {}))
     with pytest.raises(ValueError, match="not found in graph"):
         gen._validate_perturbation_nodes(["NOPE"])
 
 
 def test_validate_perturbation_nodes__not_a_list_raises(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=_FakeDGP(graph, column_mapping, {}))
     with pytest.raises(ValueError, match="must be a list"):
         gen._validate_perturbation_nodes("X")
 
 
 def test_validate_perturbation_nodes__empty_raises(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator(dgp=_FakeDGP(graph, column_mapping, {}))
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=_FakeDGP(graph, column_mapping, {}))
     with pytest.raises(ValueError, match="not be empty"):
         gen._validate_perturbation_nodes([])
 
 
 def test_deficit_labels__start_as_none(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     assert gen.deficit_labels_ is None
 
 
@@ -103,7 +103,7 @@ def test_intervene__linear_chain_recompute(chain_data):
     # Recompute semantics: descendant_new = f(child, parents_new) + fresh
     # noise, for ALL descendants in topological order (multi-hop chains).
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     gen.dgp = _FakeDGP(graph, column_mapping,
                        {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
     rows = X.copy()
@@ -122,7 +122,7 @@ def test_intervene__zero_perturbation_is_deterministic_recompute(chain_data):
     # noise: the recompute is NOT bit-identical to the input — fresh noise
     # is part of the recompute contract even for a zero shift).
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     gen.dgp = _FakeDGP(graph, column_mapping,
                        {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
     out = gen.dgp.intervene(X.copy(), ["X"], rng=np.random.default_rng(0))
@@ -135,7 +135,7 @@ def test_intervene__recompute_redraws_descendant_noise(chain_data):
     # Recompute: descendants = f(child, parents_new) + fresh noise (not a
     # delta on the original values).
     X, graph, column_mapping = chain_data
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     gen.dgp = _FakeDGP(graph, column_mapping,
                        {"Y": {"X": 2.0}, "Z": {"Y": 0.5}}, noise_std=0.3)
     rows = X.copy()
@@ -152,7 +152,7 @@ def test_lazy_fit__unfitted_constructor_dgp_is_fitted_on_generate(chain_data):
     # generator.fit exists).
     X, graph, column_mapping = chain_data
     fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
-    gen = CausalGenerator(dgp=fake)
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=fake)
     assert fake._fit_called is False
     assert gen.graph is graph
     gen._require_dgp(X)
@@ -167,7 +167,7 @@ def test_lazy_fit__fitted_constructor_dgp_is_untouched(chain_data):
     X, graph, column_mapping = chain_data
     fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
     fake.fit(X)
-    gen = CausalGenerator(dgp=fake)
+    gen = CausalGenerator(random_generator=np.random.default_rng(0), dgp=fake)
     gen._require_dgp(X)
     assert fake._fit_called is True  # from the explicit fit, not again
     assert gen.dgp is fake
@@ -179,7 +179,7 @@ def test_use_dgp__attaches_fitted_dgp(chain_data):
     X, graph, column_mapping = chain_data
     fake = _FakeDGP(graph, column_mapping, {"Y": {"X": 2.0}, "Z": {"Y": 0.5}})
     fake.fit(X)
-    gen = CausalGenerator()
+    gen = CausalGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(fake)
     assert gen.dgp is fake
     assert gen.graph is fake.graph

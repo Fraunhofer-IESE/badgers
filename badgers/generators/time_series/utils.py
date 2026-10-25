@@ -52,11 +52,11 @@ def generate_random_patterns_indices(random_generator: np.random.Generator, sign
             start = random_generator.integers(low=i * segment_size, high=(i + 1) * segment_size - patterns_sizes[i])
             end = start + patterns_sizes[i]
             patterns_indices += [(start, end)]
-        else:
-            # take care of the last remaining segment
-            start = random_generator.integers(low=(i + 1) * segment_size, high=signal_size - patterns_sizes[i + 1])
-            end = start + patterns_sizes[i + 1]
-            patterns_indices += [(start, end)]
+        # take care of the last remaining segment
+        i = n_patterns - 1
+        start = random_generator.integers(low=i * segment_size, high=signal_size - patterns_sizes[i])
+        end = start + patterns_sizes[i]
+        patterns_indices += [(start, end)]
     return patterns_indices
 
 

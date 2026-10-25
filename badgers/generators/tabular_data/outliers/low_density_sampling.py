@@ -1,7 +1,6 @@
 import warnings
 
 import numpy as np
-from numpy.random import default_rng
 from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 
@@ -42,7 +41,7 @@ class IndependentHistogramsGenerator(OutliersGenerator):
     All values generated for each feature are simply concatenated (independence hypothesis!).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
@@ -126,11 +125,11 @@ class HistogramSamplingGenerator(OutliersGenerator):
     TODO: this works but is very inefficient, better strategies are welcome!
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the HistogramSamplingGenerator with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
 
         super().__init__(random_generator)
@@ -232,11 +231,11 @@ class LowDensitySamplingGenerator(OutliersGenerator):
     TODO: this works but might not be efficient, a better sampling strategy is welcome
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the LowDensitySamplingGenerator with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         super().__init__(random_generator=random_generator)
         self.density_estimator: KernelDensity = KernelDensity(bandwidth="scott")

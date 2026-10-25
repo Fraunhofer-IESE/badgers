@@ -1,7 +1,6 @@
 import warnings
 
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
 from badgers.core.sampling import InstanceSampler
@@ -23,11 +22,11 @@ class UniformInstanceAttributeSampling(OutliersGenerator):
     not exceed the dataset size (a larger count raises).
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the UniformInstanceAttributeSampling with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         super().__init__(random_generator)
 

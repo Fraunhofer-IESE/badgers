@@ -38,7 +38,7 @@ REPRESENTATIVES = [
     ),
     pytest.param(
         "time_series",
-        lambda: TsSlopeGenerator(),
+        lambda: TsSlopeGenerator(random_generator=np.random.default_rng(0)),
         lambda: np.random.default_rng(0).normal(size=(100, 1)),
         {"slope": 0.1},
         np.ndarray,

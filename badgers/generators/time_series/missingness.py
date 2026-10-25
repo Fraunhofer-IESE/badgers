@@ -1,7 +1,6 @@
 import abc
 
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.time_series import preprocess_inputs
@@ -9,33 +8,33 @@ from badgers.core.decorators.time_series import preprocess_inputs
 
 class MissingValuesGenerator(GeneratorMixin):
     """
-    Base class for transformers that generate point outliers in time-series data
+    Base class for transformers that generate missing values in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the MissingValuesGenerator with a given random number generator.
 
         :param random_generator: An instance of a random number generator from NumPy,
                                  used to introduce randomness in the generation process.
-                                 Defaults to a default_rng seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         """
         self.random_generator = random_generator
         self.missing_indices_ = []
 
 
-class MissingAtRandomGenerator(MissingValuesGenerator):
+class MissingCompletelyAtRandomGenerator(MissingValuesGenerator):
     """
-    Randomly set data points to nan (missing)
+    Randomly set data points to nan (missing completely at random)
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
-        Initialize the MissingAtRandomGenerator with a given random number generator.
+        Initialize the MissingCompletelyAtRandomGenerator with a given random number generator.
 
         :param random_generator: An instance of a random number generator from NumPy,
                                  used to introduce randomness in the generation process.
-                                 Defaults to a default_rng seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         """
         super().__init__(random_generator=random_generator)
 

@@ -128,7 +128,7 @@ def test_random_sampling_targets__boolean_mask_selector_is_exact_drop():
 
 
 def test_random_sampling_targets__selector_none_raises(tabular_data):
-    generator = RandomSamplingTargetsGenerator()
+    generator = RandomSamplingTargetsGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(ValueError, match="selector"):
         generator.generate(np.asarray(tabular_data).copy())
 

@@ -140,7 +140,7 @@ def test_generate__multi_node_only_fired_cells(chain_data, make_gcm_dgp):
 
 def test_generate__validation_errors(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
-    gen = CausalMissingnessGenerator()
+    gen = CausalMissingnessGenerator(random_generator=np.random.default_rng(0))
     # not fitted yet
     with pytest.raises(RuntimeError, match="no structure"):
         gen.generate(X, selector=AlwaysSelector([0]))

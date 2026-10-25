@@ -1,6 +1,5 @@
 import abc
 
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 
@@ -10,12 +9,12 @@ class TyposGenerator(GeneratorMixin):
     Base class for transformers creating typos in a list of words
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the TyposGenerator with a given random number generator.
 
         :param random_generator: A random number generator used to introduce randomness in typo generation.
-        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
+        :type random_generator: numpy.random.Generator, required
         """
         self.random_generator = random_generator
 
@@ -30,12 +29,12 @@ class SwapLettersGenerator(TyposGenerator):
     Example: 'kilogram' --> 'kilogarm'
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the SwapLettersGenerator with a given random number generator.
 
         :param random_generator: A random number generator used to introduce randomness in letter swapping.
-        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
+        :type random_generator: numpy.random.Generator, required
         """
         super().__init__(random_generator)
 
@@ -47,29 +46,30 @@ class SwapLettersGenerator(TyposGenerator):
         :param X: A list of words where typos are introduced.
         :param swap_proba: Probability that a word with more than 3 characters will have one adjacent pair of letters swapped.
                            This probability applies to each eligible word independently.
-        :return: The list of words where eligible words have been swapped in place.
+        :return: A new list of words where eligible words have had one adjacent pair of letters swapped (the input list is left unchanged).
         """
-        for i in range(len(X)):
-            if len(X[i]) > 3 and self.random_generator.random() <= swap_proba:
-                # get the ith word in the list and make it a list of letters
-                word = list(X[i])
+        Xt = list(X)
+        for i in range(len(Xt)):
+            if len(Xt[i]) > 3 and self.random_generator.random() <= swap_proba:
+                # make the word a list of letters
+                word = list(Xt[i])
                 # randomly chose letters to switch
                 idx = self.random_generator.integers(1, len(word) - 2)
                 word[idx], word[idx + 1] = word[idx + 1], word[idx]
                 # save the word with switched letters as string
-                X[i] = ''.join(word)
+                Xt[i] = ''.join(word)
 
-        return X
+        return Xt
 
 
 class LeetSpeakGenerator(TyposGenerator):
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the LeetSpeakGenerator with a given random number generator.
 
         :param random_generator: A random number generator used to introduce randomness in leetspeak transformation.
-        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
+        :type random_generator: numpy.random.Generator, required
         """
         super().__init__(random_generator=random_generator)
         self.leet_speak_mapping = {
@@ -141,12 +141,12 @@ class LeetSpeakGenerator(TyposGenerator):
 
 class SwapCaseGenerator(TyposGenerator):
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the SwapCaseGenerator with a given random number generator.
 
         :param random_generator: A random number generator used to introduce randomness in case swapping.
-        :type random_generator: numpy.random.Generator, default=default_rng(seed=0)
+        :type random_generator: numpy.random.Generator, required
         """
         super().__init__(random_generator)
 
