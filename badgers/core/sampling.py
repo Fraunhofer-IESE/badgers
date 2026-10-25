@@ -10,6 +10,7 @@ observed distribution (used for perturbation nodes in causal generation).
 """
 
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 from badgers.core.utils import random_sign, random_spherical_coordinates
 
@@ -232,10 +233,102 @@ class UniformOutOfDistributionSampler(OutOfDistributionSampler):
         return rng.uniform(low=low, high=high, size=(n_samples, len(columns)))
 
 
+class IndependentHistogramSampler(OutOfDistributionSampler):
+    """Sample each requested column from its low-density histogram bins.
+
+    Parameters
+    ----------
+    bins : int, default=10
+        Number of histogram bins per column. Must be positive.
+    """
+
+    def __init__(self, bins=10):
+        if bins <= 0:
+            raise ValueError(f"bins must be > 0, got {bins}")
+        self.bins = bins
+
+    def sample(self, rng, X, columns, n_samples):
+        result = np.empty((n_samples, len(columns)), dtype=float)
+        for output_column, input_column in enumerate(columns):
+            counts, edges = np.histogram(X[:, input_column], bins=self.bins)
+            probabilities = 1.0 - counts / counts.max()
+            probability_sum = probabilities.sum()
+            if probability_sum == 0:
+                probabilities = np.full(self.bins, 1.0 / self.bins)
+            else:
+                probabilities /= probability_sum
+            bin_indices = rng.choice(
+                self.bins, size=n_samples, p=probabilities
+            )
+            result[:, output_column] = rng.uniform(
+                low=edges[bin_indices], high=edges[bin_indices + 1]
+            )
+        return result
+
+
+class JointHistogramSampler(OutOfDistributionSampler):
+    """Sample requested columns jointly from low-density histogram bins.
+
+    Parameters
+    ----------
+    bins : int, default=10
+        Number of bins along each standardized dimension. Must be positive.
+    threshold_low_density : float, default=0.1
+        Maximum normalized bin count considered low density. Must be
+        strictly between zero and one.
+    """
+
+    def __init__(self, bins=10, threshold_low_density=0.1):
+        if bins <= 0:
+            raise ValueError(f"bins must be > 0, got {bins}")
+        if not 0 < threshold_low_density < 1:
+            raise ValueError(
+                "threshold_low_density must be between 0 and 1, "
+                f"got {threshold_low_density}"
+            )
+        self.bins = bins
+        self.threshold_low_density = threshold_low_density
+
+    def sample(self, rng, X, columns, n_samples):
+        if len(columns) > 5:
+            raise NotImplementedError(
+                "Joint histogram sampling supports at most 5 columns"
+            )
+
+        target = X[:, columns]
+        scaler = StandardScaler()
+        standardized = scaler.fit_transform(target)
+        counts, edges = np.histogramdd(
+            standardized, bins=self.bins
+        )
+        normalized_counts = counts / counts.max()
+        low_density_bins = np.argwhere(
+            normalized_counts <= self.threshold_low_density
+        )
+        if len(low_density_bins) == 0:
+            raise ValueError(
+                "threshold_low_density found no low-density region"
+            )
+
+        selected_bins = low_density_bins[
+            rng.integers(0, len(low_density_bins), size=n_samples)
+        ]
+        samples = np.column_stack([
+            rng.uniform(
+                low=edges[column][selected_bins[:, column]],
+                high=edges[column][selected_bins[:, column] + 1],
+            )
+            for column in range(len(columns))
+        ])
+        return scaler.inverse_transform(samples)
+
+
 _OUT_OF_DISTRIBUTION_REGISTRY = {
     "zscore": ZScoreSampler,
     "hypersphere": HypersphereSampler,
     "uniform": UniformOutOfDistributionSampler,
+    "independent_histogram": IndependentHistogramSampler,
+    "histogram": JointHistogramSampler,
 }
 
 
@@ -245,10 +338,12 @@ def create_out_of_distribution_sampler(name="zscore", **kwargs):
     Parameters
     ----------
     name : str, default="zscore"
-        One of ``"zscore"``, ``"hypersphere"``, ``"uniform"``.
+        One of ``"zscore"``, ``"hypersphere"``, ``"uniform"``,
+        ``"independent_histogram"``, ``"histogram"``.
     **kwargs
         Passed to the sampler constructor (e.g., ``scale=2.0`` for
-        ``"zscore"``, ``expansion=0.2`` for ``"uniform"``).
+        ``"zscore"``, ``expansion=0.2`` for ``"uniform"``, or ``bins=8``
+        for either histogram sampler).
 
     Returns
     -------
