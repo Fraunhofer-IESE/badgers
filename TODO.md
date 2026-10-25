@@ -227,9 +227,11 @@ and probing the suspected bugs at runtime. The bugs and API inconsistencies foun
 - **R10** [drift/drift.py](badgers/generators/tabular_data/drift/drift.py): the Random*/Fixed* and
   base/Classes variants are near-copies (the Classes pair share ~90% of their body). Item 4's open
   decision (merge into one generator with a deterministic/random switch) also resolves R5/R7.
-- **R11** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py): the hand-rolled
-  `covered = range(X.shape[1])` fallback carries a "same default as _resolve_targets ... keep in
-  sync" comment — call `_resolve_targets(selector, X, None)` instead of duplicating the default.
+- **R11 ✅ FIXED** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py): the hand-rolled
+  `covered = range(X.shape[1])` fallback (with its "keep in sync" comment) is gone — the consumer
+  calls the canonical `_resolve_targets(selector, X, None)`, the same rule `fired()` applies
+  internally. Outputs byte-identical for valid selectors; out-of-range/non-int selector columns
+  now raise a clean `ValueError`. (commit `2f2c336`)
 - **R12 ✅ FIXED** [noise/causal.py](badgers/generators/tabular_data/noise/causal.py): both noise
   causal generators now declare `generate(X, selector, ...)` — the selector is a required
   positional parameter like in drift/missingness/outliers (omitting it is a `TypeError`, passing
