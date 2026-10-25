@@ -307,7 +307,7 @@ referenceable as R1..R14 in review discussions.
   for the internal CountSelector fallback) were corrected to "must not exceed len(X) (a larger
   count raises)" — distribution_sampling x3, low-density trio x3 + `_resolve_count_and_targets`,
   instance_sampling. The `UniformInstanceSampling` docstring reference was already resolved
-  (only `UniformInstanceAttributeSampling` exists).
+  (only `UniformInstanceAttributeSampling` exists). (commit `2ac0651`)
 - **R9** Ground-truth attribute zoo (superset of TODO item 6): direct families use
   `<family>_labels_` (`outlier_labels_`, `imbalance_labels_`), the causal base uses
   `deficit_labels_` while `CausalOutlierPropagationGenerator` additionally keeps its own
