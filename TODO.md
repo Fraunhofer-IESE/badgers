@@ -252,13 +252,10 @@ referenceable as R1..R14 in review discussions.
   exact boundary (works) and the previously-crashing 11-signal call (now raises). Note the guard
   is a conservative budget for the SEGMENT structure (each segment must hold a full-width
   pattern), not a tight packing condition.
-- **R3** [changepoints.py](badgers/generators/time_series/changepoints.py):
-  `RandomChangeInMeanGenerator.generate` draws all changepoint indices from
-  `integers(0.05n, 0.95n)` — duplicates possible (verified: 14 duplicates in 40 draws). Fixes
-  needed: (a) `replace=False` for distinct indices, (b) document the *composition* semantics —
-  currently applied in draw order (earlier `X[idx:] += change` are then re-shifted by later
-  changes), which makes the reported `changepoints` list order-dependent and the "change at idx"
-  not equal to the realized level jump when indices repeat.
+- **R3** ✅ FIXED (2026-10-25): indices are drawn DISTINCT (sampling without replacement via
+  `rng.choice(..., replace=False)`) and `changepoints` is reported sorted by index with the
+  documented composition semantics (each reported change IS the realized level jump at that
+  position) (commit `7787279`). Same-seed outputs changed (different draw mechanism).
 - **R4** [noise/noise.py](badgers/generators/tabular_data/noise/noise.py):
   `GaussianNoiseClassesGenerator.generate` looks up `noise_std_per_class[value]` with the class
   value read from `X` while the user's dict keys may have another dtype — the lookup goes through

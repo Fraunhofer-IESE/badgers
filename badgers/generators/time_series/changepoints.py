@@ -53,19 +53,26 @@ class RandomChangeInMeanGenerator(ChangePointsGenerator):
         """
         Generate random changepoints in the time-series data where the mean changes at each changepoint.
 
+        The changepoint indices are distinct (no position is drawn twice). The changes are
+        applied cumulatively: each change shifts the signal from its changepoint index to the
+        end of the signal. The reported ``changepoints`` list is sorted by index (ascending
+        position) and each entry's change value IS the realized level jump at that position
+        (the level immediately before vs. immediately after the changepoint index).
+
         :param X: Input features of the time-series data.
         :param n_changepoints: Number of changepoints to generate.
         :param min_change: Minimum value of the change in mean.
         :param max_change: Maximum value of the change in mean.
         :return: The modified time-series data.
         """
-        # Generate change points
-        self.changepoints = list(
-            zip(
-                self.random_generator.integers(int(0.05 * len(X)), int(0.95 * len(X)), size=n_changepoints),
-                self.random_generator.uniform(min_change, max_change, size=n_changepoints)
-            )
-        )
+        # Generate change points (distinct indices, sorted by position)
+        n_candidates = int(0.95 * len(X)) - int(0.05 * len(X))
+        idx = self.random_generator.choice(
+            range(int(0.05 * len(X)), int(0.95 * len(X))), size=min(n_changepoints, n_candidates),
+            replace=False)
+        changes = self.random_generator.uniform(min_change, max_change, size=len(idx))
+        self.changepoints = sorted(zip(idx, changes), key=lambda t: t[0])
+        self.changepoints = sorted(zip(idx, changes), key=lambda t: t[0])
 
         for idx, change in self.changepoints:
             X[idx:] += change

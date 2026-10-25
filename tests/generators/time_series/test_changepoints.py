@@ -45,3 +45,31 @@ def test_random_change_in_mean__creates_distinct_segments():
     # Count unique values — should have at least 2 distinct segments
     unique_values = len(set(np.round(Xt.flatten(), decimals=4)))
     assert unique_values >= 2
+
+
+def test_random_change_in_mean__distinct_indices():
+    """Changepoint indices are distinct (no position is drawn twice)."""
+    rng = default_rng(seed=0)
+    generator = RandomChangeInMeanGenerator(random_generator=rng)
+    X = np.zeros((200, 1))
+
+    generator.generate(X.copy(), n_changepoints=40, min_change=-5, max_change=5)
+
+    indices = [i for i, _ in generator.changepoints]
+    assert len(indices) == len(set(indices)) == 40
+
+
+def test_random_change_in_mean__sorted_reported_jumps_match():
+    """Changepoints are reported sorted by index and each reported change is the
+    realized level jump at that position."""
+    rng = default_rng(seed=0)
+    generator = RandomChangeInMeanGenerator(random_generator=rng)
+    X = np.zeros((200, 1))
+
+    Xt = generator.generate(X.copy(), n_changepoints=10, min_change=-5, max_change=5)
+
+    indices = [i for i, _ in generator.changepoints]
+    assert indices == sorted(indices)
+    level = np.diff(Xt[:, 0], prepend=Xt[0, 0])
+    for i, change in generator.changepoints:
+        np.testing.assert_allclose(level[i], change)

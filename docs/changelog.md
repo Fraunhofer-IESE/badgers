@@ -541,6 +541,13 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   with 2 patterns of max width 6 — then crashed inside ``rng.integers`` with
   ``high <= 0``. The guard is now ``max_width_patterns * n_patterns <= signal_size``
   (each equal-length segment must hold one full-width pattern).
+- **`RandomChangeInMeanGenerator` could draw duplicate changepoint indices.**
+  All indices were drawn independently, so one position could appear twice in the reported
+  ``changepoints`` list (verified: 14 duplicates in 40 draws) and the realized level jump at a
+  repeated position was the sum of two draws. Indices are now drawn distinct (sampling without
+  replacement) and reported sorted by index; each reported change is the realized level jump
+  at that position (documented in the docstring). Same-seed outputs change (different draw
+  mechanism).
 
 ## dev_0_0_14 (released)
 
