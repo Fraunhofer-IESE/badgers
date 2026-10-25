@@ -314,13 +314,13 @@ referenceable as R1..R14 in review discussions.
   the per-family public getters keep their docstrings and return values, and the error message
   comes from the (previously unused) `deficit_name` class attribute. `CausalOutlierPropagationGenerator`
   keeps its own `outlier_labels_` getter (different backing attribute and semantics — appended
-  rows, not deficit rows); unifying it belongs to TODO item 6's labels mixin.
+  rows, not deficit rows); unifying it belongs to TODO item 6's labels mixin. (commit `b142d66`)
 - **R15** ✅ FIXED (2026-10-25, ruling: "A — broadcast fix"): a scalar `slope` in
   `AdditiveLinearTrendGenerator` and `GlobalAdditiveLinearTrendGenerator` is now broadcast so the
   same per-row ramp is applied to every column of X (matching the array-slope path). Previously a
   scalar slope crashed on non-square X (`ValueError: could not broadcast ... (n,) into (n,2)`)
   and silently applied the ramp along COLUMNS on square X (n == n_cols). Array-slope outputs are
-  unchanged; regression tests pin the fixed behavior (commit — see hash below).
+  unchanged; regression tests pin the fixed behavior (commit `b142d66`).
 
 ## Refactor opportunities (no behavior change)
 
