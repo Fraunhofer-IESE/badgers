@@ -292,7 +292,7 @@ referenceable as R1..R14 in review discussions.
   draw (fractional scalars/bool arrays still draw), so the new AlwaysSelector defaults cost
   no draws and keep the old draw-free None path's stream alignment — pinned causal-noise test
   seed updated for the shifted stream. Default-vs-explicit equivalence tests added for all
-  three generators plus two fired() contract tests (commit `ec81a70`).
+  three generators plus two fired() contract tests (commit `abb4199`).
 - **R7** `FixedShiftGenerator.generate(X, shift_std)` — `shift_std` names a DETERMINISTIC
   parameter (the std is just used as the shift); `FixedShiftClassesGenerator.generate(X, shift)`
   names the same concept differently. Rename to `shift` (breaking; with deprecation shim) or
