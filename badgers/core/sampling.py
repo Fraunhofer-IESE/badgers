@@ -327,6 +327,10 @@ class JointHistogramSampler(OutOfDistributionSampler):
 # Cap on the number of grid cells scored by the KDE grid samplers.
 _MAX_GRID_CELLS = 65536
 
+# Budget for the coverage grid that detects space not covered by any
+# extended tree cell (added back as empty count-0 cells).
+_EMPTY_CELL_GRID_BUDGET = 4096
+
 
 class KernelDensitySampler(OutOfDistributionSampler):
     """Sample from low-density regions of a kernel density estimate.
@@ -337,7 +341,7 @@ class KernelDensitySampler(OutOfDistributionSampler):
     most ``grid_budget`` cells. Every cell is scored once, and the
     requested samples are drawn from a categorical over the cells at or
     below the ``threshold_low_density`` percentile of the data's
-    log-densities — each point uniform inside its cell. There is no
+    log-densities — each point independently uniform inside its cell. There is no
     rejection step, so exactly ``n_samples`` points are always returned.
 
     The grid keeps at most ``grid_budget`` cells per dimension root
@@ -404,7 +408,7 @@ class KernelDensitySampler(OutOfDistributionSampler):
             weights[np.argsort(f_grid)[: min(len(f_grid), self.grid_budget)]] = 1.0
         cells = rng.choice(total, size=n_samples, p=weights / weights.sum())
         samples = np.column_stack([
-            rng.uniform(cell_lo[:, j], cell_hi[:, j])[cells] for j in range(d)
+            rng.uniform(cell_lo[cells, j], cell_hi[cells, j]) for j in range(d)
         ])
         return scaler.inverse_transform(samples)
 
@@ -446,14 +450,21 @@ class TreeCellSampler(OutOfDistributionSampler):
     median splits into cells holding at most ``leaf_size`` points each:
     the resolution adapts (fine in dense regions, coarse in sparse ones),
     so the cell density ``count / volume`` is a data-driven histogram
-    with the bin size chosen by the data. Every cell is then extended
-    axis-aligned to the midplanes with the neighbouring points (an
-    axis-aligned Voronoi approximation), so the empty space between the
-    cells is covered. A cell is low density when its density is at most
-    ``threshold_low_density`` times the global mean density; the
-    requested samples are drawn from a categorical over the qualifying
-    cells (no rejection), each point uniform inside its extended cell,
-    so exactly ``n_samples`` points are always returned.
+    with the bin size chosen by the data. Cells are extended axis-aligned
+    to the midplanes with their neighbouring points (an axis-aligned
+    Voronoi approximation); at the padded box boundary, where there is no
+    neighbour to share with, a cell takes the whole remaining gap. Space
+    that is still not covered by any extended cell (typically the box
+    corners far from all points) is added back as empty count-0 cells:
+    it is genuinely low density and always qualifies. A leaf cell is low
+    density when the density of its extended territory (count over
+    extended volume) is at most ``threshold_low_density`` times the
+    global mean density, so a sparse fringe cell can qualify together
+    with the empty space it borders; the requested samples are drawn
+    from a categorical over all qualifying cells, weighted by volume
+    (uniform over the qualifying space, like a fine regular grid), each
+    point independently uniform inside its cell, so exactly
+    ``n_samples`` points are always returned.
 
     Parameters
     ----------
@@ -499,29 +510,76 @@ class TreeCellSampler(OutOfDistributionSampler):
         np.divide(counts, volumes, out=density, where=volumes > 0)
 
         # Extend each cell axis-aligned to the midplane with the
-        # neighbouring points (empty space is shared with neighbours)
+        # neighbouring points (empty space is shared with neighbours).
+        # At the box boundary there is no neighbour to share with, so a
+        # cell takes the whole remaining gap up to the padded edge.
         for j in range(d):
             values = np.sort(standardized[:, j])
-            k = np.searchsorted(values, cell_hi[:, j])
+            # side="right": nearest data point STRICTLY beyond the cell
+            # edge (the edge itself is a data value for inner cells), so
+            # both sides grow symmetrically; at the box boundary there is
+            # no such point and the cell takes the full remaining gap.
+            k = np.searchsorted(values, cell_hi[:, j], side="right")
             gap_plus = np.where(
                 k < n, values[np.minimum(k, n - 1)] - cell_hi[:, j],
                 (hi0[j] + 1.0) - cell_hi[:, j])
+            extend_plus = np.where(k < n, 0.5 * gap_plus, gap_plus)
             k2 = np.searchsorted(values, cell_lo[:, j], side="left")
             gap_minus = np.where(
                 k2 > 0, cell_lo[:, j] - values[k2 - 1],
                 cell_lo[:, j] - (lo0[j] - 1.0))
-            cell_hi[:, j] = np.minimum(cell_hi[:, j] + 0.5 * gap_plus, hi0[j] + 1.0)
-            cell_lo[:, j] = np.maximum(cell_lo[:, j] - 0.5 * gap_minus, lo0[j] - 1.0)
+            extend_minus = np.where(k2 > 0, 0.5 * gap_minus, gap_minus)
+            cell_hi[:, j] = np.minimum(cell_hi[:, j] + extend_plus, hi0[j] + 1.0)
+            cell_lo[:, j] = np.maximum(cell_lo[:, j] - extend_minus, lo0[j] - 1.0)
 
-        weights = (
-            density <= self.threshold_low_density * mean_density).astype(float)
+        # Space not covered by any extended cell (typically box corners
+        # far from all points) cannot be reached by the sampler; detect
+        # it on a coarse grid and add it back as empty count-0 cells
+        box_lo = lo0 - 1.0
+        box_hi = hi0 + 1.0
+        g = min(int(np.ceil(_EMPTY_CELL_GRID_BUDGET ** (1 / d))), 64)
+        edges = [np.linspace(box_lo[j], box_hi[j], g + 1) for j in range(d)]
+        mids = [(e[:-1] + e[1:]) / 2 for e in edges]
+        mesh = np.meshgrid(*mids, indexing="ij")
+        grid_centers = np.stack([m.ravel() for m in mesh], axis=1)
+        covered = np.zeros(len(grid_centers), dtype=bool)
+        block = max(1, 2 ** 22 // max(len(grid_centers) * d, 1))
+        for start in range(0, len(cell_lo), block):
+            lo_b = cell_lo[start:start + block, None, :]
+            hi_b = cell_hi[start:start + block, None, :]
+            covered |= ((grid_centers[None] >= lo_b)
+                        & (grid_centers[None] <= hi_b)).all(axis=2).any(axis=0)
+        if not covered.all():
+            uidx = np.flatnonzero(~covered)
+            gidx = np.unravel_index(uidx, (g,) * d)
+            empty_lo = np.stack([edges[j][gidx[j]] for j in range(d)], axis=1)
+            empty_hi = np.stack([edges[j][gidx[j] + 1] for j in range(d)], axis=1)
+            cell_lo = np.vstack([cell_lo, empty_lo])
+            cell_hi = np.vstack([cell_hi, empty_hi])
+
+        # Qualify leaves on the density of their extended territory
+        # (count over extended volume): the extended area around a sparse
+        # fringe cell belongs to it, so it qualifies together with the
+        # empty space it borders. Empty cells always qualify. Weight all
+        # qualifying cells by (extended) volume: the sampler is then
+        # uniform over the qualifying space, like a fine regular grid
+        leaf_volumes = np.prod(cell_hi[:len(density)] - cell_lo[:len(density)], axis=1)
+        extended_density = np.full(len(density), np.inf)
+        np.divide(counts, leaf_volumes, out=extended_density, where=leaf_volumes > 0)
+        all_volumes = np.prod(cell_hi - cell_lo, axis=1)
+        weights = np.where(
+            extended_density <= self.threshold_low_density * mean_density,
+            all_volumes[:len(density)], 0.0)
+        weights = np.concatenate([weights, all_volumes[len(density):]])
         if weights.sum() == 0:
             # Pathological (e.g. very small data): fall back to the least
             # dense cells.
-            weights[np.argsort(density)[: min(len(density), 10)]] = 1.0
+            fallback = np.argsort(extended_density)[: min(len(density), 10)]
+            weights[fallback] = all_volumes[fallback]
+            weights[weights == 0] = 1.0
         cells = rng.choice(len(weights), size=n_samples, p=weights / weights.sum())
         samples = np.column_stack([
-            rng.uniform(cell_lo[:, j], cell_hi[:, j])[cells] for j in range(d)
+            rng.uniform(cell_lo[cells, j], cell_hi[cells, j]) for j in range(d)
         ])
         return scaler.inverse_transform(samples)
 

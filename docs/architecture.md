@@ -355,7 +355,7 @@ python -m benchmarks compare --baseline v0.0.13
 | per-column low-density histogram bins | `IndependentHistogramSampler(bins)` | `"independent_histogram"` |
 | joint low-density histogram bins (≤ 5 columns) | `JointHistogramSampler(bins, threshold_low_density)` | `"histogram"` |
 | grid-CDF KDE: scores a bounded regular grid, categorical over low-density cells, exact count, no rejection | `KernelDensitySampler(threshold_low_density, grid_budget)` | `"low_density"` |
-| adaptive kd partition (median splits), axis-aligned Voronoi cell extension, categorical over cells with density <= threshold × mean density, exact count | `TreeCellSampler(threshold_low_density, leaf_size)` | `"tree"` |
+| adaptive kd partition (median splits), axis-aligned Voronoi cells extended across the full gap to the data-box boundary on every axis, uncovered box regions added as always-qualifying count-0 cells, categorical over cells with extended-territory density <= threshold × mean density, exact count | `TreeCellSampler(threshold_low_density, leaf_size)` | `"tree"` |
 
 The generator keeps its responsibilities outside synthesis: the required `selector` owns the outlier count and the perturbed targets, the generator copies the seed rows, replaces the selected cells with the sampler's values, appends the rows, and records `get_outliers_labels()`. `CausalOutlierPropagationGenerator` consumes the same samplers for its perturbation nodes, so both outlier families share one strategy set and one interface (`sample(rng, X, columns, n)`).
 

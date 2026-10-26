@@ -44,7 +44,7 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `KernelDensity` (Scott bandwidth, `ball_tree`), then draws exactly
   `n_samples` points from a categorical over the grid cells at or below the
   `threshold_low_density` percentile of the data log-densities, each point
-  uniform inside its cell (fallback: the least-dense cells). The new
+  independently uniform inside its cell (fallback: the least-dense cells). The new
   `grid_budget` parameter replaces the earlier `max_samples`; the count is
   always exactly `n_samples` and deterministic for a fixed `rng` seed.
 - **`TreeCellSampler`** (in `badgers.core.sampling`, registry name `"tree"`)
@@ -54,8 +54,16 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   sparse ones); every cell is extended axis-aligned to the midplanes with
   the neighbouring points (an axis-aligned Voronoi approximation), and
   exactly `n_samples` points are drawn from a categorical over the cells
-  whose density (count/volume) is at most `threshold_low_density` times the
-  global mean density (fallback: the least-dense 10 cells). Deterministic
+  whose extended-territory density (count over extended volume) is at
+  most `threshold_low_density` times the global mean density (fallback:
+  the least-dense 10 cells). Each cell is
+  extended across the full gap to the nearest data point on *both* sides of
+  every axis (the outermost cells reach the data-box boundary), so leaves
+  tile the padded box instead of only its interior; a bounded coverage grid
+  finds every box region not covered by any extended leaf and adds it as an
+  always-qualifying count-0 cell, so the empty space around and between the
+  clusters is reachable too. Weights are proportional to the extended cell
+  volumes (uniform over the qualifying space). Deterministic
   for a fixed `rng` seed.
 
 ### Changed

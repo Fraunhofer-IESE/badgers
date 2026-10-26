@@ -893,6 +893,20 @@ def test_tree__deterministic_for_same_seed(two_blob_2d):
     np.testing.assert_array_equal(first, second)
 
 
+def test_tree__reaches_uncovered_corners(two_blob_2d):
+    """Corner regions beyond the data box on both axes (previously dead
+    space between the kd-cell extensions) receive samples too."""
+    X = two_blob_2d
+    samples = TreeCellSampler(threshold_low_density=0.1).sample(
+        default_rng(0), X, [0, 1], 400)
+    x0_min, x0_max = X[:, 0].min(), X[:, 0].max()
+    x1_min, x1_max = X[:, 1].min(), X[:, 1].max()
+    tl = (samples[:, 0] < x0_min) & (samples[:, 1] > x1_max)
+    br = (samples[:, 0] > x0_max) & (samples[:, 1] < x1_min)
+    assert tl.sum() >= 10
+    assert br.sum() >= 10
+
+
 @pytest.mark.parametrize("kwargs, message", [
     ({"leaf_size": 0}, "leaf_size"),
     ({"threshold_low_density": 0.0}, "threshold_low_density"),
