@@ -2,6 +2,59 @@
 
 See https://github.com/Fraunhofer-IESE/badgers/releases
 
+## Unreleased
+
+### Added
+
+- **`UndersamplingGenerator`** (in `badgers.generators.tabular_data.imbalance`)
+  — a row-removing imbalance generator: `generate(X, selector=None)` removes
+  the rows flagged by a deficit `Selector` (`True`/`1.0` = row removed;
+  fractional specs are removed stochastically; multiple columns = union;
+  `selector=None` is a no-op). `get_imbalance_labels()` returns a boolean
+  array aligned with the input rows (`True` = row removed).
+- **`OversamplingGenerator`** (in `badgers.generators.tabular_data.imbalance`)
+  — a row-duplicating imbalance generator: `generate(X, selector=None)`
+  duplicates rows according to per-row integer multiplicities
+  (`ConstantMultiplicity(k)`, `MaskedMultiplicity(mask, k)`, or a bare int /
+  `(n,)` int array; all values must be `>= 1`). The output is a superset of
+  the input — no row is ever dropped and the original order is preserved.
+  `get_imbalance_labels()` returns a boolean array aligned with the input
+  rows (`True` = row duplicated, i.e. multiplicity > 1).
+- **`ConstantMultiplicity(k)`** — a `MultiplicitiesSelector` that assigns
+  every row multiplicity `k`.
+- **`MaskedMultiplicity(mask, k)`** — a `MultiplicitiesSelector` that assigns
+  multiplicity `k` to the rows where `mask` is `True` (a `(n,)` bool array or
+  a callable on `X`) and multiplicity 1 to the rest.
+
+### Changed
+
+- **The imbalance API is split into under- and oversampling (breaking).**
+  Imbalance is no longer a single score-driven resampler. Deficit-based row
+  removal lives in `UndersamplingGenerator` (a deficit `Selector` decides
+  which rows are dropped); row duplication lives in
+  `OversamplingGenerator` (a per-row multiplicity selector decides how many
+  copies of each row survive). Oversampling input validation rejects
+  fractional values in `(0, 1)` ("looks like a deficit Selector"), zeros
+  ("row dropped"), negative values ("must be >= 1"), and non-integer
+  multiplicities ("not supported").
+
+### Removed
+
+- **`RandomSamplingClassesGenerator`** — replaced by
+  `UndersamplingGenerator` (with a `ClassSelector`) and
+  `OversamplingGenerator` (with a `MaskedMultiplicity`).
+- **`RandomSamplingTargetsGenerator`** — replaced by
+  `UndersamplingGenerator` (score-driven deficit selectors such as
+  `ProportionalSelector`) and `OversamplingGenerator`.
+- **`CausalImbalanceGenerator`** — removed from
+  `badgers.generators.tabular_data.causal`; causal no longer ships an
+  imbalance generator (row removal/duplication is an observation-process
+  operation in `badgers.generators.tabular_data.imbalance`).
+
+  **No backward compatibility** is provided for any of these classes.
+  See the new [Imbalance tutorial](tutorials/tabular-data/Imbalance.md)
+  for the replacement patterns.
+
 ## dev_0_0_15 (unreleased)
 
 ### Breaking changes

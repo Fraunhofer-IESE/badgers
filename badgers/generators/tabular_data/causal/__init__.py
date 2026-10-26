@@ -24,9 +24,6 @@ are only needed for using those backends::
 _LAZY_ATTRS = {
     "CausalGenerator": "badgers.generators.tabular_data.causal._base",
     "CausalDriftGenerator": "badgers.generators.tabular_data.drift.causal",
-    "CausalImbalanceGenerator": (
-        "badgers.generators.tabular_data.imbalance.causal"
-    ),
     "CausalMissingnessGenerator": (
         "badgers.generators.tabular_data.missingness.causal"
     ),

@@ -1,207 +1,133 @@
-import abc
+"""Imbalance generators.
+
+Two complementary, unambiguous classes — no ``size`` / ``replace`` flag:
+
+- :class:`UndersamplingGenerator` — rows SELECTED by a deficit
+  :class:`~badgers.core.selectors.Selector` are REMOVED. The selector decides
+  which rows to drop; the amount lives entirely in the selector.
+- :class:`OversamplingGenerator` — rows are DUPLICATED according to per-row
+  integer multiplicities supplied by a multiplicity selector. The selector
+  decides which rows to copy and how many times; the output always contains
+  every input row at least once (nothing is dropped).
+
+Both expose :meth:`ImbalanceGenerator.get_imbalance_labels` (a boolean vector
+aligned with the last generated output: removed rows for undersampling,
+duplicated rows for oversampling).
+"""
 
 import numpy as np
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.decorators.tabular_data import preprocess_inputs
-from badgers.core.selectors import get_selected_fields
-from badgers.core.utils import normalize_proba
+from badgers.core.selectors.base import get_selected_fields
+
+from .multiplicity import resolve_multiplicities
 
 
 class ImbalanceGenerator(GeneratorMixin):
+    """Base for imbalance generators (undersampling / oversampling).
+
+    Parameters
+    ----------
+    random_generator : numpy.random.Generator, required
+        Random number generator instance.
     """
-    Base class for transformers that makes tabular data imbalanced
-    """
+
+    deficit_name = "imbalance"
 
     def __init__(self, random_generator):
-        """
-        Initialize the ImbalanceGenerator with a specified random number generator.
-
-        :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Required (no default): pass a numpy.random.Generator.
-        :type random_generator: numpy.random.Generator
-        """
         self.random_generator = random_generator
-        self.imbalance_labels_: np.ndarray | None = None
 
-    def get_imbalance_labels(self) -> np.ndarray:
+    def get_imbalance_labels(self) -> np.ndarray | None:
+        """Return per-row imbalance labels of the last generated output.
+
+        A boolean vector aligned with the rows of the last generated
+        output: True for rows that carry the imbalance deficit (rows removed
+        by undersampling, or rows that were duplicated by oversampling),
+        False otherwise. ``None`` if nothing has been generated yet.
         """
-        Per-row imbalance labels of the LAST generated output.
+        return self._imbalance_labels_
 
-        :return: A boolean array aligned with the rows of the LAST input
-            passed to ``generate()``; ``True`` marks a row on which the
-            deficit applied (the row was dropped from the output), ``False``
-            a row that is part of the generated output.
-        :raises RuntimeError: if ``generate()`` has not been called yet.
-        """
-        if self.imbalance_labels_ is None:
-            raise RuntimeError(
-                "no labels available: call generate() first "
-                "(the labels describe the LAST input to generate())"
-            )
-        return self.imbalance_labels_
-
-    @abc.abstractmethod
-    def generate(self, X, **params):
-        """
-        Abstract method to generate imbalanced data from the input data.
-        This should be overridden
-
-        :param X: Input features, can be a pandas DataFrame or a numpy array.
-        :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param params: Additional keyword arguments that might be required for specific implementations.
-        :type params: dict
-        """
-        pass
+    def _set_imbalance_labels(self, labels: np.ndarray | None):
+        self._imbalance_labels_ = (
+            None if labels is None else labels.astype(bool)
+        )
 
 
-class RandomSamplingClassesGenerator(ImbalanceGenerator):
+class UndersamplingGenerator(ImbalanceGenerator):
+    """Remove rows selected by a deficit selector.
+
+    The selector encodes the amount of imbalance entirely (a ``[0, 1]``
+    deficit spec per column). A fractional spec is realized stochastically
+    (each selected row is dropped with probability ``spec[i]``); a
+    boolean/integer spec is deterministic. With multiple target columns the
+    union of selected rows is dropped.
+
+    Parameters
+    ----------
+    random_generator : numpy.random.Generator, required
+        Random number generator instance.
+
+    generate() parameters
+    ----------
+    selector : Selector or None, default=None
+        Deficit row-selection rule from ``badgers.core.selectors``. ``None``
+        returns the input unchanged.
     """
-    Randomly samples data points within predefined classes
-    """
-
-    def __init__(self, random_generator):
-        """
-        Initialize the RandomSamplingClassesGenerator with a specified random number generator.
-
-        :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Required (no default): pass a numpy.random.Generator.
-        :type random_generator: numpy.random.Generator
-        """
-        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
     def generate(self, X, selector=None):
-        """
-        Drops the rows selected by the selector (subsampling deficit),
-        per-class: exactly ``int(prop * n_rows)`` rows of each listed class
-        are removed, classes absent from the mapping are kept.
-
-        :param X: Input features, can be a pandas DataFrame or a numpy array.
-        :type X: Union[pandas.DataFrame, numpy.ndarray]
-        :param selector: A selector (e.g.
-                         :class:`badgers.core.selectors.ClassSelector`)
-                         deciding which rows are dropped. ``None`` = the
-                         relevant default: a selector that selects nothing
-                         (no rows dropped). The class variable is a
-                         column of ``X`` (read from the selector's
-                         ``class_column``).
-        :type selector: callable, optional
-        :return: The sampled features (Xt).
-        """
+        """Return the input with selector-selected rows removed."""
         if selector is None:
-            self.imbalance_labels_ = np.zeros(X.shape[0], dtype=bool)
+            self._set_imbalance_labels(np.zeros(X.shape[0], dtype=bool))
             return X
-        # a row is dropped if selected in any class column
         selected = get_selected_fields(X, selector, self.random_generator).any(axis=1)
         Xt = X[~selected, :]
-        self.imbalance_labels_ = selected
+        # True = removed; aligned with the input (the pre-subset frame).
+        self._set_imbalance_labels(selected)
         return Xt
 
 
-class RandomSamplingTargetsGenerator(ImbalanceGenerator):
+class OversamplingGenerator(ImbalanceGenerator):
+    """Duplicate rows according to per-row integer multiplicities.
+
+    The multiplicity selector encodes the amount of imbalance entirely: each
+    row ``i`` appears ``m[i]`` times in the output (``m[i] >= 1``), in the
+    original row order. The output always contains every input row at least
+    once — oversampling never drops a row.
+
+    Parameters
+    ----------
+    random_generator : numpy.random.Generator, required
+        Random number generator instance.
+
+    generate() parameters
+    ----------
+    selector : MultiplicitiesSelector or int or array-like or None, \
+default=None
+        Per-row multiplicities: a :class:`MultiplicitiesSelector` (``__call__``
+        returns an integer array ``(n_rows,)``), a bare integer (every row),
+        or an integer array of shape ``(n_rows,)``. All values must be
+        ``>= 1``. ``None`` returns the input unchanged.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from badgers.generators.tabular_data.imbalance import (
+    ...     OversamplingGenerator, ConstantMultiplicity,
+    ... )
+    >>> gen = OversamplingGenerator(np.random.default_rng(0))
+    >>> X = np.arange(6).reshape(3, 2)
+    >>> gen.generate(X, ConstantMultiplicity(2)).shape
+    (6, 2)
     """
-    Resamples rows with per-row probabilities derived from a selector.
-
-    The selector decides, for each row, the probability that the deficit
-    is applied. The deficit HERE is "this row is not kept": the generator
-    realizes the fractional scores as KEEP weights
-    (``1 - deficit_probability``, noisy-OR combined over the selector's
-    variables) and resamples rows from those weights.
-
-    This is the single score-driven resampler of the imbalance family,
-    covering the two former classes: a FRACTIONAL selector over a
-    continuous column (e.g. ``ProportionalSelector``) gives the
-    value-weighted resample of the removed ``RandomSamplingFeaturesGenerator``,
-    while a BOOLEAN selector over a discrete class column (e.g.
-    ``ClassSelector``) gives an exact per-class subsample (the selected rows
-    are dropped).
-
-    With ``replace=True`` (default) rows may be DUPLICATED -- the classic
-    importance-resampling deficit. With ``replace=False`` the output is a
-    weighted thinning (each row kept at most once).
-    """
-
-    def __init__(self, random_generator):
-        """
-        Initialize the RandomSamplingTargetsGenerator with a specified random number generator.
-
-        :param random_generator: A NumPy random number generator used to generate random numbers.
-                                 Required (no default): pass a numpy.random.Generator.
-        :type random_generator: numpy.random.Generator
-        """
-        super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, *, selector=None, replace=True, size=None):
-        """
-        Resamples instances from a selector's deficit probabilities.
-
-        The selector returns per-row deficit probabilities (float scores in
-        ``[0, 1]``, boolean masks being the degenerate case); rows are
-        resampled with probability proportional to ``1 - p`` (i.e. rows
-        with a high deficit probability are largely dropped, rows with a
-        low deficit probability are kept/replicated).
-
-        :param X: Input features, can be a pandas DataFrame or a numpy array.
-        :param selector: A selector deciding which rows get the deficit.
-            E.g. ``ProportionalSelector([0], 0)`` (deficit
-            probability proportional to a column), a ``BernoulliSelector``,
-            or any callable accepting X and returning ``dict[int, spec]``
-            (keys are column positions; the per-row specs are the deficit
-            scores). Required (``None`` raises -- there is no relevant
-            default: resampling needs the user's deficit scores).
-        :param replace: Whether to sample with replacement (default True:
-            rows may be duplicated). ``False`` gives a weighted thinning.
-        :param size: Number of rows to draw (default: the input row count).
-        :return: The resampled features (Xt).
-        """
-        if selector is None:
-            raise ValueError(
-                "RandomSamplingTargetsGenerator needs a selector deciding "
-                "which rows get the deficit (e.g. ProportionalSelector "
-                "over a column of X)."
-            )
-        scores = [np.asarray(s, dtype=float) for s in selector(X).values()]
-        if len(scores) == 1:
-            deficit_proba = scores[0]
-        else:
-            # noisy-OR: the probabilistic generalization of the boolean OR
-            keep = np.prod([1.0 - s for s in scores], axis=0)
-            deficit_proba = 1.0 - keep
-        if (deficit_proba < 0).any() or (deficit_proba > 1).any():
-            raise ValueError(
-                "selector scores must be in [0, 1] "
-                f"(got [{deficit_proba.min()}, {deficit_proba.max()}])"
-            )
-        keep_weights = 1.0 - deficit_proba
-        if not keep_weights.sum() > 0:
-            raise ValueError(
-                "every row has deficit probability 1: no row can be kept "
-                "(lower the selector's deficit probabilities)"
-            )
-        # Boolean scores (all 0/1) are DETERMINISTIC: realize them as an
-        # exact subsample of the rows that are never selected (deficit proba 0) --
-        # a weighted draw without replacement of size n would draw every
-        # index once, zero-weight rows included.
-        if np.isin(deficit_proba, (0.0, 1.0)).all():
-            kept = np.flatnonzero(deficit_proba == 0.0)
-            if size is not None and size < len(kept):
-                kept = self.random_generator.choice(kept, size=size, replace=False)
-            Xt = X[kept, :]
-            selected = np.ones(X.shape[0], dtype=bool)
-            selected[kept] = False
-            self.imbalance_labels_ = selected
-            return Xt
-        # Fractional scores: normalize the keep weights into a probability
-        # vector and resample from them.
-        p = normalize_proba(keep_weights.reshape(-1, 1)).ravel()
-        n = self.random_generator.choice(
-            X.shape[0], p=p, size=X.shape[0] if size is None else size,
-            replace=replace,
-        )
-        Xt = X[n, :]
-        selected = np.ones(X.shape[0], dtype=bool)
-        selected[n] = False
-        self.imbalance_labels_ = selected
+    def generate(self, X, selector=None):
+        """Return the input with rows duplicated per their multiplicity."""
+        m = resolve_multiplicities(X, selector)
+        idx = np.repeat(np.arange(X.shape[0]), m)
+        Xt = X[idx, :]
+        # True = duplicated (multiplicity > 1); aligned with the input.
+        self._set_imbalance_labels(m > 1)
         return Xt
