@@ -25,6 +25,38 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 - **`MaskedMultiplicity(mask, k)`** — a `MultiplicitiesSelector` that assigns
   multiplicity `k` to the rows where `mask` is `True` (a `(n,)` bool array or
   a callable on `X`) and multiplicity 1 to the rest.
+- **`OutlierSamplingGenerator`** (in
+  `badgers.generators.tabular_data.outliers.sampling`) — the generic
+  non-causal outlier generator: `generate(X, selector, *,
+  out_of_distribution_sampler="zscore")` appends rows that are copies of the
+  selector's seed rows with the selector-selected cells replaced by
+  out-of-distribution values (all other cells keep the seed row's values).
+  The `selector` is REQUIRED — it owns the outlier count and the perturbed
+  targets (e.g. `CountSelector([0, 1], count=20, rng=...)`).
+  `get_outliers_labels()` returns a boolean array aligned with the OUTPUT
+  rows (`True` = appended outlier row).
+- **`KernelDensitySampler`** (in `badgers.core.sampling`, registry name
+  `"low_density"`) — a KDE-based out-of-distribution sampler preserved from
+  the removed `LowDensitySamplingGenerator`. Rewritten as a grid-CDF
+  construction (no rejection): it scores a bounded regular grid of at most
+  ~`grid_budget` cells (hard cap of 65536 cells; `NotImplementedError` if
+  fewer than 2 cells per dimension is feasible) with an sklearn
+  `KernelDensity` (Scott bandwidth, `ball_tree`), then draws exactly
+  `n_samples` points from a categorical over the grid cells at or below the
+  `threshold_low_density` percentile of the data log-densities, each point
+  uniform inside its cell (fallback: the least-dense cells). The new
+  `grid_budget` parameter replaces the earlier `max_samples`; the count is
+  always exactly `n_samples` and deterministic for a fixed `rng` seed.
+- **`TreeCellSampler`** (in `badgers.core.sampling`, registry name `"tree"`)
+  — an adaptive-histogram out-of-distribution sampler (no KDE): recursive
+  median splits partition the standardized columns into kd cells holding at
+  most `leaf_size` points (fine resolution in dense regions, coarse in
+  sparse ones); every cell is extended axis-aligned to the midplanes with
+  the neighbouring points (an axis-aligned Voronoi approximation), and
+  exactly `n_samples` points are drawn from a categorical over the cells
+  whose density (count/volume) is at most `threshold_low_density` times the
+  global mean density (fallback: the least-dense 10 cells). Deterministic
+  for a fixed `rng` seed.
 
 ### Changed
 
@@ -37,6 +69,18 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   fractional values in `(0, 1)` ("looks like a deficit Selector"), zeros
   ("row dropped"), negative values ("must be >= 1"), and non-integer
   multiplicities ("not supported").
+- **The non-causal outlier generators collapsed into a single generic
+  `OutlierSamplingGenerator` (breaking).** It mirrors the causal
+  `CausalOutlierPropagationGenerator`'s contract: a REQUIRED `selector`
+  (owns the outlier count and the perturbed targets) plus a pluggable
+  `out_of_distribution_sampler` (an `OutOfDistributionSampler` instance from
+  `badgers.core.sampling`, or its registry name as a string, default
+  `"zscore"`). The former strategy-specific generators are now samplers:
+  `ZScoreSampler` (`"zscore"`), `HypersphereSampler` (`"hypersphere"`),
+  `UniformOutOfDistributionSampler` (`"uniform"`),
+  `IndependentHistogramSampler` (`"independent_histogram"`),
+  `JointHistogramSampler` (`"histogram"`), and `KernelDensitySampler`
+  (`"low_density"`).
 
 ### Removed
 
@@ -50,10 +94,32 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
   `badgers.generators.tabular_data.causal`; causal no longer ships an
   imbalance generator (row removal/duplication is an observation-process
   operation in `badgers.generators.tabular_data.imbalance`).
+- **`HyperCubeSampling`** — replaced by
+  `OutlierSamplingGenerator` with `UniformOutOfDistributionSampler(expansion)`
+  (registry name `"uniform"`).
+- **`ZScoreSamplingGenerator`** — replaced by
+  `OutlierSamplingGenerator` with `ZScoreSampler(scale)`
+  (registry name `"zscore"`).
+- **`HypersphereSamplingGenerator`** — replaced by
+  `OutlierSamplingGenerator` with `HypersphereSampler(scale)`
+  (registry name `"hypersphere"`).
+- **`IndependentHistogramsGenerator`** — replaced by
+  `OutlierSamplingGenerator` with `IndependentHistogramSampler(bins)`
+  (registry name `"independent_histogram"`).
+- **`HistogramSamplingGenerator`** — replaced by
+  `OutlierSamplingGenerator` with
+  `JointHistogramSampler(bins, threshold_low_density)`
+  (registry name `"histogram"`).
+- **`LowDensitySamplingGenerator`** — replaced by
+  `OutlierSamplingGenerator` with
+  `KernelDensitySampler(threshold_low_density, grid_budget)`
+  (registry name `"low_density"`).
 
   **No backward compatibility** is provided for any of these classes.
   See the new [Imbalance tutorial](tutorials/tabular-data/Imbalance.md)
-  for the replacement patterns.
+  for the replacement patterns, and the
+  [Outliers tutorial](tutorials/tabular-data/Outliers/) for the
+  `OutlierSamplingGenerator` + sampler patterns.
 
 ## dev_0_0_15 (unreleased)
 

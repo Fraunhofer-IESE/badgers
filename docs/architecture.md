@@ -19,9 +19,10 @@ badgers/
 │       ├── __init__.py
 │       ├── tabular_data/             # outliers, drift, imbalance, missingness, noise
 │       │   ├── outliers/
-│       │   │   ├── distribution_sampling.py
+│       │   │   ├── causal.py
 │       │   │   ├── instance_sampling.py
-│       │   │   └── low_density_sampling.py
+│       │   │   ├── sampling.py
+│       │   │   └── _selection.py
 │       │   ├── drift.py
 │       │   ├── imbalance.py
 │       │   ├── missingness.py
@@ -310,7 +311,7 @@ tests/
 
 **Decision:** Each generator category has a `_*.py` registration module in `benchmarks/generators/<data_type>/` that imports generator classes and calls `register(GeneratorBenchmark(...))`. The registry auto-discovers these modules.
 
-**Key constraint:** Density-based generators (e.g., `HistogramSamplingGenerator`) must only use `SCENARIO_SMALL_BLOBS` (2D) because they raise on >5D input.
+**Key constraint:** The `OutlierSamplingGenerator` benchmarks using `JointHistogramSampler` (registry name `"histogram"`) must only use `SCENARIO_SMALL_BLOBS` (2D) because joint histogram sampling supports at most 5 columns.
 
 **Rationale:** Decouples benchmark definitions from the benchmark runner. Adding a new generator to benchmarks is a single `register()` call in the appropriate `_*.py` file — no other changes needed.
 
@@ -342,16 +343,23 @@ python -m benchmarks compare --baseline v0.0.13
 
 **Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.
 
-### ADR-6: Low-Density Value Synthesis Reuses Shared OOD Samplers (2026-10-25)
+### ADR-6: Outlier Value Synthesis Is Owned by Shared OOD Samplers (2026-10-25)
 
-**Decision:** The histogram-based outlier generators delegate their value synthesis to the reusable OOD samplers in `badgers.core.sampling`:
+**Decision:** All non-causal outlier value synthesis is delegated to the reusable OOD samplers in `badgers.core.sampling`, which one generic `OutlierSamplingGenerator` selects at `generate()` time (a string registry name is resolved via `create_out_of_distribution_sampler`):
 
-- `IndependentHistogramsGenerator` → `IndependentHistogramSampler` (per-column low-density histogram bins)
-- `HistogramSamplingGenerator` → `JointHistogramSampler` (standardize → histogramdd → low-density bins → inverse-transform; supports at most 5 synthesized columns)
+| Strategy | Sampler (`badgers.core.sampling`) | Registry name |
+|---|---|---|
+| z-score (±(3 + exponential)·σ per column) | `ZScoreSampler(scale)` | `"zscore"` (default) |
+| hypersphere shell (radius ≥ 3σ) | `HypersphereSampler(scale)` | `"hypersphere"` |
+| uniform around the observed range | `UniformOutOfDistributionSampler(expansion)` | `"uniform"` |
+| per-column low-density histogram bins | `IndependentHistogramSampler(bins)` | `"independent_histogram"` |
+| joint low-density histogram bins (≤ 5 columns) | `JointHistogramSampler(bins, threshold_low_density)` | `"histogram"` |
+| grid-CDF KDE: scores a bounded regular grid, categorical over low-density cells, exact count, no rejection | `KernelDensitySampler(threshold_low_density, grid_budget)` | `"low_density"` |
+| adaptive kd partition (median splits), axis-aligned Voronoi cell extension, categorical over cells with density <= threshold × mean density, exact count | `TreeCellSampler(threshold_low_density, leaf_size)` | `"tree"` |
 
-Generators keep their responsibilities outside synthesis: count validation, selector-key target resolution, zero-outlier short-circuit, `InstanceSampler` bootstrap of unselected columns (in real space), row appending, and label bookkeeping. The KDE-based `LowDensitySamplingGenerator` is intentionally not delegated.
+The generator keeps its responsibilities outside synthesis: the required `selector` owns the outlier count and the perturbed targets, the generator copies the seed rows, replaces the selected cells with the sampler's values, appends the rows, and records `get_outliers_labels()`. `CausalOutlierPropagationGenerator` consumes the same samplers for its perturbation nodes, so both outlier families share one strategy set and one interface (`sample(rng, X, columns, n)`).
 
-**Rationale:** The histogram algorithms are useful beyond this pair of generators (e.g., for custom pipelines); exposing them as samplers avoids code duplication while the seeded delegation-parity tests in `test_outliers.py` guarantee bit-for-bit identical synthesis to the former inline implementations.
+**Rationale:** The sampling algorithms are useful beyond the outlier generators (e.g., for custom pipelines); exposing them as samplers avoids code duplication and makes a new strategy a new sampler — not a new generator class — for both the non-causal and the causal generator.
 
 ## Causal defect family: three-layer design
 

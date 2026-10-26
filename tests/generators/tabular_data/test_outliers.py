@@ -5,57 +5,58 @@ from numpy.random import default_rng
 from sklearn.datasets import make_blobs
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import KernelDensity as _KernelDensityEstimator
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from badgers.core.sampling import (
     HypersphereSampler,
+    IndependentHistogramSampler,
+    JointHistogramSampler,
+    KernelDensitySampler,
+    TreeCellSampler,
     UniformOutOfDistributionSampler,
     ZScoreSampler,
+    create_out_of_distribution_sampler,
 )
-from badgers.core.selectors import AlwaysSelector, CountSelector, get_selected_fields
-from badgers.core.utils import random_sign
+from badgers.core.selectors import CountSelector, get_selected_fields
 from badgers.generators.tabular_data.outliers._selection import iter_selection_groups
 from badgers.generators.tabular_data.outliers import StructuredOutlierGenerator
-from badgers.generators.tabular_data.outliers.distribution_sampling import (
-    ZScoreSamplingGenerator, HypersphereSamplingGenerator, HyperCubeSampling,
-)
 from badgers.generators.tabular_data.outliers.instance_sampling import (
     UniformInstanceAttributeSampling,
 )
-from badgers.generators.tabular_data.outliers.low_density_sampling import (
-    HistogramSamplingGenerator, LowDensitySamplingGenerator,
-    IndependentHistogramsGenerator,
-)
+from badgers.generators.tabular_data.outliers.sampling import OutlierSamplingGenerator
+
 
 COMMON_GENERATORS = [
-    ("hyper_cube", HyperCubeSampling, {"expansion": 0.0}),
-    ("z_score", ZScoreSamplingGenerator, {"scale": 1.0}),
-    ("hypersphere", HypersphereSamplingGenerator, {"scale": 1.0}),
-    ("histogram", HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
-    ("low_density", LowDensitySamplingGenerator, {}),
-    ("independent_histograms", IndependentHistogramsGenerator, {"bins": 3}),
+    ("uniform", "uniform", {"expansion": 0.0}),
+    ("zscore", "zscore", {"scale": 1.0}),
+    ("hypersphere", "hypersphere", {"scale": 1.0}),
+    ("histogram", "histogram", {"bins": 3, "threshold_low_density": 0.5}),
+    ("low_density", "low_density", {}),
+    ("independent_histogram", "independent_histogram", {"bins": 3}),
+    ("tree", "tree", {"leaf_size": 4}),
 ]
 
 
 def test_outliers__correct_shape_and_labels(tabular_data):
-    """For each generator and input type: Xt has original + outliers, and the
+    """For each sampler and input type: Xt has original + outliers, and the
     internal labels via get_outliers_labels() are False/True aligned with rows."""
     n_outliers = 10
     X = np.asarray(tabular_data)
     n_samples = len(X)
 
-    for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
-        generator = gen_class(random_generator=default_rng(0))
+    for gen_name, ood_name, ood_kwargs in COMMON_GENERATORS:
+        generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+        selector = CountSelector(
+            list(range(X.shape[1])), count=n_outliers, rng=default_rng(1))
 
         try:
             Xt = generator.generate(
-                X.copy(), n_outliers=n_outliers, **default_kwargs
-            )
+                X.copy(), selector,
+                out_of_distribution_sampler=create_out_of_distribution_sampler(
+                    ood_name, **ood_kwargs))
         except (NotImplementedError, AttributeError, ValueError):
             continue
-
-        if len(Xt) == n_samples:
-            continue  # LowDensitySamplingGenerator may generate 0 outliers
 
         # Xt has original + outlier rows
         assert Xt.shape[0] == n_samples + n_outliers
@@ -70,40 +71,53 @@ def test_outliers__correct_shape_and_labels(tabular_data):
 
 
 def test_outliers__reproducibility_given_same_seed(tabular_data):
-    """With the same RNG seed and same inputs, generators produce the same output."""
+    """With the same RNG seeds and same inputs, the generator reproduces output."""
     X = np.asarray(tabular_data)
 
-    for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
-        rng1 = default_rng(42)
-        rng2 = default_rng(42)
-        gen1 = gen_class(random_generator=rng1)
-        gen2 = gen_class(random_generator=rng2)
+    for gen_name, ood_name, ood_kwargs in COMMON_GENERATORS:
+        gen1 = OutlierSamplingGenerator(random_generator=default_rng(42))
+        gen2 = OutlierSamplingGenerator(random_generator=default_rng(42))
+        sel1 = CountSelector(list(range(X.shape[1])), count=20, rng=default_rng(7))
+        sel2 = CountSelector(list(range(X.shape[1])), count=20, rng=default_rng(7))
 
         try:
-            Xt1 = gen1.generate(X.copy(), n_outliers=20, **default_kwargs)
-            Xt2 = gen2.generate(X.copy(), n_outliers=20, **default_kwargs)
+            Xt1 = gen1.generate(
+                X.copy(), sel1,
+                out_of_distribution_sampler=create_out_of_distribution_sampler(
+                    ood_name, **ood_kwargs))
+            Xt2 = gen2.generate(
+                X.copy(), sel2,
+                out_of_distribution_sampler=create_out_of_distribution_sampler(
+                    ood_name, **ood_kwargs))
         except (NotImplementedError, AttributeError, ValueError):
-            continue
-
-        if len(Xt1) == len(X):
             continue
 
         np.testing.assert_allclose(Xt1, Xt2)
 
 
 def test_outliers__scores_worse_than_original():
-    """Outlier scores from IsolationForest should be lower than original data scores."""
+    """Outlier scores from IsolationForest should be lower than original data scores.
+
+    Uses a low feature count: the hypersphere sampler's anomaly is radial
+    (a large joint norm), which spreads to ~1 sigma per coordinate and is only
+    separable by an axis-aligned IsolationForest when the dimension is small.
+    """
     rng = default_rng(0)
-    X = rng.normal(size=(100, 10))
+    X = rng.normal(size=(100, 5))
     detector = IsolationForest(random_state=0, n_estimators=100, contamination="auto")
     detector.fit(X)
     original_scores = detector.decision_function(X)
     mean_original_score = original_scores.mean()
 
-    for gen_name, gen_class, default_kwargs in COMMON_GENERATORS:
-        generator = gen_class(random_generator=default_rng(0))
+    for gen_name, ood_name, ood_kwargs in COMMON_GENERATORS:
+        generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+        selector = CountSelector(
+            list(range(X.shape[1])), count=50, rng=default_rng(1))
         try:
-            Xt = generator.generate(X.copy(), n_outliers=50, **default_kwargs)
+            Xt = generator.generate(
+                X.copy(), selector,
+                out_of_distribution_sampler=create_out_of_distribution_sampler(
+                    ood_name, **ood_kwargs))
         except (NotImplementedError, AttributeError, ValueError):
             continue
 
@@ -128,10 +142,16 @@ def test_zscore__scale_effect_on_zscore_magnitude():
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    generator = ZScoreSamplingGenerator(random_generator=default_rng(0))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
     n_outliers = 200
-    Xt_small = generator.generate(X_scaled.copy(), n_outliers=n_outliers, scale=0.1)
-    Xt_large = generator.generate(X_scaled.copy(), n_outliers=n_outliers, scale=5.0)
+    Xt_small = generator.generate(
+        X_scaled.copy(),
+        CountSelector(range(10), count=n_outliers, rng=default_rng(1)),
+        out_of_distribution_sampler=ZScoreSampler(scale=0.1))
+    Xt_large = generator.generate(
+        X_scaled.copy(),
+        CountSelector(range(10), count=n_outliers, rng=default_rng(1)),
+        out_of_distribution_sampler=ZScoreSampler(scale=5.0))
 
     # Extract only the outlier rows
     n_original = len(X_scaled)
@@ -147,19 +167,22 @@ def test_zscore__scale_effect_on_zscore_magnitude():
 def test_zscore__delegates_to_sampler_math():
     """Outlier rows equal the selector-flow replay on the same stream.
 
-    Pins the draw order of the new flow: CountSelector row draw, then
-    get_selected_fields()'s realization draws, then the sampler's signs + exponentials.
+    Pins the draw order of the new flow: CountSelector row draw (selector's
+    own rng), then get_selected_fields()'s realization draws, then the
+    sampler's signs + exponentials (all on the generator's rng).
     The sampler MATH exactness itself is pinned in tests/core/test_sampling.py.
     """
     rng = default_rng(42)
     X = rng.normal(size=(50, 4))
     n_outliers, scale = 10, 1.0
 
-    generator = ZScoreSamplingGenerator(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=n_outliers, scale=scale)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector, out_of_distribution_sampler=ZScoreSampler(scale=scale))
 
-    ref_rng = default_rng(0)
-    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
+    ref_rng = default_rng(0)  # the generator's stream: realization + sampler
+    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(1))
     ref_field = get_selected_fields(X, ref_selector, ref_rng)
     ref_targets = list(range(X.shape[1]))
     ref_seeds = np.flatnonzero(ref_field.any(axis=1))
@@ -176,8 +199,11 @@ def test_zscore__selector_partial_selection_keeps_seed_values():
     X = rng.normal(size=(40, 3))
     mask0 = np.zeros(40, dtype=bool)
     mask0[:5] = True
-    generator = ZScoreSamplingGenerator(random_generator=default_rng(1))
-    Xt = generator.generate(X.copy(), selector=lambda X_, targets=None: {0: mask0})
+    generator = OutlierSamplingGenerator(random_generator=default_rng(1))
+    Xt = generator.generate(
+        X.copy(),
+        lambda X_, targets=None: {0: mask0},
+        out_of_distribution_sampler=ZScoreSampler(scale=1.0))
     outliers = Xt[len(X):]
     assert outliers.shape == (5, 3)
     labels = generator.get_outliers_labels()
@@ -194,10 +220,11 @@ def test_zscore__selector_partial_selection_keeps_seed_values():
 def test_zscore__explicit_count_selector():
     """An explicit CountSelector owns count and targets."""
     X = default_rng(0).normal(size=(40, 3))
-    generator = ZScoreSamplingGenerator(random_generator=default_rng(2))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(2))
     selector = CountSelector([0], count=6, rng=default_rng(3))
     ref_selector = CountSelector([0], count=6, rng=default_rng(3))
-    Xt = generator.generate(X.copy(), selector=selector)
+    Xt = generator.generate(
+        X.copy(), selector, out_of_distribution_sampler=ZScoreSampler(scale=1.0))
     assert Xt.shape == (46, 3)
     labels = generator.get_outliers_labels()
     assert labels[:40].sum() == 0 and labels[40:].all()
@@ -212,23 +239,29 @@ def test_zscore__explicit_count_selector():
 
 
 def test_histogram__2d_raises_not_implemented():
-    """HistogramSamplingGenerator raises NotImplementedError for >3 columns."""
+    """JointHistogramSampler raises NotImplementedError for >5 columns."""
     rng = default_rng(0)
     X = pd.DataFrame(rng.normal(size=(100, 10)), columns=[f"col{i}" for i in range(10)])
-    generator = HistogramSamplingGenerator(random_generator=default_rng(0))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(range(10), count=10, rng=default_rng(1))
     try:
-        generator.generate(X.copy(), n_outliers=10, bins=3)
+        generator.generate(
+            X.copy(), selector, out_of_distribution_sampler=JointHistogramSampler(bins=3))
         assert False, "Expected NotImplementedError"
     except NotImplementedError:
         pass
 
 
 def test_histogram__3cols_works():
-    """HistogramSamplingGenerator works with 3 columns."""
+    """JointHistogramSampler works with 3 columns."""
     rng = default_rng(0)
     X = pd.DataFrame(rng.normal(size=(100, 3)), columns=["a", "b", "c"])
-    generator = HistogramSamplingGenerator(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=10, bins=3)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(
+        X.copy(),
+        CountSelector(range(3), count=10, rng=default_rng(1)),
+        out_of_distribution_sampler=JointHistogramSampler(bins=3,
+                                                          threshold_low_density=0.5))
     n_original = len(X)
     assert len(Xt) == n_original + 10
     assert Xt.shape[1] == 3
@@ -241,8 +274,11 @@ def test_hypersphere__radius_ge_three_in_standardized_space():
     X_arr = np.asarray(X)
     scaler = StandardScaler().fit(X_arr)
 
-    generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=100, scale=1.0)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(
+        X.copy(),
+        CountSelector(range(10), count=100, rng=default_rng(1)),
+        out_of_distribution_sampler=HypersphereSampler(scale=1.0))
     assert len(Xt) == 200  # 100 original + 100 outliers
 
     # Extract only the outlier rows
@@ -259,13 +295,19 @@ def test_hypersphere__scale_effect_on_radius():
     """Larger scale should, on average, yield larger radii."""
     rng = default_rng(0)
     X = pd.DataFrame(rng.normal(size=(300, 10)), columns=[f"col{i}" for i in range(10)])
-    generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
-    Xt_small = generator.generate(X.copy(), n_outliers=200, scale=0.1)
-    Xt_large = generator.generate(X.copy(), n_outliers=200, scale=5.0)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    Xt_small = generator.generate(
+        X.copy(),
+        CountSelector(range(10), count=200, rng=default_rng(1)),
+        out_of_distribution_sampler=HypersphereSampler(scale=0.1))
+    Xt_large = generator.generate(
+        X.copy(),
+        CountSelector(range(10), count=200, rng=default_rng(1)),
+        out_of_distribution_sampler=HypersphereSampler(scale=5.0))
 
     # Extract only the outlier rows
-    outliers_small = Xt_small[200:]  # last 200 rows are outliers
-    outliers_large = Xt_large[200:]
+    outliers_small = Xt_small[300:]  # last 200 rows are outliers
+    outliers_large = Xt_large[300:]
 
     r_small = np.linalg.norm(outliers_small, axis=1).mean()
     r_large = np.linalg.norm(outliers_large, axis=1).mean()
@@ -279,11 +321,13 @@ def test_hypersphere__delegates_to_sampler_math():
     X = rng.normal(size=(50, 4))
     n_outliers, scale = 10, 1.0
 
-    generator = HypersphereSamplingGenerator(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=n_outliers, scale=scale)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector, out_of_distribution_sampler=HypersphereSampler(scale=scale))
 
     ref_rng = default_rng(0)
-    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
+    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(1))
     ref_field = get_selected_fields(X, ref_selector, ref_rng)
     ref_targets = list(range(X.shape[1]))
     ref_seeds = np.flatnonzero(ref_field.any(axis=1))
@@ -299,8 +343,11 @@ def test_hypercube__expansion_zero_within_min_max():
     rng = default_rng(0)
     X = pd.DataFrame(rng.normal(size=(100, 10)), columns=[f"col{i}" for i in range(10)])
     X_arr = np.asarray(X)
-    generator = HyperCubeSampling(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=100, expansion=0.0)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(
+        X.copy(),
+        CountSelector(range(10), count=100, rng=default_rng(1)),
+        out_of_distribution_sampler=UniformOutOfDistributionSampler(expansion=0.0))
     assert len(Xt) == 200  # 100 original + 100 outliers
 
     # Extract only the outlier rows
@@ -322,8 +369,11 @@ def test_hypercube__expansion_positive_respects_range():
     scaler = MinMaxScaler().fit(X_arr)
     expansion = 0.1
 
-    generator = HyperCubeSampling(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=100, expansion=expansion)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    Xt = generator.generate(
+        X.copy(),
+        CountSelector(range(10), count=100, rng=default_rng(1)),
+        out_of_distribution_sampler=UniformOutOfDistributionSampler(expansion=expansion))
     assert len(Xt) == 200  # 100 original + 100 outliers
 
     # Extract only the outlier rows
@@ -339,11 +389,13 @@ def test_hypercube__expansion_positive_respects_range():
 def test_hypercube__expansion_negative_raises():
     """Negative expansion raises ValueError (no bare asserts: validation
     must survive python -O)."""
-    rng = default_rng(0)
-    X = rng.normal(size=(100, 10))
-    generator = HyperCubeSampling(random_generator=default_rng(0))
+    X = default_rng(0).normal(size=(100, 10))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(range(10), count=10, rng=default_rng(1))
     with pytest.raises(ValueError, match="expansion"):
-        generator.generate(X.copy(), n_outliers=10, expansion=-0.1)
+        generator.generate(
+            X.copy(), selector,
+            out_of_distribution_sampler=UniformOutOfDistributionSampler(expansion=-0.1))
 
 
 def test_hypercube__delegates_to_sampler_math():
@@ -352,11 +404,14 @@ def test_hypercube__delegates_to_sampler_math():
     X = rng.normal(size=(50, 4))
     n_outliers, expansion = 10, 0.1
 
-    generator = HyperCubeSampling(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=n_outliers, expansion=expansion)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector,
+        out_of_distribution_sampler=UniformOutOfDistributionSampler(expansion=expansion))
 
     ref_rng = default_rng(0)
-    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=ref_rng)
+    ref_selector = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(1))
     ref_field = get_selected_fields(X, ref_selector, ref_rng)
     ref_targets = list(range(X.shape[1]))
     ref_seeds = np.flatnonzero(ref_field.any(axis=1))
@@ -366,9 +421,12 @@ def test_hypercube__delegates_to_sampler_math():
             expansion=expansion).sample(ref_rng, X, selected_cols, group_rows.size)
     np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
 
-    # the expansion=0 default path through the relaxed sampler: exact bounding box
-    generator0 = HyperCubeSampling(random_generator=default_rng(0))
-    Xt0 = generator0.generate(X.copy(), n_outliers=n_outliers, expansion=0.0)
+    # the expansion=0 path through the sampler: exact bounding box
+    generator0 = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector0 = CountSelector(range(X.shape[1]), count=n_outliers, rng=default_rng(5))
+    Xt0 = generator0.generate(
+        X.copy(), selector0,
+        out_of_distribution_sampler=UniformOutOfDistributionSampler(expansion=0.0))
     assert np.all(Xt0[len(X):] >= X.min(axis=0) - 1e-12)
     assert np.all(Xt0[len(X):] <= X.max(axis=0) + 1e-12)
 
@@ -377,18 +435,25 @@ def test_decomposition_and_outlier__generates_correct_shape():
     """DecompositionAndOutlierGenerator produces correct shape outliers."""
     X = make_blobs(centers=5, n_features=10, n_samples=100)[0]
     n_outliers = 10
-    outlier_generators = [
-        ZScoreSamplingGenerator(random_generator=np.random.default_rng(0)),
-        HistogramSamplingGenerator(random_generator=np.random.default_rng(0)),
-        HypersphereSamplingGenerator(random_generator=np.random.default_rng(0)),
-        LowDensitySamplingGenerator(random_generator=np.random.default_rng(0)),
+    samplers = [
+        ZScoreSampler(scale=1.0),
+        JointHistogramSampler(bins=10, threshold_low_density=0.1),
+        HypersphereSampler(scale=1.0),
+        KernelDensitySampler(),
+        TreeCellSampler(),
     ]
-    for outlier_generator in outlier_generators:
+    for ood in samplers:
+        outlier_generator = OutlierSamplingGenerator(
+            random_generator=np.random.default_rng(0))
         generator = StructuredOutlierGenerator(
             dimension_reduction_transformer=PCA(n_components=3),
             outlier_generator=outlier_generator,
         )
-        Xt = generator.generate(X.copy(), n_outliers=n_outliers)
+        # the reduced space is 3-D; the selector operates in that space
+        selector = CountSelector(range(3), count=n_outliers,
+                                 rng=np.random.default_rng(0))
+        Xt = generator.generate(
+            X.copy(), selector=selector, out_of_distribution_sampler=ood)
         assert Xt.shape[0] == X.shape[0] + n_outliers
         assert Xt.shape[1] == X.shape[1]
 
@@ -406,7 +471,7 @@ def test_decomposition_and_outlier__generates_correct_shape():
 
 def test_outliers__labels_before_generate_raises():
     """get_outliers_labels() raises RuntimeError if generate() was not called."""
-    generator = ZScoreSamplingGenerator(random_generator=default_rng(0))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
     with pytest.raises(RuntimeError):
         generator.get_outliers_labels()
 
@@ -488,69 +553,63 @@ def test_instance_sampling__selector_is_ignored_with_warning():
     assert labels[30:].all()
 
 
-# --- shared direct-four selector-flow suite ---
+# --- shared direct-four sampler-flow suite ---
 
 DIRECT_FOUR = [
-    (HyperCubeSampling, {"expansion": 0.1}),
-    (ZScoreSamplingGenerator, {"scale": 1.0}),
-    (HypersphereSamplingGenerator, {"scale": 1.0}),
+    ("uniform", UniformOutOfDistributionSampler, {"expansion": 0.1}),
+    ("zscore", ZScoreSampler, {"scale": 1.0}),
+    ("hypersphere", HypersphereSampler, {"scale": 1.0}),
 ]
 
 
-@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__n_outliers_capped_at_row_count(gen_class, kwargs):
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", DIRECT_FOUR)
+def test_direct_four__selector_count_capped_at_row_count(gen_name, sampler_class, kwargs):
     X = np.arange(20.0).reshape(10, 2)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(list(range(X.shape[1])), count=11, rng=default_rng(1))
     with pytest.raises(ValueError, match="exceeds the number of rows"):
-        gen_class(random_generator=default_rng(0)).generate(
-            X.copy(), n_outliers=11, **kwargs)
+        generator.generate(
+            X.copy(), selector, out_of_distribution_sampler=sampler_class(**kwargs))
 
 
-@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__negative_n_outliers_raises(gen_class, kwargs):
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", DIRECT_FOUR)
+def test_direct_four__negative_count_raises(gen_name, sampler_class, kwargs):
     X = np.arange(20.0).reshape(10, 2)
     with pytest.raises(ValueError, match="count must be >= 0"):
-        gen_class(random_generator=default_rng(0)).generate(
-            X.copy(), n_outliers=-1, **kwargs)
+        CountSelector(list(range(X.shape[1])), count=-1, rng=default_rng(1))
 
 
-@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__n_outliers_with_selector_raises(gen_class, kwargs):
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", DIRECT_FOUR)
+def test_direct_four__selector_none_raises(gen_name, sampler_class, kwargs):
     X = np.arange(20.0).reshape(10, 2)
-    with pytest.raises(ValueError, match="only the default count"):
-        gen_class(random_generator=default_rng(0)).generate(
-            X.copy(), n_outliers=5,
-            selector=CountSelector([0], count=3, rng=default_rng(1)), **kwargs)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    with pytest.raises(ValueError, match="selector is required"):
+        generator.generate(
+            X.copy(), None, out_of_distribution_sampler=sampler_class(**kwargs))
 
 
-@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__n_outliers_zero_is_noop(gen_class, kwargs):
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", DIRECT_FOUR)
+def test_direct_four__count_zero_is_noop(gen_name, sampler_class, kwargs):
     X = np.arange(40.0).reshape(20, 2)
-    generator = gen_class(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=0, **kwargs)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(list(range(X.shape[1])), count=0, rng=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector, out_of_distribution_sampler=sampler_class(**kwargs))
     np.testing.assert_array_equal(Xt, X)
     assert not generator.get_outliers_labels().any()
 
 
-@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__default_count_is_ten(gen_class, kwargs):
-    X = np.arange(40.0).reshape(20, 2)
-    generator = gen_class(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), **kwargs)
-    assert Xt.shape == (30, 2)
-    labels = generator.get_outliers_labels()
-    assert labels[:20].sum() == 0 and labels[20:].all()
-
-
-@pytest.mark.parametrize("gen_class,kwargs", DIRECT_FOUR)
-def test_direct_four__selector_oracle_unselected_cells(gen_class, kwargs):
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", DIRECT_FOUR)
+def test_direct_four__selector_oracle_unselected_cells(gen_name, sampler_class, kwargs):
     """Unselected cells of an appended row equal the seed row's values."""
     rng = default_rng(0)
     X = rng.normal(size=(40, 3))
     mask0 = np.zeros(40, dtype=bool)
     mask0[:5] = True
-    generator = gen_class(random_generator=default_rng(1))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(1))
     Xt = generator.generate(
-        X.copy(), selector=lambda X_, targets=None: {0: mask0}, **kwargs)
+        X.copy(), lambda X_, targets=None: {0: mask0},
+        out_of_distribution_sampler=sampler_class(**kwargs))
     outliers = Xt[len(X):]
     assert outliers.shape == (5, 3)
     np.testing.assert_array_equal(outliers[:, 1:], X[:5, 1:])
@@ -561,134 +620,299 @@ def test_direct_four__selector_oracle_unselected_cells(gen_class, kwargs):
 
 # --- low-density trio selector surface ---
 
-def test_independent_histograms__selector_keys_choose_synthesized_columns():
-    """Keys choose the synthesized columns; the mask is discarded; unselected
-    columns are per-cell bootstrap copies of real X values."""
+def test_independent_histograms__selector_keys_choose_perturbed_columns():
+    """The selector's columns are the perturbed cells; the selected rows are
+    the seeds, so unselected columns keep the SEED row's own value."""
     rng = default_rng(0)
     X = rng.normal(size=(60, 3))
-    generator = IndependentHistogramsGenerator(random_generator=default_rng(1))
-    # a CountSelector selects only 3 rows — proof the mask is discarded: the
-    # output still appends n_outliers FULL rows
+    generator = OutlierSamplingGenerator(random_generator=default_rng(1))
+    selector = CountSelector([0], count=3, rng=default_rng(2))
     Xt = generator.generate(
-        X.copy(), n_outliers=10, bins=5,
-        selector=CountSelector([0], count=3, rng=rng))
-    assert Xt.shape == (70, 3)
+        X.copy(), selector,
+        out_of_distribution_sampler=IndependentHistogramSampler(bins=5))
+    assert Xt.shape == (63, 3)
     labels = generator.get_outliers_labels()
     assert labels[:60].sum() == 0 and labels[60:].all()
-    fill = Xt[60:, 1:]  # unselected columns
-    assert np.isin(fill[:, 0], X[:, 1]).all()
-    assert np.isin(fill[:, 1], X[:, 2]).all()
+    # unselected columns (1, 2) keep the seed row's values
+    ref_selector = CountSelector([0], count=3, rng=default_rng(2))
+    seeds = np.flatnonzero(ref_selector(X, targets=[0])[0])
+    np.testing.assert_array_equal(Xt[60:, 1], X[seeds, 1])
+    np.testing.assert_array_equal(Xt[60:, 2], X[seeds, 2])
+    # selected column 0 was overwritten (not the seed values)
+    assert not np.array_equal(Xt[60:, 0], X[seeds, 0])
 
 
-def test_independent_histograms__default_path_unchanged():
-    """selector=None reproduces today's all-column synthesis exactly."""
+def test_independent_histograms__default_ood_sampler_is_zscore():
+    """out_of_distribution_sampler=None defaults to the zscore sampler."""
     X = default_rng(0).normal(size=(60, 3))
-    Xt1 = IndependentHistogramsGenerator(random_generator=default_rng(1)).generate(
-        X.copy(), n_outliers=10, bins=5)
-    Xt2 = IndependentHistogramsGenerator(random_generator=default_rng(1)).generate(
-        X.copy(), n_outliers=10, bins=5, selector=None)
+    gen1 = OutlierSamplingGenerator(random_generator=default_rng(1))
+    sel1 = CountSelector(list(range(3)), count=10, rng=default_rng(2))
+    Xt1 = gen1.generate(X.copy(), sel1)  # default -> zscore
+    gen2 = OutlierSamplingGenerator(random_generator=default_rng(1))
+    sel2 = CountSelector(list(range(3)), count=10, rng=default_rng(2))
+    Xt2 = gen2.generate(
+        X.copy(), sel2, out_of_distribution_sampler="zscore")
     np.testing.assert_array_equal(Xt1, Xt2)
 
 
-# --- delegation parity: generators must reproduce the shared samplers ---
-
-
-def _independent_histogram_reference(X, columns, n_samples, bins, seed):
-    """Seeded oracle reproducing the pre-delegation per-column algorithm."""
-    rng = default_rng(seed)
-    out = np.zeros((n_samples, len(columns)), dtype=float)
-    for j, column in enumerate(columns):
-        hist, bin_edges = np.histogram(X[:, column], bins=bins)
-        inv_density = 1 - hist / np.max(hist)
-        p = inv_density / np.sum(inv_density)
-        indices = rng.choice(bins, p=p, size=n_samples, replace=True)
-        out[:, j] = rng.uniform(low=bin_edges[indices], high=bin_edges[indices + 1])
-    return out
-
-
-def _joint_histogram_reference(X, columns, n_samples, bins, threshold, seed):
-    """Seeded oracle reproducing the pre-delegation joint algorithm."""
-    rng = default_rng(seed)
-    scaler = StandardScaler().fit(X[:, columns])
-    standardized = scaler.transform(X[:, columns])
-    hist, edges = np.histogramdd(standardized, density=False, bins=bins)
-    norm_hist = hist / np.max(hist)
-    low_density_coordinates = list(zip(*np.where(norm_hist <= threshold)))
-    coords = np.array(
-        rng.choice(low_density_coordinates, n_samples, replace=True), dtype=int)
-    out = np.zeros((n_samples, len(columns)), dtype=float)
-    for j in range(len(columns)):
-        bin_indices = coords[:, j]
-        bin_width = edges[j][bin_indices + 1] - edges[j][bin_indices]
-        out[:, j] = (
-            edges[j][bin_indices] + rng.uniform(0, 1, size=n_samples) * bin_width)
-    return scaler.inverse_transform(out)
+# --- delegation parity: the generator reproduces the shared samplers ---
 
 
 def test_independent_histograms_generator__delegates_to_sampler():
-    """Appended target values equal IndependentHistogramSampler's output."""
+    """Appended rows equal a replay of the exact generator rng flow."""
     X = default_rng(0).normal(size=(80, 2))
-    generator = IndependentHistogramsGenerator(random_generator=default_rng(1))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(1))
+    selector = CountSelector([0], count=12, rng=default_rng(2))
     Xt = generator.generate(
-        X.copy(), n_outliers=12, bins=5, selector=AlwaysSelector([0]))
-    expected = _independent_histogram_reference(X, [0], 12, bins=5, seed=1)
+        X.copy(), selector, out_of_distribution_sampler=IndependentHistogramSampler(bins=5))
+
+    ref_rng = default_rng(1)
+    ref_selector = CountSelector([0], count=12, rng=default_rng(2))
+    ref_field = get_selected_fields(X, ref_selector, ref_rng)
+    ref_targets = [0]
+    ref_seeds = np.flatnonzero(ref_field.any(axis=1))
+    outliers_ref = X[ref_seeds].astype(np.float64)
+    for group_rows, selected_cols in iter_selection_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, selected_cols)] = IndependentHistogramSampler(bins=5).sample(
+            ref_rng, X, selected_cols, group_rows.size)
+
     np.testing.assert_array_equal(Xt[:len(X)], X)
-    np.testing.assert_allclose(Xt[len(X):, 0], expected[:, 0])
-    assert np.isin(Xt[len(X):, 1], X[:, 1]).all()
+    np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
+    # unselected column keeps the seed value
+    np.testing.assert_array_equal(Xt[len(X):, 1], X[ref_seeds, 1])
     labels = generator.get_outliers_labels()
     assert labels.shape == (92,)
     assert labels[:80].sum() == 0 and labels[80:].all()
 
 
 def test_histogram_sampling_generator__delegates_to_sampler():
-    """Appended target values equal JointHistogramSampler's output."""
+    """Appended rows equal a replay of the exact generator rng flow."""
     X = default_rng(0).normal(size=(80, 2))
-    generator = HistogramSamplingGenerator(random_generator=default_rng(1))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(1))
+    selector = CountSelector([0], count=12, rng=default_rng(2))
     Xt = generator.generate(
-        X.copy(), n_outliers=12, bins=6, threshold_low_density=0.25,
-        selector=AlwaysSelector([0]))
-    expected = _joint_histogram_reference(
-        X, [0], 12, bins=6, threshold=0.25, seed=1)
+        X.copy(), selector,
+        out_of_distribution_sampler=JointHistogramSampler(
+            bins=6, threshold_low_density=0.25))
+
+    ref_rng = default_rng(1)
+    ref_selector = CountSelector([0], count=12, rng=default_rng(2))
+    ref_field = get_selected_fields(X, ref_selector, ref_rng)
+    ref_targets = [0]
+    ref_seeds = np.flatnonzero(ref_field.any(axis=1))
+    outliers_ref = X[ref_seeds].astype(np.float64)
+    for group_rows, selected_cols in iter_selection_groups(ref_field, ref_targets, ref_seeds):
+        outliers_ref[np.ix_(group_rows, selected_cols)] = JointHistogramSampler(
+            bins=6, threshold_low_density=0.25).sample(
+            ref_rng, X, selected_cols, group_rows.size)
+
     np.testing.assert_array_equal(Xt[:len(X)], X)
-    np.testing.assert_allclose(Xt[len(X):, 0], expected[:, 0])
-    assert np.isin(Xt[len(X):, 1], X[:, 1]).all()
+    np.testing.assert_allclose(Xt[len(X):], outliers_ref, rtol=0, atol=1e-12)
+    # unselected column keeps the seed value
+    np.testing.assert_array_equal(Xt[len(X):, 1], X[ref_seeds, 1])
     labels = generator.get_outliers_labels()
     assert labels.shape == (92,)
     assert labels[:80].sum() == 0 and labels[80:].all()
 
 
-@pytest.mark.parametrize("gen_class,kwargs", [
-    (IndependentHistogramsGenerator, {"bins": 3}),
-    (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
-    (LowDensitySamplingGenerator, {}),
-])
-def test_trio__n_outliers_capped_at_row_count(gen_class, kwargs):
+# --- low-density trio count/noop surface ---
+
+TRIO = [
+    ("independent_histogram", IndependentHistogramSampler, {"bins": 3}),
+    ("histogram", JointHistogramSampler, {"bins": 3, "threshold_low_density": 0.5}),
+    ("low_density", KernelDensitySampler, {}),
+    ("tree", TreeCellSampler, {"leaf_size": 4}),
+]
+
+
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", TRIO)
+def test_trio__selector_count_capped_at_row_count(gen_name, sampler_class, kwargs):
     X = np.arange(20.0).reshape(10, 2)
-    with pytest.raises(ValueError, match="must not exceed"):
-        gen_class(random_generator=default_rng(0)).generate(
-            X.copy(), n_outliers=11, **kwargs)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(list(range(X.shape[1])), count=11, rng=default_rng(1))
+    with pytest.raises(ValueError, match="exceeds the number of rows"):
+        generator.generate(
+            X.copy(), selector, out_of_distribution_sampler=sampler_class(**kwargs))
 
 
-@pytest.mark.parametrize("gen_class,kwargs", [
-    (IndependentHistogramsGenerator, {"bins": 3}),
-    (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
-    (LowDensitySamplingGenerator, {}),
-])
-def test_trio__negative_n_outliers_raises(gen_class, kwargs):
-    X = np.arange(20.0).reshape(10, 2)
-    with pytest.raises(ValueError, match="n_outliers must be a positive"):
-        gen_class(random_generator=default_rng(0)).generate(
-            X.copy(), n_outliers=-1, **kwargs)
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", TRIO)
+def test_trio__negative_count_raises(gen_name, sampler_class, kwargs):
+    with pytest.raises(ValueError, match="count must be >= 0"):
+        CountSelector([0], count=-1, rng=default_rng(1))
 
 
-@pytest.mark.parametrize("gen_class,kwargs", [
-    (IndependentHistogramsGenerator, {"bins": 3}),
-    (HistogramSamplingGenerator, {"bins": 3, "threshold_low_density": 0.5}),
-    (LowDensitySamplingGenerator, {}),
-])
-def test_trio__n_outliers_zero_is_noop(gen_class, kwargs):
+@pytest.mark.parametrize("gen_name,sampler_class,kwargs", TRIO)
+def test_trio__count_zero_is_noop(gen_name, sampler_class, kwargs):
     X = np.arange(40.0).reshape(20, 2)
-    generator = gen_class(random_generator=default_rng(0))
-    Xt = generator.generate(X.copy(), n_outliers=0, **kwargs)
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(list(range(X.shape[1])), count=0, rng=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector, out_of_distribution_sampler=sampler_class(**kwargs))
     np.testing.assert_array_equal(Xt, X)
     assert not generator.get_outliers_labels().any()
+
+
+# --- new OutlierSamplingGenerator contract ---
+
+def test_sampling__selector_none_raises():
+    """A missing selector is a hard error: it owns count and targets."""
+    X = default_rng(0).normal(size=(20, 3))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    with pytest.raises(ValueError, match="selector is required"):
+        generator.generate(X.copy(), None)
+
+
+def test_sampling__ood_sampler_str_and_instance():
+    """out_of_distribution_sampler accepts a registry string or an instance."""
+    X = default_rng(0).normal(size=(40, 3))
+    for sampler in ("zscore", "histogram",
+                    ZScoreSampler(scale=1.0),
+                    JointHistogramSampler(bins=3, threshold_low_density=0.5)):
+        generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+        selector = CountSelector(list(range(3)), count=8, rng=default_rng(1))
+        Xt = generator.generate(
+            X.copy(), selector, out_of_distribution_sampler=sampler)
+        assert Xt.shape == (48, 3)
+        labels = generator.get_outliers_labels()
+        assert labels[:40].sum() == 0 and labels[40:].all()
+
+
+def test_sampling__ood_sampler_invalid_type_raises():
+    """A non-str / non-sampler out_of_distribution_sampler is rejected."""
+    X = default_rng(0).normal(size=(20, 3))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector([0], count=3, rng=default_rng(1))
+    with pytest.raises(ValueError, match="OutOfDistributionSampler instance or str"):
+        generator.generate(
+            X.copy(), selector, out_of_distribution_sampler=42)
+
+
+def test_sampling__create_low_density_resolves():
+    """create_out_of_distribution_sampler resolves the low_density entry."""
+    sampler = create_out_of_distribution_sampler("low_density", grid_budget=50)
+    assert isinstance(sampler, KernelDensitySampler)
+    assert sampler.grid_budget == 50
+
+
+def test_sampling__create_tree_resolves():
+    """create_out_of_distribution_sampler resolves the tree entry."""
+    sampler = create_out_of_distribution_sampler("tree", leaf_size=5)
+    assert isinstance(sampler, TreeCellSampler)
+    assert sampler.leaf_size == 5
+
+
+def test_sampling__low_density_string_end_to_end():
+    """The 'low_density' registry name works end-to-end in generate()."""
+    X = default_rng(0).normal(size=(60, 3))
+    generator = OutlierSamplingGenerator(random_generator=default_rng(0))
+    selector = CountSelector(list(range(3)), count=12, rng=default_rng(1))
+    Xt = generator.generate(
+        X.copy(), selector, out_of_distribution_sampler="low_density")
+    assert Xt.shape == (72, 3)
+    labels = generator.get_outliers_labels()
+    assert labels[:60].sum() == 0 and labels[60:].all()
+
+
+# --- low_density / tree targeted sampler behaviour ---
+
+@pytest.fixture
+def two_blob_2d():
+    """Two well-separated 2D blobs: the region between them is low density."""
+    return make_blobs(
+        n_samples=200, centers=[[-6.0, -6.0], [6.0, 6.0]],
+        cluster_std=1.0, random_state=0)[0]
+
+
+def _low_density_frac(X, samples, percentile=10):
+    """Fraction of `samples` whose sklearn log-density is at or below the
+    `percentile`-th percentile of the data's log-densities (the low-density
+    boundary both grid/tree samplers aim for)."""
+    estimator = _KernelDensityEstimator(
+        bandwidth="scott", algorithm="ball_tree").fit(X)
+    threshold = np.percentile(
+        estimator.score_samples(X), percentile)
+    return (estimator.score_samples(samples) <= threshold).mean()
+
+
+@pytest.mark.parametrize("sampler", [
+    pytest.param(KernelDensitySampler(threshold_low_density=0.1),
+                 id="low_density"),
+    pytest.param(TreeCellSampler(threshold_low_density=0.1),
+                 id="tree"),
+])
+def test_low_density_samplers__samples_lie_in_low_density_region(
+        two_blob_2d, sampler):
+    """Sampled rows sit in the low-density region between/around the blobs:
+    at least 80% of them score at or below the data's 10th-percentile
+    log-density (a few may sit in fallback or cell-interior positions)."""
+    X = two_blob_2d
+    n_samples = 100
+    samples = sampler.sample(default_rng(0), X, [0, 1], n_samples)
+    assert samples.shape == (n_samples, 2)
+    assert _low_density_frac(X, samples, percentile=10) >= 0.8
+
+
+def test_low_density__always_returns_exactly_n_samples(two_blob_2d):
+    """No rejection budget: every draw count comes back in full."""
+    for n in (0, 1, 3, 17):
+        samples = KernelDensitySampler(grid_budget=32).sample(
+            default_rng(7), two_blob_2d, [0, 1], n)
+        assert samples.shape == (n, 2)
+
+
+def test_low_density__deterministic_for_same_seed(two_blob_2d):
+    first = KernelDensitySampler(grid_budget=32).sample(
+        default_rng(7), two_blob_2d, [0, 1], 25)
+    second = KernelDensitySampler(grid_budget=32).sample(
+        default_rng(7), two_blob_2d, [0, 1], 25)
+    np.testing.assert_array_equal(first, second)
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"grid_budget": 0}, "grid_budget"),
+    ({"threshold_low_density": 1.0}, "threshold_low_density"),
+])
+def test_low_density__rejects_invalid_configuration(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        KernelDensitySampler(**kwargs)
+
+
+def test_tree__always_returns_exactly_n_samples(two_blob_2d):
+    """No rejection budget: every draw count comes back in full."""
+    for n in (0, 1, 3, 17):
+        samples = TreeCellSampler(leaf_size=4).sample(
+            default_rng(7), two_blob_2d, [0, 1], n)
+        assert samples.shape == (n, 2)
+
+
+def test_tree__deterministic_for_same_seed(two_blob_2d):
+    first = TreeCellSampler(leaf_size=4).sample(
+        default_rng(7), two_blob_2d, [0, 1], 25)
+    second = TreeCellSampler(leaf_size=4).sample(
+        default_rng(7), two_blob_2d, [0, 1], 25)
+    np.testing.assert_array_equal(first, second)
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"leaf_size": 0}, "leaf_size"),
+    ({"threshold_low_density": 0.0}, "threshold_low_density"),
+    ({"threshold_low_density": -0.1}, "threshold_low_density"),
+])
+def test_tree__rejects_invalid_configuration(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        TreeCellSampler(**kwargs)
+
+
+def test_tree__threshold_one_is_valid(two_blob_2d):
+    """threshold_low_density=1.0 accepts every cell; it must not raise."""
+    samples = TreeCellSampler(threshold_low_density=1.0).sample(
+        default_rng(0), two_blob_2d, [0, 1], 12)
+    assert samples.shape == (12, 2)
+
+
+def test_tree__constant_column_returns_full_shape():
+    """A degenerate (zero-variance) column does not break the partition."""
+    X = default_rng(0).normal(size=(40, 2))
+    X[:, 0] = 3.14
+    samples = TreeCellSampler(leaf_size=8).sample(default_rng(0), X, [0, 1], 15)
+    assert samples.shape == (15, 2)

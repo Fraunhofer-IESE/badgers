@@ -10,6 +10,7 @@ observed distribution (used for perturbation nodes in causal generation).
 """
 
 import numpy as np
+from sklearn.neighbors import KernelDensity
 from sklearn.preprocessing import StandardScaler
 
 from badgers.core.utils import random_sign, random_spherical_coordinates
@@ -323,12 +324,216 @@ class JointHistogramSampler(OutOfDistributionSampler):
         return scaler.inverse_transform(samples)
 
 
+# Cap on the number of grid cells scored by the KDE grid samplers.
+_MAX_GRID_CELLS = 65536
+
+
+class KernelDensitySampler(OutOfDistributionSampler):
+    """Sample from low-density regions of a kernel density estimate.
+
+    The requested columns are standardized, a ``KernelDensity`` is fit on
+    them (ball-tree accelerated), and the standardized bounding box padded
+    by one standard deviation per side is discretized into a grid of at
+    most ``grid_budget`` cells. Every cell is scored once, and the
+    requested samples are drawn from a categorical over the cells at or
+    below the ``threshold_low_density`` percentile of the data's
+    log-densities — each point uniform inside its cell. There is no
+    rejection step, so exactly ``n_samples`` points are always returned.
+
+    The grid keeps at most ``grid_budget`` cells per dimension root
+    (``g = ceil(grid_budget ** (1 / d))``) and at most 65536 cells in
+    total, so the sampler is intended for low dimensionality (d <= ~16
+    with the default budget).
+
+    Parameters
+    ----------
+    threshold_low_density : float, default=0.1
+        Percentile (in [0, 1)) of the data's log-densities that defines
+        the low-density boundary.
+    grid_budget : int, default=2048
+        Approximate number of grid cells (``g ** d``). Must be >= 1.
+    """
+
+    def __init__(self, threshold_low_density=0.1, grid_budget=2048):
+        if not 0 <= threshold_low_density < 1:
+            raise ValueError(
+                "threshold_low_density must be in [0, 1), "
+                f"got {threshold_low_density}")
+        if grid_budget < 1:
+            raise ValueError(f"grid_budget must be >= 1, got {grid_budget}")
+        self.threshold_low_density = threshold_low_density
+        self.grid_budget = grid_budget
+
+    def sample(self, rng, X, columns, n_samples):
+        target = X[:, columns]
+        d = target.shape[1]
+        if n_samples == 0:
+            return np.empty((0, d))
+        scaler = StandardScaler()
+        standardized = scaler.fit_transform(target)
+
+        estimator = KernelDensity(
+            bandwidth="scott", algorithm="ball_tree").fit(standardized)
+        low_density_threshold = np.percentile(
+            estimator.score_samples(standardized), self.threshold_low_density)
+
+        g = min(int(np.ceil(self.grid_budget ** (1.0 / d))), 32)
+        while g > 1 and g ** d > _MAX_GRID_CELLS:
+            g -= 1
+        if g < 2:
+            raise NotImplementedError(
+                f"a grid with >= 2 cells per dimension is infeasible for "
+                f"{d} dimensions with grid_budget={self.grid_budget}; "
+                f"use fewer columns or a larger budget")
+        edges = [
+            np.linspace(standardized[:, j].min() - 1.0,
+                        standardized[:, j].max() + 1.0, g + 1)
+            for j in range(d)
+        ]
+        total = g ** d
+        idx = np.unravel_index(np.arange(total), (g,) * d)
+        cell_lo = np.column_stack([edges[j][idx[j]] for j in range(d)])
+        cell_hi = np.column_stack([edges[j][idx[j] + 1] for j in range(d)])
+        centers = (cell_lo + cell_hi) / 2
+
+        f_grid = estimator.score_samples(centers)
+        weights = (f_grid <= low_density_threshold).astype(float)
+        if weights.sum() == 0:
+            # Pathological (tiny grid / very peaked data): fall back to
+            # the least dense cells.
+            weights[np.argsort(f_grid)[: min(len(f_grid), self.grid_budget)]] = 1.0
+        cells = rng.choice(total, size=n_samples, p=weights / weights.sum())
+        samples = np.column_stack([
+            rng.uniform(cell_lo[:, j], cell_hi[:, j])[cells] for j in range(d)
+        ])
+        return scaler.inverse_transform(samples)
+
+
+def _kd_partition(points, lo, hi, leaf_size):
+    """Yield ``(count, lo, hi)`` leaf cells of a recursive median split.
+
+    Splits the hyperrectangle on its longest axis at the data median until
+    every cell holds at most ``leaf_size`` points (or is degenerate).
+    Median splits balance the counts, so the depth is O(log n).
+    """
+    n = points.shape[0]
+    if n <= leaf_size:
+        yield n, lo, hi
+        return
+    axis = int(np.argmax(hi - lo))
+    if hi[axis] <= lo[axis]:
+        yield n, lo, hi
+        return
+    order = np.argsort(points[:, axis], kind="stable")
+    values = points[order, axis]
+    med = values[n // 2]
+    pos = int(np.searchsorted(values, med, side="right"))
+    if pos <= 0 or pos >= n:
+        yield n, lo, hi
+        return
+    left_hi = hi.copy()
+    right_lo = lo.copy()
+    left_hi[axis] = med
+    right_lo[axis] = med
+    yield from _kd_partition(points[order[:pos]], lo, left_hi, leaf_size)
+    yield from _kd_partition(points[order[pos:]], right_lo, hi, leaf_size)
+
+
+class TreeCellSampler(OutOfDistributionSampler):
+    """Sample from low-density cells of an adaptive kd partition.
+
+    The requested columns are standardized and partitioned by recursive
+    median splits into cells holding at most ``leaf_size`` points each:
+    the resolution adapts (fine in dense regions, coarse in sparse ones),
+    so the cell density ``count / volume`` is a data-driven histogram
+    with the bin size chosen by the data. Every cell is then extended
+    axis-aligned to the midplanes with the neighbouring points (an
+    axis-aligned Voronoi approximation), so the empty space between the
+    cells is covered. A cell is low density when its density is at most
+    ``threshold_low_density`` times the global mean density; the
+    requested samples are drawn from a categorical over the qualifying
+    cells (no rejection), each point uniform inside its extended cell,
+    so exactly ``n_samples`` points are always returned.
+
+    Parameters
+    ----------
+    threshold_low_density : float, default=0.1
+        Maximum cell density, as a share of the global mean density,
+        for the cell to count as low density (in (0, 1]).
+    leaf_size : int, default=8
+        Maximum number of points per leaf cell (must be >= 1).
+    """
+
+    def __init__(self, threshold_low_density=0.1, leaf_size=8):
+        if not 0 < threshold_low_density <= 1:
+            raise ValueError(
+                "threshold_low_density must be in (0, 1], "
+                f"got {threshold_low_density}")
+        if leaf_size < 1:
+            raise ValueError(f"leaf_size must be >= 1, got {leaf_size}")
+        self.threshold_low_density = threshold_low_density
+        self.leaf_size = leaf_size
+
+    def sample(self, rng, X, columns, n_samples):
+        target = X[:, columns]
+        d = target.shape[1]
+        if n_samples == 0:
+            return np.empty((0, d))
+        scaler = StandardScaler()
+        standardized = scaler.fit_transform(target)
+        n = standardized.shape[0]
+
+        lo0 = standardized.min(axis=0)
+        hi0 = standardized.max(axis=0)
+        leaves = list(_kd_partition(standardized, lo0, hi0, self.leaf_size))
+        counts = np.array([c for c, _, _ in leaves], dtype=float)
+        cell_lo = np.array([lo for _, lo, _ in leaves])
+        cell_hi = np.array([hi for _, _, hi in leaves])
+
+        # Density proxy: points per cell volume, relative to the global
+        # mean density (degenerate zero-volume cells are infinitely dense)
+        volumes = np.prod(cell_hi - cell_lo, axis=1)
+        mean_volume = float(np.prod(hi0 - lo0))
+        mean_density = n / mean_volume if mean_volume > 0 else 0.0
+        density = np.full(len(volumes), np.inf)
+        np.divide(counts, volumes, out=density, where=volumes > 0)
+
+        # Extend each cell axis-aligned to the midplane with the
+        # neighbouring points (empty space is shared with neighbours)
+        for j in range(d):
+            values = np.sort(standardized[:, j])
+            k = np.searchsorted(values, cell_hi[:, j])
+            gap_plus = np.where(
+                k < n, values[np.minimum(k, n - 1)] - cell_hi[:, j],
+                (hi0[j] + 1.0) - cell_hi[:, j])
+            k2 = np.searchsorted(values, cell_lo[:, j], side="left")
+            gap_minus = np.where(
+                k2 > 0, cell_lo[:, j] - values[k2 - 1],
+                cell_lo[:, j] - (lo0[j] - 1.0))
+            cell_hi[:, j] = np.minimum(cell_hi[:, j] + 0.5 * gap_plus, hi0[j] + 1.0)
+            cell_lo[:, j] = np.maximum(cell_lo[:, j] - 0.5 * gap_minus, lo0[j] - 1.0)
+
+        weights = (
+            density <= self.threshold_low_density * mean_density).astype(float)
+        if weights.sum() == 0:
+            # Pathological (e.g. very small data): fall back to the least
+            # dense cells.
+            weights[np.argsort(density)[: min(len(density), 10)]] = 1.0
+        cells = rng.choice(len(weights), size=n_samples, p=weights / weights.sum())
+        samples = np.column_stack([
+            rng.uniform(cell_lo[:, j], cell_hi[:, j])[cells] for j in range(d)
+        ])
+        return scaler.inverse_transform(samples)
+
+
 _OUT_OF_DISTRIBUTION_REGISTRY = {
     "zscore": ZScoreSampler,
     "hypersphere": HypersphereSampler,
     "uniform": UniformOutOfDistributionSampler,
     "independent_histogram": IndependentHistogramSampler,
     "histogram": JointHistogramSampler,
+    "low_density": KernelDensitySampler,
+    "tree": TreeCellSampler,
 }
 
 
@@ -339,7 +544,8 @@ def create_out_of_distribution_sampler(name="zscore", **kwargs):
     ----------
     name : str, default="zscore"
         One of ``"zscore"``, ``"hypersphere"``, ``"uniform"``,
-        ``"independent_histogram"``, ``"histogram"``.
+        ``"independent_histogram"``, ``"histogram"``, ``"low_density"``,
+        ``"tree"``.
     **kwargs
         Passed to the sampler constructor (e.g., ``scale=2.0`` for
         ``"zscore"``, ``expansion=0.2`` for ``"uniform"``, or ``bins=8``
