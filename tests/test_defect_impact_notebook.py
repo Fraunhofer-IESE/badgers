@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import matplotlib
 import numpy as np
 import pandas as pd
-from matplotlib.collections import PathCollection
+from matplotlib.colors import to_hex
 from matplotlib.contour import QuadContourSet
 from matplotlib.lines import Line2D
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
@@ -121,10 +121,11 @@ def test_regression_metrics_compare_predictions_with_continuous_y():
 
 
 def test_classifier_renderer_uses_caller_axes_and_draws_map_and_points():
+    class_colors = ["#2878b5", "#e69f00", "#009e73", "#d55e00"]
     namespace = {
         "np": np,
         "Line2D": Line2D,
-        "CLASS_COLORS": ["#2878b5", "#e69f00", "#009e73", "#d55e00"],
+        "CLASS_COLORS": class_colors,
         "CLASS_MARKERS": ["o", "s", "^", "D"],
         "wrong_clf": lambda frame: (
             frame["prediction_clf"].to_numpy()
@@ -134,6 +135,7 @@ def test_classifier_renderer_uses_caller_axes_and_draws_map_and_points():
     plot_classifier = load_notebook_function(
         NOTEBOOK, "plot_classifier", namespace
     )
+    darken = namespace["darken"]
     predictions = pd.DataFrame(
         {
             "x": [-0.5, 0.5],
@@ -157,15 +159,18 @@ def test_classifier_renderer_uses_caller_axes_and_draws_map_and_points():
         assert set(plt.get_fignums()) == open_figures
         assert len(ax.images) == 1
         assert ax.images[0].axes is ax
-        # class 0 predicted wrong: darkened point; class 1 correct: plain
+        # row 0: class 0 predicted correctly -> plain class-0 point
+        # row 1: class 1 predicted as class 0 -> darkened class-1 point
         points = [line for line in marker_lines(ax)
                   if len(line.get_xdata())]
         assert len(points) == 2
         assert all(line.axes is ax for line in points)
         np.testing.assert_array_equal(points[0].get_xdata(), [-0.5])
         np.testing.assert_array_equal(points[1].get_xdata(), [0.5])
-        # both rows predicted wrong: plain class markers with darkened colors
+        # class-shaped markers; colors: plain class 0, darkened class 1
         assert [line.get_marker() for line in points] == ["o", "s"]
+        assert to_hex(points[0].get_color()) == to_hex(class_colors[0])
+        assert to_hex(points[1].get_color()) == to_hex(darken(class_colors[1]))
     finally:
         plt.close(fig)
 
@@ -241,7 +246,6 @@ def test_regression_renderer_conditions_four_step_curves_on_class():
         "wrong_reg": lambda frame: np.abs(
             frame["prediction_reg"].to_numpy() - frame["y"].to_numpy()
         ) > 0.5,
-        "darken": lambda color: color,
     }
     plot_regression = load_notebook_function(
         NOTEBOOK, "plot_regression", namespace
