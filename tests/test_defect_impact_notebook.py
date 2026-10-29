@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.collections import PathCollection
 from matplotlib.contour import QuadContourSet
+from matplotlib.lines import Line2D
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
 
 matplotlib.use("Agg")
@@ -25,21 +26,55 @@ NOTEBOOK = (
 
 def load_notebook_function(notebook_path, function_name, namespace):
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
-    source = next(
-        "".join(cell["source"])
+    target_cell = next(
+        cell
         for cell in notebook["cells"]
         if cell["cell_type"] == "code" and any(
             isinstance(node, ast.FunctionDef) and node.name == function_name
             for node in ast.parse("".join(cell.get("source", []))).body
         )
     )
-    function_node = next(
+    # Pre-populate the namespace with every helper defined in other cells
+    # (e.g. scatter_classes / outlier_marks live in the setup cell), so the
+    # lifted functions resolve through the notebook's own namespace plus the
+    # supplied externals.
+    for cell in notebook["cells"]:
+        if cell is target_cell or cell["cell_type"] != "code":
+            continue
+        source = "".join(cell.get("source", []))
+        helper_nodes = [
+            node for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef)
+        ]
+        if helper_nodes:
+            exec(compile(ast.Module(body=helper_nodes, type_ignores=[]),
+                         str(notebook_path), "exec"), namespace)
+    source = "".join(target_cell.get("source", []))
+    tree = ast.parse(source)
+    # module-level constants the lifted functions reference as default
+    # values (e.g. overlay's ms=POINT_MS) must exist before the defs run
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and all(
+            isinstance(t, ast.Name) for t in node.targets
+        ):
+            names = {t.id for t in node.targets}
+            if names <= {"POINT_MS", "POINT_EDGE", "OUTLIER_MS",
+                         "OUTLIER_EDGE"}:
+                exec(compile(ast.Module(body=[node], type_ignores=[]),
+                             str(notebook_path), "exec"), namespace)
+    function_nodes = [
         node for node in ast.parse(source).body
-        if isinstance(node, ast.FunctionDef) and node.name == function_name
-    )
-    module = ast.Module(body=[function_node], type_ignores=[])
+        if isinstance(node, ast.FunctionDef)
+    ]
+    module = ast.Module(body=function_nodes, type_ignores=[])
     exec(compile(module, str(notebook_path), "exec"), namespace)
     return namespace[function_name]
+
+
+def marker_lines(ax):
+    """Marker-carrying Line2D artists: point rows and appended x-marks."""
+    return [line for line in ax.lines
+            if line.get_marker() not in (None, "None")]
 
 
 def test_regression_metrics_compare_predictions_with_continuous_y():
@@ -86,15 +121,11 @@ def test_regression_metrics_compare_predictions_with_continuous_y():
 
 
 def test_classifier_renderer_uses_caller_axes_and_draws_map_and_points():
-    overlay_calls = []
-
-    def overlay(ax, X2, y_true, observed=None, wrong=None):
-        overlay_calls.append((ax, X2.copy(), y_true.copy(), wrong.copy()))
-        return ax.scatter(X2[:, 0], X2[:, 1])
-
     namespace = {
         "np": np,
-        "overlay": overlay,
+        "Line2D": Line2D,
+        "CLASS_COLORS": ["#2878b5", "#e69f00", "#009e73", "#d55e00"],
+        "CLASS_MARKERS": ["o", "s", "^", "D"],
         "wrong_clf": lambda frame: (
             frame["prediction_clf"].to_numpy()
             != frame["cls"].to_numpy()
@@ -126,24 +157,25 @@ def test_classifier_renderer_uses_caller_axes_and_draws_map_and_points():
         assert set(plt.get_fignums()) == open_figures
         assert len(ax.images) == 1
         assert ax.images[0].axes is ax
-        assert len(ax.collections) == 1
-        assert ax.collections[0].axes is ax
-        assert overlay_calls[0][0] is ax
-        np.testing.assert_array_equal(overlay_calls[0][3], [False, True])
+        # class 0 predicted wrong: darkened point; class 1 correct: plain
+        points = [line for line in marker_lines(ax)
+                  if len(line.get_xdata())]
+        assert len(points) == 2
+        assert all(line.axes is ax for line in points)
+        np.testing.assert_array_equal(points[0].get_xdata(), [-0.5])
+        np.testing.assert_array_equal(points[1].get_xdata(), [0.5])
+        # both rows predicted wrong: plain class markers with darkened colors
+        assert [line.get_marker() for line in points] == ["o", "s"]
     finally:
         plt.close(fig)
 
 
 def test_detector_renderer_uses_caller_axes_for_score_contours_and_points():
-    overlay_calls = []
-
-    def overlay(ax, X2, y_true, observed=None, wrong=None):
-        overlay_calls.append(ax)
-        return ax.scatter(X2[:, 0], X2[:, 1])
-
     namespace = {
         "np": np,
-        "overlay": overlay,
+        "Line2D": Line2D,
+        "CLASS_COLORS": ["#2878b5", "#e69f00", "#009e73", "#d55e00"],
+        "CLASS_MARKERS": ["o", "s", "^", "D"],
     }
     plot_detector = load_notebook_function(
         NOTEBOOK, "plot_detector", namespace
@@ -173,12 +205,14 @@ def test_detector_renderer_uses_caller_axes_for_score_contours_and_points():
             isinstance(collection, QuadContourSet)
             for collection in ax.collections
         ) == 2
-        assert sum(
-            isinstance(collection, PathCollection)
-            for collection in ax.collections
-        ) == 1
         assert all(collection.axes is ax for collection in ax.collections)
-        assert overlay_calls == [ax]
+        # both rows observed (no appended rows): one point line per class
+        # with a non-empty marker position (absent classes yield empty lines)
+        points = [line for line in marker_lines(ax) if len(line.get_xdata())]
+        assert len(points) == 2
+        assert all(line.axes is ax for line in points)
+        np.testing.assert_array_equal(points[0].get_xdata(), [-0.5])
+        np.testing.assert_array_equal(points[1].get_xdata(), [0.5])
     finally:
         plt.close(fig)
 
@@ -201,6 +235,7 @@ def test_regression_renderer_conditions_four_step_curves_on_class():
     }
     namespace = {
         "np": np,
+        "Line2D": Line2D,
         "CLASS_COLORS": ["#2878b5", "#e69f00", "#009e73", "#d55e00"],
         "CLASS_MARKERS": ["o", "s", "^", "D"],
         "wrong_reg": lambda frame: np.abs(
@@ -222,23 +257,32 @@ def test_regression_renderer_conditions_four_step_curves_on_class():
         assert result is ax
         assert set(plt.get_fignums()) == open_figures
         assert len(regressor.inputs) == 4
-        assert len(ax.lines) == 4
-        assert all(line.get_linewidth() < 2.0 for line in ax.lines)
+        steps = [
+            line for line in ax.lines
+            if line.get_marker() in (None, "None")
+        ]
+        assert len(steps) == 4
+        assert all(line.get_linewidth() < 2.0 for line in steps)
         for cls, model_input in enumerate(regressor.inputs):
             np.testing.assert_array_equal(
                 model_input[:, 1], np.full(len(x_grid), cls)
             )
             np.testing.assert_allclose(
-                ax.lines[cls].get_ydata(),
+                steps[cls].get_ydata(),
                 model_input[:, 0] + 10 * cls,
             )
-        assert len(ax.collections) > 0
-        observed_points = np.concatenate(
-            [collection.get_offsets() for collection in ax.collections]
+        points = marker_lines(ax)
+        assert len(points) > 0
+        observed = np.concatenate(
+            [np.column_stack([line.get_xdata(), line.get_ydata()])
+             for line in points],
+            axis=0,
         )
-        np.testing.assert_allclose(
-            observed_points,
-            frame[["x", "y"]].to_numpy(),
-        )
+        expected = frame[["x", "y"]].to_numpy()
+        assert len(observed) == len(expected)
+        for row in expected:
+            hits = (np.isclose(observed[:, 0], row[0])
+                    & np.isclose(observed[:, 1], row[1]))
+            assert hits.sum() == 1
     finally:
         plt.close(fig)
