@@ -20,6 +20,12 @@ If you are new to badgers, start with the [Understanding badgers](concepts/Badge
 | Generate class imbalance | [Generating Imbalanced Data](tabular-data/Imbalance/) |
 | Shift data over time (drift) | [Generating Drift](tabular-data/Drift/) |
 
+## Use Case
+
+| Goal | Tutorial |
+|---|---|
+| Using Badgers for testing ML predictors  | [Impact of data quality deficits of ML predictors](use-cases/Impact-of-deficits-on-ML-predictor)  |
+
 ## Beyond tabular data
 
 | Goal | Tutorial |

@@ -8,37 +8,49 @@ from benchmarks.scenarios.tabular import (
 )
 from badgers.core.selectors import ClassSelector, ProportionalSelector
 from badgers.generators.tabular_data.imbalance import (
-    RandomSamplingFeaturesGenerator,
-    RandomSamplingClassesGenerator,
-    RandomSamplingTargetsGenerator,
+    ConstantMultiplicity,
+    MaskedMultiplicity,
+    OversamplingGenerator,
+    UndersamplingGenerator,
 )
 
 register(GeneratorBenchmark(
-    generator_cls=RandomSamplingFeaturesGenerator,
-    name="RandomSamplingFeatures",
-    module_path="tabular_data.imbalance",
-    default_params={},
-    scenarios=[SCENARIO_SMALL_BLOBS],
-))
-
-register(GeneratorBenchmark(
-    generator_cls=RandomSamplingClassesGenerator,
-    name="RandomSamplingClasses",
+    generator_cls=UndersamplingGenerator,
+    name="UndersamplingClassSelector",
     module_path="tabular_data.imbalance",
     default_params={
-        "selector": ClassSelector(
-            "cls", {"cls": 2},  # small_blobs_2d_classes stacks classes last
-            {"cls": {c: 0.2 for c in range(5)}}, rng=default_rng(0))
+        "selector": ClassSelector([0], class_column=2,
+                                  proportions={c: 0.2 for c in range(5)}, rng=default_rng(0))
     },
     scenarios=[SCENARIO_SMALL_BLOBS_CLASSES],
 ))
 
 register(GeneratorBenchmark(
-    generator_cls=RandomSamplingTargetsGenerator,
-    name="RandomSamplingTargets",
+    generator_cls=UndersamplingGenerator,
+    name="UndersamplingProportional",
     module_path="tabular_data.imbalance",
     default_params={
-        "selector": ProportionalSelector("f0", {"f0": 0, "f1": 1}),
+        "selector": ProportionalSelector([0, 1], column=0),
+    },
+    scenarios=[SCENARIO_SMALL_BLOBS],
+))
+
+register(GeneratorBenchmark(
+    generator_cls=OversamplingGenerator,
+    name="OversamplingConstant",
+    module_path="tabular_data.imbalance",
+    default_params={
+        "selector": ConstantMultiplicity(3),
+    },
+    scenarios=[SCENARIO_SMALL_BLOBS],
+))
+
+register(GeneratorBenchmark(
+    generator_cls=OversamplingGenerator,
+    name="OversamplingMasked",
+    module_path="tabular_data.imbalance",
+    default_params={
+        "selector": MaskedMultiplicity(lambda X: X[:, 0] < 5, multiplicity=3),
     },
     scenarios=[SCENARIO_SMALL_BLOBS],
 ))

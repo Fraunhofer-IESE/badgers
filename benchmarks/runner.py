@@ -50,7 +50,7 @@ def run_performance(
         for scenario in gb.scenarios:
             rng = np.random.default_rng(0)
             try:
-                X, y = scenario.factory(rng)
+                X = scenario.factory(rng)
             except Exception as e:
                 warnings.warn(
                     f"Scenario {scenario.name} factory failed for {gb.name}: {e}"
@@ -61,7 +61,7 @@ def run_performance(
 
             # Warmup
             try:
-                generator.generate(X, y, **gb.default_params)
+                generator.generate(X, **gb.default_params)
             except NotImplementedError:
                 warnings.warn(
                     f"Generator {gb.name} does not support scenario {scenario.name}"
@@ -77,7 +77,7 @@ def run_performance(
                 gen = gb.generator_cls(random_generator=np.random.default_rng(0))
                 tracemalloc.start()
                 t_start = time.perf_counter()
-                gen.generate(X, y, **gb.default_params)
+                gen.generate(X, **gb.default_params)
                 t_end = time.perf_counter()
                 _, peak = tracemalloc.get_traced_memory()
                 tracemalloc.stop()

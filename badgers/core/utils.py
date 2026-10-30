@@ -23,27 +23,6 @@ def normalize_proba(p: np.array) -> np.array:
     return p
 
 
-def resolve_class_column(selector, X: np.ndarray):
-    """Recover the class column position from a value-reading selector.
-
-    Value-reading selector presets (``TopQuantileSelector``,
-    ``ClassSelector``, ...) expose a ``column_mapping`` attribute mapping
-    variable names to column positions; the first variable whose position
-    exists in ``X`` is used as the class column. Returns ``None`` when the
-    selector has no such attribute (the consuming generator then treats
-    all fired rows as one class, or requires a plain magnitude).
-    """
-    column_mapping = getattr(selector, "column_mapping", None)
-    variables = getattr(selector, "variables", None)
-    if column_mapping is None or not variables:
-        return None
-    for name in variables:
-        pos = column_mapping.get(name)
-        if pos is not None and 0 <= pos < X.shape[1]:
-            return pos
-    return None
-
-
 def random_sign(random_generator: numpy.random.Generator = default_rng(0), size: Tuple[int] = (1,)) -> np.array:
     """
     Generates an array full of ones, with randomly assigned signs.
@@ -68,7 +47,8 @@ def random_spherical_coordinate(random_generator: numpy.random.Generator = defau
     :param radius: the radius of the hypersphere
     :return: an array of shape (`size`,) containing the values of the point generated
     """
-    assert size > 0
+    if size <= 0:
+        raise ValueError(f"size must be a positive integer, got {size}")
     if size == 1:
         x = random_sign(random_generator, size=(1,)) * radius
     elif size == 2:
@@ -114,7 +94,8 @@ def random_spherical_coordinates(
         An array of shape ``(n_samples, size)`` where each row is a point
         on the hypersphere with the corresponding radius from ``radii``.
     """
-    assert size > 0
+    if size <= 0:
+        raise ValueError(f"size must be a positive integer, got {size}")
     n_samples = len(radii)
 
     if size == 1:

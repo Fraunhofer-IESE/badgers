@@ -8,7 +8,7 @@ from benchmarks.scenarios.tabular import SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_B
 from badgers.core.selectors import ClassSelector
 from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator, GaussianNoiseClassesGenerator
 
-_CLASS_PROPORTIONS = {"cls": {c: 1.0 for c in range(5)}}
+_CLASS_PROPORTIONS = {c: 1.0 for c in range(5)}
 
 register(GeneratorBenchmark(
     generator_cls=AdditiveNoiseGenerator,
@@ -23,7 +23,7 @@ register(GeneratorBenchmark(
     name="GaussianNoiseClasses",
     module_path="tabular_data.noise",
     default_params={
-        "selector": ClassSelector("cls", {"cls": 2}, _CLASS_PROPORTIONS, rng=default_rng(0)),
+        "selector": ClassSelector([0], class_column=2, proportions=_CLASS_PROPORTIONS, rng=default_rng(0)),
         "noise_std_per_class": {0: 0.5, 1: 0.5, 2: 0.5, 3: 0.5, 4: 0.5},
     },
     scenarios=[SCENARIO_SMALL_BLOBS_CLASSES],

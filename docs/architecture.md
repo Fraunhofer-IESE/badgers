@@ -19,9 +19,10 @@ badgers/
 │       ├── __init__.py
 │       ├── tabular_data/             # outliers, drift, imbalance, missingness, noise
 │       │   ├── outliers/
-│       │   │   ├── distribution_sampling.py
+│       │   │   ├── causal.py
 │       │   │   ├── instance_sampling.py
-│       │   │   └── low_density_sampling.py
+│       │   │   ├── sampling.py
+│       │   │   └── _selection.py
 │       │   ├── drift.py
 │       │   ├── imbalance.py
 │       │   ├── missingness.py
@@ -138,7 +139,7 @@ The `core` module serves as the foundation of the Badgers framework, providing e
 
 1. **Base Classes**: Defines the fundamental `GeneratorMixin` abstract base class that all generators must inherit from, ensuring a consistent interface across the entire system.
 
-2. **Standardized Interface**: Enforces a uniform `generate(X, y, **params)` method signature that returns transformed data `(Xt, yt)` for all generators.
+2. **Standardized Interface**: Enforces a uniform `generate(X, **params)` method signature that returns the single generated object `Xt` for all generators (target-like data lives inside `X`).
 
 3. **Input Preprocessing**: Provides decorator functions (`preprocess_inputs`) that automatically validate and convert input data to standardized formats (numpy arrays).
 
@@ -245,7 +246,7 @@ tests/
 
 ### Key Conventions
 
-- **Fixtures over classes**: Each data type has a `conftest.py` with reusable fixtures (e.g., `tabular_small`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`). Fixtures return `(X, y)` tuples with deterministic random seeds.
+- **Fixtures over classes**: Each data type has a `conftest.py` with reusable fixtures (e.g., `tabular_small`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`). Fixtures return the input data `X` directly (with class values as a column of `X` where labeled data is needed) and use deterministic random seeds.
 - **Flat test functions**: Tests are plain `test_<subject>__<behavior>` functions (double underscore separator), not methods on `TestCase` classes.
 - **Generator tests are independent**: Generator correctness is tested directly via pytest, not through the benchmark framework's functional checks. This keeps tests fast, focused, and free of benchmark infrastructure coupling.
 
@@ -310,7 +311,7 @@ tests/
 
 **Decision:** Each generator category has a `_*.py` registration module in `benchmarks/generators/<data_type>/` that imports generator classes and calls `register(GeneratorBenchmark(...))`. The registry auto-discovers these modules.
 
-**Key constraint:** Density-based generators (e.g., `HistogramSamplingGenerator`) must only use `SCENARIO_SMALL_BLOBS` (2D) because they raise on >5D input.
+**Key constraint:** The `OutlierSamplingGenerator` benchmarks using `JointHistogramSampler` (registry name `"histogram"`) must only use `SCENARIO_SMALL_BLOBS` (2D) because joint histogram sampling supports at most 5 columns.
 
 **Rationale:** Decouples benchmark definitions from the benchmark runner. Adding a new generator to benchmarks is a single `register()` call in the appropriate `_*.py` file — no other changes needed.
 
@@ -342,6 +343,24 @@ python -m benchmarks compare --baseline v0.0.13
 
 **Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.
 
+### ADR-6: Outlier Value Synthesis Is Owned by Shared OOD Samplers (2026-10-25)
+
+**Decision:** All non-causal outlier value synthesis is delegated to the reusable OOD samplers in `badgers.core.sampling`, which one generic `OutlierSamplingGenerator` selects at `generate()` time (a string registry name is resolved via `create_out_of_distribution_sampler`):
+
+| Strategy | Sampler (`badgers.core.sampling`) | Registry name |
+|---|---|---|
+| z-score (±(3 + exponential)·σ per column) | `ZScoreSampler(scale)` | `"zscore"` (default) |
+| hypersphere shell (radius ≥ 3σ) | `HypersphereSampler(scale)` | `"hypersphere"` |
+| uniform around the observed range | `UniformOutOfDistributionSampler(expansion)` | `"uniform"` |
+| per-column low-density histogram bins | `IndependentHistogramSampler(bins)` | `"independent_histogram"` |
+| joint low-density histogram bins (≤ 5 columns) | `JointHistogramSampler(bins, threshold_low_density)` | `"histogram"` |
+| grid-CDF KDE: scores a bounded regular grid, categorical over low-density cells, exact count, no rejection | `KernelDensitySampler(threshold_low_density, grid_budget)` | `"low_density"` |
+| adaptive kd partition (median splits), axis-aligned Voronoi cells extended across the full gap to the data-box boundary on every axis, uncovered box regions added as always-qualifying count-0 cells, categorical over cells with extended-territory density <= threshold × mean density, exact count | `TreeCellSampler(threshold_low_density, leaf_size)` | `"tree"` |
+
+The generator keeps its responsibilities outside synthesis: the required `selector` owns the outlier count and the perturbed targets, the generator copies the seed rows, replaces the selected cells with the sampler's values, appends the rows, and records `get_outliers_labels()`. `CausalOutlierPropagationGenerator` consumes the same samplers for its perturbation nodes, so both outlier families share one strategy set and one interface (`sample(rng, X, columns, n)`).
+
+**Rationale:** The sampling algorithms are useful beyond the outlier generators (e.g., for custom pipelines); exposing them as samplers avoids code duplication and makes a new strategy a new sampler — not a new generator class — for both the non-causal and the causal generator.
+
 ## Causal defect family: three-layer design
 
 1. **Structure** (static, user-provided): the structural `nx.DiGraph` (latent
@@ -355,7 +374,15 @@ python -m benchmarks compare --baseline v0.0.13
    empirical). `fit(X)` is a provided topological loop. The DGP is
    **immutable and rngless**: every stochastic method takes the caller's
    `rng`; nothing retains training data.
-3. **Deficit algebra** (written once, backend-blind): the generic
+3. **Cascade composition** (the `structural` hook, default in `DGPMixin`):
+   `structural(node, parent_values, rng, n)` composes ONE node's values
+   for a cascade as `response(parent_values) + draw_noise(node, rng, n)`.
+   Backends whose mechanisms are not additive override it — the gcm
+   backend delegates to the mechanism's own
+   `evaluate(parents, noise)` (rounded discrete predictions, class CDFs)
+   while badgers still draws the noise. `sample`/`intervene` never
+   compose the two views themselves.
+4. **Deficit algebra** (written once, backend-blind): the generic
    `DGPMixin` cascade — `intervene(rows, nodes, values=None, *, rng=None)`
    (Pearl surgery on given rows: fix the nodes, recompute ALL descendants
    in topological order with fresh noise; intervened nodes stay pinned)
@@ -373,7 +400,7 @@ python -m benchmarks compare --baseline v0.0.13
    wrap it again with `GcmSCMDGP`/`PyMCSCMDGP`. Edits return
    read-only views and never mutate the base DGP. Indicator derivation
    from the observation graph lives in the missingness generator
-   (structure-layer helpers + generator-local firing/spread logic).
+   (structure-layer helpers + generator-local selection/spread logic).
 
 Backend selection is **object injection only** (`dgp=...` / `use_dgp`).
 Deficit semantics live in the generators; they never see which backend ran.

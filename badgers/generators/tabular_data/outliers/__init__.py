@@ -2,7 +2,6 @@ import abc
 
 import numpy as np
 import sklearn.base
-from numpy.random import default_rng
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -17,16 +16,14 @@ class OutliersGenerator(GeneratorMixin):
     After each ``generate()`` call the generator stores a boolean label
     vector describing ITS OWN output: ``get_outliers_labels()`` returns a
     per-row array aligned with the generated features, ``True`` where the
-    row is an outlier (the deficit), ``False`` for an original row. The
-    target ``y`` is only a pass-through -- deficit labels never ride in
-    ``yt``.
+    row is an outlier (the deficit), ``False`` for an original row.
     """
 
-    def __init__(self, random_generator: np.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the OutliersGenerator with a random number generator.
 
-        :param random_generator: An instance of numpy's random number generator (default is a new generator with seed 0).
+        :param random_generator: An instance of numpy's random number generator (required; no default).
         """
         self.random_generator = random_generator
         self.outlier_labels_: np.ndarray | None = None
@@ -56,12 +53,11 @@ class OutliersGenerator(GeneratorMixin):
         ])
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params):
+    def generate(self, X, **params):
         """
         Abstract method to generate outliers data. Must be implemented by subclasses.
 
         :param X: Input features (pandas DataFrame or numpy array).
-        :param y: Target variable (pandas Series or numpy array, or None; passed through unchanged).
         :param params: Additional parameters required for the generation.
         """
         pass
@@ -101,19 +97,19 @@ class StructuredOutlierGenerator(OutliersGenerator):
         preprocessor=None,
     ):
         if preprocessor is None:
-            assert dimension_reduction_transformer is not None, (
-                "either dimension_reduction_transformer or preprocessor "
-                "must be given"
-            )
-            assert hasattr(
-                dimension_reduction_transformer,
-                'inverse_transform'), \
-                f'the decomposition transformer class must implement the inverse_transform function.' \
-                f'\nUnfortunately the class {dimension_reduction_transformer} does not'
+            if dimension_reduction_transformer is None:
+                raise ValueError(
+                    "either dimension_reduction_transformer or preprocessor "
+                    "must be given")
+            if not hasattr(dimension_reduction_transformer, 'inverse_transform'):
+                raise ValueError(
+                    f'the decomposition transformer class must implement the inverse_transform function.'
+                    f'\nUnfortunately the class {dimension_reduction_transformer} does not')
         else:
-            assert hasattr(preprocessor, 'inverse_transform'), \
-                f'the preprocessor must implement the inverse_transform function.' \
-                f'\nUnfortunately the class {preprocessor} does not'
+            if not hasattr(preprocessor, 'inverse_transform'):
+                raise ValueError(
+                    f'the preprocessor must implement the inverse_transform function.'
+                    f'\nUnfortunately the class {preprocessor} does not')
         if outlier_generator is not None:
             super().__init__(random_generator=outlier_generator.random_generator)
         else:
@@ -124,7 +120,7 @@ class StructuredOutlierGenerator(OutliersGenerator):
         self.preprocessor = preprocessor
 
     @preprocess_inputs
-    def generate(self, X, y=None, **params):
+    def generate(self, X, **params):
         """
         Randomly generate outliers by first applying a dimensionality reduction technique (sklearn.decomposition)
         and an outlier transformer.
@@ -135,9 +131,8 @@ class StructuredOutlierGenerator(OutliersGenerator):
         4. Inverse the dimensionality reduction and the standardization transformations (or the custom ``preprocessor``)
 
         :param X: the input features
-        :param y: the regression target, class labels, or None
         :param params:
-        :return:
+        :return: The generated features in the original feature space.
         """
 
         # standardize the data and apply the dimensionality reduction transformer
@@ -150,11 +145,11 @@ class StructuredOutlierGenerator(OutliersGenerator):
             )
         Xt = pipeline.fit_transform(X)
         # add outliers using the zscore_transformer
-        Xt, yt = self.outlier_generator.generate(Xt, y, **params)
+        Xt = self.outlier_generator.generate(Xt, **params)
         # propagate the inner generator's labels (aligned with Xt's rows)
         self.outlier_labels_ = self.outlier_generator.get_outliers_labels()
         # inverse the manifold and standardization transformations
-        return pipeline.inverse_transform(Xt), yt
+        return pipeline.inverse_transform(Xt)
 
 
 # Backwards-compatible alias (renamed in 0.0.15)

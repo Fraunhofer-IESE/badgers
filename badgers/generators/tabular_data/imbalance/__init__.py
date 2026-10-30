@@ -1,15 +1,21 @@
-"""Imbalance generators for tabular data."""
-
 from badgers.generators.tabular_data.imbalance.imbalance import (
     ImbalanceGenerator,
-    RandomSamplingClassesGenerator,
-    RandomSamplingFeaturesGenerator,
-    RandomSamplingTargetsGenerator,
+    OversamplingGenerator,
+    UndersamplingGenerator,
+)
+from badgers.generators.tabular_data.imbalance.multiplicity import (
+    ConstantMultiplicity,
+    MaskedMultiplicity,
+    MultiplicitiesSelector,
+    resolve_multiplicities,
 )
 
 __all__ = [
     "ImbalanceGenerator",
-    "RandomSamplingFeaturesGenerator",
-    "RandomSamplingClassesGenerator",
-    "RandomSamplingTargetsGenerator",
+    "OversamplingGenerator",
+    "UndersamplingGenerator",
+    "ConstantMultiplicity",
+    "MaskedMultiplicity",
+    "MultiplicitiesSelector",
+    "resolve_multiplicities",
 ]

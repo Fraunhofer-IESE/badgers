@@ -1,8 +1,7 @@
 import abc
-from typing import Tuple, Union
+from typing import Union
 
 import numpy as np
-from numpy.random import default_rng
 from scipy.interpolate import CubicSpline
 
 from badgers.core.base import GeneratorMixin
@@ -57,7 +56,7 @@ class Pattern:
             values = values.reshape(-1, 1)
         if values.ndim > 2:
             raise ValueError(
-                "Values has more thant 2 dimensions where it is expected to have either 1 or 2!"
+                "Values have more than 2 dimensions where 1 or 2 are expected!"
             )
         self.values = values
         self.interpolation_function = CubicSpline(np.linspace(0, 1, values.shape[0]), values, bc_type='natural')
@@ -71,7 +70,7 @@ class PatternsGenerator(GeneratorMixin):
     Base class for transformers that generate patterns in time-series data
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the PatternsGenerator with a random number generator.
 
@@ -81,15 +80,14 @@ class PatternsGenerator(GeneratorMixin):
         self.patterns_indices_ = []
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, **params):
         """
         Abstract method to inject patterns into the time-series data.
         This method should be overridden by subclasses to implement specific pattern generation logic.
 
         :param X: Input time-series data as a 2D numpy array or pandas DataFrame.
-        :param y: Target values as a 1D numpy array or pandas Series.
         :param params: Additional parameters that might be required for pattern generation.
-        :return: A tuple containing the modified time-series data and target values.
+        :return: The modified time-series data.
         """
         pass
 
@@ -134,7 +132,7 @@ class RandomlySpacedPatterns(PatternsGenerator):
     Inject given patterns with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedPatterns with a random number generator.
 
@@ -143,21 +141,20 @@ class RandomlySpacedPatterns(PatternsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
+    def generate(self, X, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10,
                  pattern: Pattern = Pattern(values=np.array([0, 0, 0, 0, 0])),
-                 scaling_factor: Union[float, str, None] = 'auto') -> Tuple:
+                 scaling_factor: Union[float, str, None] = 'auto'):
         """
         Inject patterns with random width and indices in the time-series data.
 
         :param X: Input time-series data as a 2D numpy array or pandas DataFrame.
-        :param y: Target values as a 1D numpy array or pandas Series (not used in this method).
         :param n_patterns: The number of patterns to inject into the time-series data.
         :param min_width_pattern: The minimum width of the pattern to inject.
         :param max_width_patterns: The maximum width of the pattern to inject.
         :param pattern: The pattern to inject, represented as a `Pattern` object.
         :param scaling_factor: The factor by which to scale the pattern before injection. Can be a float, 'auto' to scale based on the signal's range, or None to apply no scaling.
-        :return: A tuple containing the transformed time-series data and the unchanged target values.
+        :return: The transformed time-series data.
         """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
@@ -170,7 +167,7 @@ class RandomlySpacedPatterns(PatternsGenerator):
         for (start, end) in self.patterns_indices_:
             X = self._inject_pattern(X, p=pattern, start_index=start, end_index=end, scaling_factor=scaling_factor)
 
-        return X, y
+        return X
 
 
 class RandomlySpacedConstantPatterns(PatternsGenerator):
@@ -178,7 +175,7 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
     Generates constant patterns of constant value with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedConstantPatterns with a random number generator.
 
@@ -187,19 +184,18 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
+    def generate(self, X, n_patterns: int = 10, min_width_pattern: int = 5,
                  max_width_patterns: int = 10,
-                 constant_value: float = 0) -> Tuple:
+                 constant_value: float = 0):
         """
         Generate constant patterns with random width and indices in the time-series data.
 
         :param X: Input time-series data as a 2D numpy array or pandas DataFrame.
-        :param y: Target values as a 1D numpy array or pandas Series (not used in this method).
         :param n_patterns: The number of constant patterns to inject into the time-series data.
         :param min_width_pattern: The minimum width of each constant pattern to inject.
         :param max_width_patterns: The maximum width of each constant pattern to inject.
         :param constant_value: The constant value of the patterns to inject.
-        :return: A tuple containing the transformed time-series data and the unchanged target values.
+        :return: The transformed time-series data.
         """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
@@ -212,7 +208,7 @@ class RandomlySpacedConstantPatterns(PatternsGenerator):
         for (start, end) in self.patterns_indices_:
             X[start:end, :] = constant_value
 
-        return X, y
+        return X
 
 
 class RandomlySpacedLinearPatterns(PatternsGenerator):
@@ -220,7 +216,7 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
     Generates patterns of constant slope (linear) with random width and indices
     """
 
-    def __init__(self, random_generator=default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the RandomlySpacedLinearPatterns with a random number generator.
 
@@ -229,17 +225,16 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
         super().__init__(random_generator=random_generator)
 
     @preprocess_inputs
-    def generate(self, X, y, n_patterns: int = 10, min_width_pattern: int = 5,
-                 max_width_patterns: int = 10) -> Tuple:
+    def generate(self, X, n_patterns: int = 10, min_width_pattern: int = 5,
+                 max_width_patterns: int = 10):
         """
         Generate linear patterns with random width and indices in the time-series data.
 
         :param X: Input time-series data as a 2D numpy array or pandas DataFrame.
-        :param y: Target values as a 1D numpy array or pandas Series (not used in this method).
         :param n_patterns: The number of linear patterns to inject into the time-series data.
         :param min_width_pattern: The minimum width of each linear pattern to inject.
         :param max_width_patterns: The maximum width of each linear pattern to inject.
-        :return: A tuple containing the transformed time-series data and the unchanged target values.
+        :return: The transformed time-series data.
         """
         # generate patterns indices and values
         self.patterns_indices_ = generate_random_patterns_indices(
@@ -258,4 +253,4 @@ class RandomlySpacedLinearPatterns(PatternsGenerator):
             t = np.linspace(0, 1, n_pts)[:, np.newaxis]
             X[start:end, :] = start_vals + t * (end_vals - start_vals)
 
-        return X, y
+        return X

@@ -15,18 +15,17 @@ class Pipeline:
         """
         self.generators = generators
 
-    def generate(self, X, y, params: Dict = None):
+    def generate(self, X, params: Dict = None):
         """
         Calls all generators generate function in the order
 
         :param X: the input features
-        :param y: the class labels, regression targets, or None
         :param params: a dictionary containing as key: the generator names and
         as values: the parameters for each corresponding generate function
-        :return: Xt, yt
+        :return: Xt
         """
         if params is None:
             params = dict()
         for name, generator in self.generators.items():
-            X, y = generator.generate(X, y, **params.get(name, dict()))
-        return X, y
+            X = generator.generate(X, **params.get(name, dict()))
+        return X

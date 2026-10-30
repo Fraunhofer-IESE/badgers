@@ -18,6 +18,11 @@ Mapping (dowhy 0.13):
   fit time and resampled with the caller's rng — gcm's own draw paths use
   global ``np.random`` with no seed, which would break the library-wide
   reproducibility contract);
+- cascade composition (``structural``) delegates to the mechanism's own
+  ``evaluate(parents, noise)`` — dowhy owns the deterministic form
+  (continuous additive, ROUNDED discrete additive, classifier class
+  CDFs) while badgers keeps drawing the noise (empirical residuals /
+  classifier uniforms) with the caller's rng;
 - root ``EmpiricalDistribution`` nodes: ``response`` returns zeros and
   ``draw_noise`` resamples the stored observations ``mechanism.data``
   (response + noise reconstructs the marginal);
@@ -51,10 +56,13 @@ class GcmSCMDGP(DGPMixin):
 
     Requires the optional ``dowhy`` extra (``pip install badgers[dowhy]``).
 
-    Classifier nodes couple ``response`` to ``draw_noise``: ``response``
-    captures the pending parent values that ``draw_noise`` then consumes
-    (it receives no parents itself). Discrete classes are numeric-encoded
-    (``get_class_names`` coerced to float).
+    Classifier nodes couple ``response`` to ``draw_noise`` for DIRECT
+    protocol calls: ``response`` captures the pending parent values that
+    ``draw_noise`` then consumes (it receives no parents itself). The
+    cascade path (``sample``/``intervene``) bypasses this coupling —
+    ``structural`` calls ``ClassifierFCM.evaluate`` directly, which takes
+    the parents and the uniform noise. Discrete classes are
+    numeric-encoded (``get_class_names`` coerced to float).
     """
 
     def __init__(self, causal_model, column_mapping=None):
@@ -178,6 +186,12 @@ class GcmSCMDGP(DGPMixin):
         for node in self.graph.nodes:
             mech = self._mech[node]
             if isinstance(mech, AdditiveNoiseModel):
+                # this branch also catches DiscreteAdditiveNoiseModel (a
+                # subclass) — and that is CORRECT: dowhy's overridden
+                # estimate_noise fits the noise as actual - ROUNDED
+                # prediction, so the cached residuals match the
+                # mechanism's own evaluate (round(predict) + noise),
+                # which structural delegates to
                 parents = get_parents(self.graph, node)
                 residuals = mech.estimate_noise(
                     df[[node]].to_numpy(), df[parents].to_numpy()
@@ -191,7 +205,7 @@ class GcmSCMDGP(DGPMixin):
         return self
 
     def response(self, node, parent_values):
-        from dowhy.gcm import ClassifierFCM
+        from dowhy.gcm import ClassifierFCM, DiscreteAdditiveNoiseModel
 
         mech = self._mech[node]
         if isinstance(mech, ClassifierFCM):
@@ -216,12 +230,62 @@ class GcmSCMDGP(DGPMixin):
                     mech.prediction_model.predict(parent_values[finite]),
                     dtype=float,
                 ).ravel()
+            if isinstance(mech, DiscreteAdditiveNoiseModel):
+                # the deterministic part of a discrete ANM is the ROUNDED
+                # prediction (dowhy's evaluate is round(predict) + noise;
+                # the cached residuals are actual - rounded-prediction)
+                out[finite] = np.round(out[finite])
             return out
         # EmpiricalDistribution root: the marginal comes entirely from
         # draw_noise; the deterministic part contributes zeros (the mixin's
         # sample/intervene always call response, even for roots, with
         # parent_values of shape (n, 0)).
         return np.zeros(parent_values.shape[0])
+
+    def structural(self, node, parent_values, rng, n):
+        """Cascade composition delegated to the mechanism's own
+        ``evaluate`` (badgers draws the noise, dowhy owns the math).
+
+        Non-root functional causal models own their composition:
+        continuous ANMs (``predict + noise``), discrete ANMs
+        (``round(predict) + noise``), ClassifierFCMs (inverse-CDF class
+        sampling over the classifier's probabilities), post-nonlinear
+        models (``g(predict + noise)``). Badgers still DRAWS the noise
+        with the caller's rng — empirical residuals for the additive
+        families, uniforms on [0, 1] for ClassifierFCMs (the noise
+        dowhy's evaluate expects). Root ``EmpiricalDistribution`` nodes
+        have no ``evaluate`` and keep the additive composition (response
+        zeros + marginal resample). Inherited dowhy caveats, accepted:
+        DiscreteAdditiveNoiseModel rounds via its own
+        ``_rounded_prediction`` (int32 cast — predictions >= 2**31 would
+        wrap, unreachable for count data), and ClassifierFCM's
+        ``argmax(cum >= u)`` can hit the empty-True edge when float error
+        leaves the CDF below 1.0 and ``u`` lands in the gap (returns class
+        0 instead of the last class; ~1e-16 per row).
+        """
+        from dowhy.gcm.causal_mechanisms import ClassifierFCM, FunctionalCausalModel
+
+        mech = self._mech[node]
+        if not isinstance(mech, FunctionalCausalModel):
+            # EmpiricalDistribution root: additive composition
+            return self.response(node, parent_values) + self.draw_noise(node, rng, n)
+        # NaN-cascade semantics (G9): sklearn estimators REJECT NaN input,
+        # so evaluate finite rows only and let NaN parents propagate to a
+        # NaN value (the mixin's sample/intervene then cascade NaNs exactly
+        # like the pure NumPy backends do).
+        parent_values = np.asarray(parent_values, dtype=float)
+        finite = np.isfinite(parent_values).all(axis=1)
+        out = np.full(parent_values.shape[0], np.nan)
+        if finite.any():
+            k = int(finite.sum())
+            if isinstance(mech, ClassifierFCM):
+                noise = rng.random(k)
+            else:
+                noise = self.draw_noise(node, rng, k)
+            out[finite] = np.asarray(
+                mech.evaluate(parent_values[finite], noise), dtype=float
+            ).ravel()
+        return out
 
     def draw_noise(self, node, rng, n):
         if node in self._clf:

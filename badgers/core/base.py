@@ -1,17 +1,14 @@
 import abc
-from typing import Tuple
 
 
 class GeneratorMixin:
 
     @abc.abstractmethod
-    def generate(self, X, y, **params) -> Tuple:
+    def generate(self, X, **params):
         """
 
         :param X: the input
-        :param y: the target
         :param params: optional parameters
-        :return: Xt, yt
+        :return: Xt
         """
         pass
-

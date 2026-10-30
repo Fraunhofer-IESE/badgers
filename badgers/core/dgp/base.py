@@ -1,6 +1,7 @@
 """Shared defaults for DGP backends (mixin base class).
 
-Backends implement ``fit_node`` and expose ``response`` / ``draw_noise``.
+Backends implement ``fit_node`` and expose ``response`` / ``draw_noise``
+(plus a ``structural`` override when the composition is not additive).
 Everything else is generic algebra, provided once here — identical for
 every backend by construction:
 
@@ -64,9 +65,9 @@ class DGPMixin:
     def sample(self, rng: np.random.Generator, n: int) -> np.ndarray:
         """Sample ``n`` joint rows.
 
-        Topological walk: every node contributes
-        ``response(parents) + draw_noise``; for roots, ``parent_values``
-        has shape ``(n, 0)`` and ``response`` returns the fitted mean.
+        Topological walk: every node contributes its :meth:`structural`
+        values (default: the additive composition ``response(parents) +
+        draw_noise``); for roots, ``parent_values`` has shape ``(n, 0)``.
 
         ONE parameter set drives the whole cascade (one call = one
         coherent model); see :meth:`pick_parameters`.
@@ -80,11 +81,24 @@ class DGPMixin:
                 carrier.column_mapping[p]
                 for p in get_parents(carrier.graph, node)
             ]
-            X_sampled[:, col] = (
-                carrier.response(node, X_sampled[:, pcols])
-                + carrier.draw_noise(node, rng, n)
+            X_sampled[:, col] = carrier.structural(
+                node, X_sampled[:, pcols], rng, n
             )
         return X_sampled
+
+    def structural(self, node, parent_values, rng, n):
+        """One node's values for a cascade: compose the deterministic
+        part and the noise.
+
+        Default: the additive composition ``response(parents) +
+        draw_noise``. Backends whose mechanisms are not additive (e.g.
+        dowhy functional causal models, where ``evaluate`` owns the
+        composition — rounded predictions, class CDFs, post-nonlinear
+        links) override this and delegate the composition to the
+        library's own ``evaluate`` while still drawing the noise with
+        the caller's ``rng``.
+        """
+        return self.response(node, parent_values) + self.draw_noise(node, rng, n)
 
     # -- Value-level intervention --------------------------------------------
 
@@ -100,8 +114,8 @@ class DGPMixin:
         2. Walk the descendants of ``nodes`` in topological order (the
            intervened nodes themselves are excluded — pinned values stay
            pinned even if one intervened node is a descendant of another)
-           and recompute each: ``child = f(child, parents_new) + fresh
-           noise``.
+           and recompute each via :meth:`structural` (default
+           ``response(parents_new) + fresh noise``).
 
         Upstream and non-descendant columns and rows are untouched.
         Pre-existing NaNs in a recomputed descendant column are
@@ -140,10 +154,7 @@ class DGPMixin:
                 carrier.column_mapping[p]
                 for p in get_parents(carrier.graph, child)
             ]
-            rows[:, ccol] = (
-                carrier.response(child, rows[:, pcols])
-                + carrier.draw_noise(child, rng, n)
-            )
+            rows[:, ccol] = carrier.structural(child, rows[:, pcols], rng, n)
         return rows
 
     def pick_parameters(self, rng=None):

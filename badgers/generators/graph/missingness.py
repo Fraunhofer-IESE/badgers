@@ -1,11 +1,7 @@
 import abc
-from copy import copy
-from typing import Tuple
 
 import networkx as nx
 import numpy
-import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 
@@ -15,7 +11,7 @@ class MissingGenerator(GeneratorMixin):
     Base class for missing nodes transformer
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
 
         :param random_generator: A random generator
@@ -23,7 +19,7 @@ class MissingGenerator(GeneratorMixin):
         self.random_generator = random_generator
 
     @abc.abstractmethod
-    def generate(self, X, y=None, **params) -> Tuple:
+    def generate(self, X, **params):
         """
         This method should be overridden by subclasses.
         """
@@ -35,33 +31,35 @@ class NodesMissingCompletelyAtRandom(MissingGenerator):
     Removes nodes from the graph uniformly at random.
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the missingness generator.
 
         :param random_generator: A NumPy random number generator.
-                               Defaults to a default random number generator seeded with 0.
+                               Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
 
-    def generate(self, X, y=None, percentage_missing: float = 0.1) -> Tuple:
+    def generate(self, X, percentage_missing: float = 0.1):
         """
         Generate a graph with a specified percentage of missing nodes.
 
+        Any values associated with the nodes (e.g., node attributes such as labels)
+        are stored as attributes on the graph nodes themselves. When a node is removed,
+        its associated values are removed with it.
+
         :param X: The input graph from which nodes will be removed.
         :type X: nx.Graph
-        :param y: Optional target array associated with the nodes in the graph.
-                  If provided, the corresponding elements will also be removed.
-        :type y: np.ndarray, optional
         :param percentage_missing: The percentage of nodes to be removed (float value between 0 and 1).
         :type percentage_missing: float
-        :return: A tuple containing the modified graph with missing nodes and the modified target array (if provided).
-        :rtype: Tuple[nx.Graph, Optional[np.ndarray]]
+        :return: The modified graph with missing nodes.
+        :rtype: nx.Graph
         """
-        assert 0 < percentage_missing < 1
+        if not 0 < percentage_missing < 1:
+            raise ValueError(f"percentage_missing must be in (0, 1), got {percentage_missing}")
         if not isinstance(X, nx.Graph):
-            raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
+            raise TypeError('badgers does only support networkx.Graph objects for graphs')
 
         nodes_to_be_removed = self.random_generator.choice(
             X.nodes(),
@@ -72,12 +70,7 @@ class NodesMissingCompletelyAtRandom(MissingGenerator):
         Xt = X.copy()
         Xt.remove_nodes_from(nodes_to_be_removed)
 
-        if y is not None:
-            yt = np.delete(y, nodes_to_be_removed)
-        else:
-            yt = None
-
-        return Xt, yt
+        return Xt
 
 
 class EdgesMissingCompletelyAtRandom(MissingGenerator):
@@ -85,34 +78,35 @@ class EdgesMissingCompletelyAtRandom(MissingGenerator):
     Removes edges from the graph uniformly at random.
     """
 
-    def __init__(self, random_generator: numpy.random.Generator = default_rng(seed=0)):
+    def __init__(self, random_generator):
         """
         Initialize the missingness generator.
 
         :param random_generator: A NumPy random number generator.
-                                 Defaults to a default random number generator seeded with 0.
+                                 Required (no default): pass a numpy.random.Generator.
         :type random_generator: numpy.random.Generator
         """
         super().__init__(random_generator=random_generator)
 
-    def generate(self, X, y=None, percentage_missing: float = 0.1) -> Tuple:
+    def generate(self, X, percentage_missing: float = 0.1):
         """
         Generate a graph with a specified percentage of missing edges.
 
+        Any values associated with the edges (e.g., edge attributes such as weights)
+        are stored as attributes on the graph edges themselves. When an edge is removed,
+        its associated values are removed with it.
+
         :param X: The input graph from which edges will be removed.
         :type X: nx.Graph
-        :param y: Optional target data associated with the edges in the graph.
-                  If provided, the corresponding elements will also be removed.
-                  Can be a dictionary where keys are edge tuples and values are target values.
-        :type y: dict, optional
         :param percentage_missing: The percentage of edges to be removed (float value between 0 and 1).
         :type percentage_missing: float
-        :return: A tuple containing the modified graph with missing edges and the modified target data (if provided).
-        :rtype: Tuple[nx.Graph, Optional[dict]]
+        :return: The modified graph with missing edges.
+        :rtype: nx.Graph
         """
-        assert 0 < percentage_missing < 1
+        if not 0 < percentage_missing < 1:
+            raise ValueError(f"percentage_missing must be in (0, 1), got {percentage_missing}")
         if not isinstance(X, nx.Graph):
-            raise NotImplementedError('badgers does only support networkx.Graph objects for graphs')
+            raise TypeError('badgers does only support networkx.Graph objects for graphs')
 
         edges_to_be_removed = self.random_generator.choice(
             X.edges(),
@@ -123,13 +117,4 @@ class EdgesMissingCompletelyAtRandom(MissingGenerator):
         Xt = X.copy()
         Xt.remove_edges_from(edges_to_be_removed)
 
-        if y is None:
-            yt = None
-        elif isinstance(y, dict):
-            yt = copy(y)
-            for e in edges_to_be_removed:
-                del yt[e]
-        else:
-            raise ValueError(f'This type of y is not supported {type(y)}, {y}')
-
-        return Xt, yt
+        return Xt

@@ -2,15 +2,21 @@
 
 Owns the shared plumbing: DGP configuration (no generator-side ``fit`` —
 the DGP is fitted by its own ``fit``, explicitly by the caller or lazily
-inside ``generate()``), input/structure validation, and mechanism gating
-(which rows get the defect). Subclasses define the defect injection and
-propagation, and manage their OWN labels: each generator stores the
-per-row defect labels of its last generated output and exposes them
-through a public getter (e.g. ``get_outliers_labels()``).
+inside ``generate()``) and input/structure validation. Subclasses define
+the defect injection and propagation, and manage their OWN labels: each
+generator stores the per-row defect labels of its last generated output
+and exposes them through a public getter (e.g. ``get_outliers_labels()``).
+
+Selection (which rows get the defect) is realized by
+``badgers.core.selectors.get_selected_fields``; generators import and call it
+themselves. The DGP's ``column_mapping`` is the ONLY name↔position
+bridge: generators speak column positions, and ``_node_names``
+translates them back at the intervene boundary.
 """
 
+import warnings
+
 import numpy as np
-from numpy.random import default_rng
 
 from badgers.core.base import GeneratorMixin
 from badgers.core.causal_graph import validate_dag
@@ -23,12 +29,32 @@ def _column_stds(X):
     scale of 1.0 so a drawn offset stays finite -- a NaN-bearing column
     must never silently poison the whole output column (G9b).
     """
-    import warnings
-
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN slice
         std = np.nanstd(X, axis=0)
     return np.where(np.isfinite(std) & (std > 0), std, 1.0)
+
+
+def _param_by_target(param, name, targets):
+    """Per-target scalar parameter: scalar broadcast or dict by column position.
+
+    ``{0: 0.3}`` keys are COLUMN POSITIONS (the selector's targets), not
+    node names. The dict must cover every target column.
+    """
+    if np.isscalar(param):
+        return {c: float(param) for c in targets}
+    if not isinstance(param, dict):
+        raise ValueError(
+            f"{name} must be a scalar or a dict keyed by column "
+            f"position, got {type(param).__name__}"
+        )
+    missing = [c for c in targets if c not in param]
+    if missing:
+        raise ValueError(
+            f"{name} dict is missing entries for target column(s) {missing} "
+            f"(keys are column positions; selector targets = {list(targets)})"
+        )
+    return {c: float(param[c]) for c in targets}
 
 
 class CausalGenerator(GeneratorMixin):
@@ -36,7 +62,7 @@ class CausalGenerator(GeneratorMixin):
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (fitted or unfitted). This is the ONLY structure
@@ -64,11 +90,11 @@ class CausalGenerator(GeneratorMixin):
 
             dgp = GcmSCMDGP(make_gcm_scm(graph, column_mapping)).fit(X)  # fit on clean X
 
-            missingness = CausalMissingnessGenerator(rng=..., dgp=dgp)
-            Xm, _ = missingness.generate(X, None, ...)
+            missingness = CausalMissingnessGenerator(random_generator=..., dgp=dgp)
+            Xm = missingness.generate(X, ...)
 
-            drift = CausalDriftGenerator(rng=..., dgp=dgp)  # share
-            Xt, _ = drift.generate(Xm, None, ...)
+            drift = CausalDriftGenerator(random_generator=..., dgp=dgp)  # share
+            Xt = drift.generate(Xm, ...)
 
         All per-stage scale computations are NaN-safe, so even the lazy
         refit path behaves sensibly; the explicitly-fitted shared
@@ -80,7 +106,7 @@ class CausalGenerator(GeneratorMixin):
     #: Subclasses set this to the deficit name used in labels.
     deficit_name = "causal"
 
-    def __init__(self, random_generator=default_rng(seed=0), dgp=None):
+    def __init__(self, random_generator, dgp=None):
         self.random_generator = random_generator
         self.dgp = dgp
         self.graph = None if dgp is None else dgp.graph
@@ -90,6 +116,21 @@ class CausalGenerator(GeneratorMixin):
         # public getter (e.g. ``get_outliers_labels()``) which raises
         # RuntimeError when no output has been generated yet.
         self.deficit_labels_ = None
+
+    def _get_deficit_labels(self) -> np.ndarray:
+        """Shared body of the per-family ``get_<deficit>_labels()`` getters.
+
+        Returns ``self.deficit_labels_`` (the boolean per-row field filled
+        by ``generate()``); raises ``RuntimeError`` when no output has
+        been generated yet. The error message names the family through
+        ``self.deficit_name``.
+        """
+        if self.deficit_labels_ is None:
+            raise RuntimeError(
+                f"{self.deficit_name.capitalize()} labels are only "
+                "available after calling generate()."
+            )
+        return self.deficit_labels_
 
     # -- DGP plumbing -------------------------------------------------------
 
@@ -144,39 +185,6 @@ class CausalGenerator(GeneratorMixin):
                 "the constructor (or use_dgp(dgp)) first."
             )
         return self.dgp.sample(self.random_generator, n_samples)
-
-    # -- Mechanism gating (Distinction 3) -----------------------------------
-
-    def _fire_masks(self, rows, perturbation_nodes, selector=None):
-        """Fire masks for ALL rows at once: dict {node: bool row-mask}.
-
-        Delegates to a ``Selector`` from ``badgers.core.selectors``:
-        ``selector(rows, y) -> {node: bool mask}``.
-        ``None`` defaults to ``AlwaysSelector`` (every row fires).
-
-        Parameters
-        ----------
-        rows : array to gate (the generator's working rows -- for the noise
-            generator these are the n_copies-EXPANDED rows).
-        perturbation_nodes : list of str, non-empty (pre-validated).
-        selector : Selector or None, default None
-            The row-selection rule. ``None`` = ``AlwaysSelector`` (all
-            rows fire). Presets: ``BernoulliSelector`` (iid rate),
-            ``ExactCountSelector`` (exact count), ``TopQuantileSelector``
-            (value threshold, self or driver mode), ``AlwaysSelector``;
-            any user callable with the same signature works.
-
-        Note: masks are computed against ``rows`` BEFORE any mutation
-        (callers write NaNs/noise afterwards), which makes the gate
-        order-independent -- the "compute ALL masks first" invariant the
-        legacy missingness path already documented.
-        """
-        if selector is None:
-            return {
-                node: np.ones(rows.shape[0], dtype=bool)
-                for node in perturbation_nodes
-            }
-        return selector(rows, None)
 
     # -- Validation ---------------------------------------------------------
 
@@ -256,6 +264,9 @@ class CausalGenerator(GeneratorMixin):
 
         Requires a non-empty list of nodes that exist in the graph.
         Raises ``ValueError`` otherwise; returns nothing.
+
+        Only the legacy ``quantile_range`` fallback of
+        ``CausalImbalanceGenerator`` still takes node names.
         """
         graph = self.graph
         if graph is None:
@@ -278,3 +289,13 @@ class CausalGenerator(GeneratorMixin):
                 raise ValueError(
                     f"perturbation node '{node}' not found in graph"
                 )
+
+    def _node_names(self, columns):
+        """Node names for column positions (inverse of ``column_mapping``).
+
+        Total after :meth:`_validate_structure`: the mapping is a bijection
+        between graph nodes and in-range column indices, so every valid
+        position has exactly one name.
+        """
+        names = {col: node for node, col in self.column_mapping.items()}
+        return [names[c] for c in columns]

@@ -9,13 +9,14 @@ pip install badgers
 Import badgers as any other library and start using it:
 
 ```python
+from numpy.random import default_rng
 from sklearn.datasets import make_blobs
 from scipy.stats import norm
 from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator
 
-X, y = make_blobs()
-gen = AdditiveNoiseGenerator()
-Xt, yt = gen.generate(X, y, distribution=norm(scale=0.5))
+X, _ = make_blobs()
+gen = AdditiveNoiseGenerator(random_generator=default_rng(0))
+Xt = gen.generate(X, distribution=norm(scale=0.5))
 ```
 
 More examples are available in the [tutorials](tutorials/index.md) section.

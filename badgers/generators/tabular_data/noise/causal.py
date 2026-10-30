@@ -9,18 +9,28 @@ fresh noise).
 import numpy as np
 
 from badgers.core.decorators.tabular_data import preprocess_inputs
+from badgers.core.selectors import get_selected_fields
+from badgers.core.selectors.base import _resolve_targets
 from badgers.generators.tabular_data.causal._base import (
     CausalGenerator,
     _column_stds,
+    _param_by_target,
 )
 
 
 class CausalNoiseGenerator(CausalGenerator):
     """Generates causally-propagated Gaussian noise.
 
+    A selector is required and owns the intervention targets: the
+    selector's ``columns`` (column positions) are the nodes where the
+    noise is injected, and its selection rule decides which rows are
+    perturbed. The selector sees the ORIGINAL (un-expanded) rows:
+    selection masks are evaluated before the ``n_copies`` expansion, then
+    replicated so every copy of a seed row shares the same state.
+
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (passed via the constructor or use_dgp(); fitted
@@ -29,17 +39,19 @@ class CausalNoiseGenerator(CausalGenerator):
 
     generate() parameters (passed via **params)
     ----------
-    perturbation_nodes : list of str
-        Nodes where the noise is injected (required).
+    selector : Selector
+        Row/column selection rule from ``badgers.core.selectors``. Its
+        ``columns`` own the perturbation targets; required (``None``
+        raises -- there is no relevant default: the selector owns the
+        perturbation targets). Evaluated on the ORIGINAL (un-expanded)
+        rows.
     n_copies : int, default=1
         Number of noisy copies per seed row (``n -> n * n_copies``).
         ``1`` degenerates to in-place.
-    selector : Selector or None, default=None
-        Row-selection rule from ``badgers.core.selectors``, evaluated on
-        the ORIGINAL (un-expanded) rows. ``None`` = every row fires.
-    noise_std : float or np.ndarray, default=0.1
-        Std of Gaussian noise, relative to column std. Scalar or per-column
-        (aligned to perturbation_nodes order).
+    noise_std : float or dict, default=0.1
+        Std of Gaussian noise, relative to column std. Scalar (same for
+        all targets) or dict keyed by column position
+        (``{col_position: std}``) — must cover every target.
     """
 
     deficit_name = "noise"
@@ -51,78 +63,66 @@ class CausalNoiseGenerator(CausalGenerator):
         output: True for rows that carry the noise deficit, False for
         original rows.
         """
-        if self.deficit_labels_ is None:
-            raise RuntimeError(
-                "Noise labels are only available after calling generate()."
-            )
-        return self.deficit_labels_
+        return self._get_deficit_labels()
 
     @preprocess_inputs
     def generate(
         self,
         X,
-        y,
-        perturbation_nodes=None,
+        selector,
         n_copies=1,
-        selector=None,
         noise_std=0.1,
     ):
         """Generate causally-propagated noise (expands each seed row)."""
         if n_copies < 1:
             raise ValueError(f"n_copies must be >= 1, got {n_copies}")
         self._require_fitted()
+        if selector is None:
+            raise ValueError(
+                "selector is required: it owns the intervention targets"
+            )
         self._require_dgp(X)
         self._validate_structure(X)
-        self._validate_perturbation_nodes(perturbation_nodes)
-        node_to_col = self.column_mapping
-        n_features = X.shape[1]
+        targets = list(_resolve_targets(selector, X, None))
+        scale = _param_by_target(noise_std, "noise_std", targets)
         col_stds = _column_stds(X)
+        rng = self.random_generator
 
-        # noise_std scalar or per-perturbation-node array
-        if np.isscalar(noise_std):
-            noise_scale = np.full(len(perturbation_nodes), float(noise_std))
-        else:
-            noise_scale = np.asarray(noise_std, dtype=float)
-            if noise_scale.shape != (len(perturbation_nodes),):
-                raise ValueError(
-                    "noise_std array must have one entry per perturbation node"
-                )
+        # Selector realization: masks evaluated on the ORIGINAL (un-expanded)
+        # rows, then replicated to the expansion (each seed row's copies
+        # either all are selected or all stay clean). Quantile thresholds are
+        # computed on the un-expanded input by construction.
+        field = get_selected_fields(X, selector, rng)
+        field_expanded = np.repeat(field, n_copies, axis=0)
 
         # Expand: each seed row -> n_copies copies (n_copies=1 keeps the shape).
         rows = np.repeat(X, n_copies, axis=0)
-        # Selector gating: masks evaluated on the ORIGINAL (un-expanded)
-        # rows, then replicated to the expansion (each seed row's copies
-        # either all fire or all stay clean). Quantile thresholds are
-        # computed on the un-expanded input by construction.
-        fires = self._fire_masks(
-            X, perturbation_nodes, selector=selector,
-        )
-        fires = {
-            node: np.repeat(mask, n_copies) for node, mask in fires.items()
-        }
+
+        # Inject noise ONLY at the selected rows of each target.
         affected = np.zeros(rows.shape[0], dtype=bool)
-        for j, node in enumerate(perturbation_nodes):
-            mask = fires[node]
-            col = node_to_col[node]
+        for i, col in enumerate(targets):
+            mask = field_expanded[:, i]
             if mask.any():
-                rows[mask, col] += self.random_generator.normal(
-                    0, noise_scale[j] * col_stds[col], size=int(mask.sum())
+                rows[mask, col] += rng.normal(
+                    scale=scale[col] * col_stds[col],
+                    size=int(mask.sum()),
                 )
             affected |= mask
 
         # Recompute the descendants of the AFFECTED rows through the
         # structural equations (Pearl surgery): descendant = f(new parents)
-        # + fresh noise. Unaffected rows are left untouched.
+        # + fresh noise. Intervene receives ALL target names: unselected
+        # target nodes stay pinned at their (possibly noisy) current
+        # values while their strict descendants recompute from the pinned
+        # parents. Unaffected rows are left untouched.
         affected_rows = np.flatnonzero(affected)
         if affected_rows.size:
             sub = rows[affected_rows]
-            self.dgp.intervene(
-                sub, perturbation_nodes, rng=self.random_generator
-            )
+            self.dgp.intervene(sub, self._node_names(targets), rng=rng)
             rows[affected_rows] = sub
 
         self.deficit_labels_ = affected.copy()
-        return rows, None
+        return rows
 
 
 class CausalAdditiveNoiseGenerator(CausalGenerator):
@@ -131,13 +131,18 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
     Like :class:`CausalNoiseGenerator`, but the injected noise is drawn from
     a user-chosen distribution (a *frozen* scipy distribution object, e.g.
     ``scipy.stats.laplace(scale=1)``, ``scipy.stats.t(df=3)``) instead of
-    Gaussian white noise. Every row fires (no mechanism gating, no row
-    expansion — strictly in-place); the affected rows' descendants are
-    recomputed through the structural equations (Pearl surgery).
+    Gaussian white noise. The affected rows are noised in place
+    (``rows = X + noise``) and their descendants are recomputed through
+    the structural equations (Pearl surgery).
+
+    A selector is required and owns the intervention targets: the
+    selector's ``columns`` (column positions) are the nodes where the
+    noise is injected, and its selection rule decides which rows are
+    perturbed.
 
     Parameters
     ----------
-    random_generator : numpy.random.Generator, default=rng(seed=0)
+    random_generator : numpy.random.Generator, required
         Random number generator instance.
     dgp : DGP or None, default=None
         DGP instance (passed via the constructor or use_dgp(); fitted
@@ -146,17 +151,17 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
 
     generate() parameters (passed via **params)
     ----------
+    selector : Selector
+        Row/column selection rule from ``badgers.core.selectors``. Its
+        ``columns`` own the perturbation targets; required (``None``
+        raises -- there is no relevant default: the selector owns the
+        perturbation targets).
     distribution : frozen scipy distribution
         Frozen scipy distribution object exposing ``.rvs(size=...,
         random_state=...)`` (e.g. ``scipy.stats.laplace(scale=1)``). Drawn
         samples are added as-is.
     noise_std : float, default=1.0
         Global multiplier applied to the drawn noise (1.0 = raw draw).
-    perturbation_nodes : list of str
-        Nodes where the noise is injected (required).
-    selector : Selector or None, default=None
-        Row-selection rule from ``badgers.core.selectors``. ``None`` =
-        every row fires.
     """
 
     deficit_name = "noise"
@@ -168,21 +173,15 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
         output: True for rows that carry the noise deficit, False for
         original rows.
         """
-        if self.deficit_labels_ is None:
-            raise RuntimeError(
-                "Noise labels are only available after calling generate()."
-            )
-        return self.deficit_labels_
+        return self._get_deficit_labels()
 
     @preprocess_inputs
     def generate(
         self,
         X,
-        y,
-        perturbation_nodes,
-        distribution,
+        selector,
+        distribution=None,
         noise_std=1.0,
-        selector=None,
     ):
         """Generate causally-propagated additive noise (in-place)."""
         rvs = getattr(distribution, "rvs", None)
@@ -195,39 +194,40 @@ class CausalAdditiveNoiseGenerator(CausalGenerator):
         if noise_std < 0:
             raise ValueError(f"noise_std must be >= 0, got {noise_std}")
         self._require_fitted()
+        if selector is None:
+            raise ValueError(
+                "selector is required: it owns the intervention targets"
+            )
         self._require_dgp(X)
         self._validate_structure(X)
-        self._validate_perturbation_nodes(perturbation_nodes)
-        node_to_col = self.column_mapping
+        targets = list(_resolve_targets(selector, X, None))
+        col_stds = _column_stds(X)
+        rng = self.random_generator
 
-        fires = self._fire_masks(
-            X, perturbation_nodes, selector=selector,
-        )
-        affected = np.zeros(X.shape[0], dtype=bool)
-        for mask in fires.values():
-            affected |= mask
+        field = get_selected_fields(X, selector, rng)
+        affected = field.any(axis=1)
 
-        # Inject noise ONLY at the fired rows of each perturbation node.
+        # Inject noise ONLY at the selected rows of each target.
         noise = np.zeros(X.shape)
-        for j, node in enumerate(perturbation_nodes):
-            col = node_to_col[node]
-            mask = fires[node]
+        for i, col in enumerate(targets):
+            mask = field[:, i]
             if mask.any():
                 noise[mask, col] = (
-                    rvs(size=int(mask.sum()), random_state=self.random_generator)
+                    rvs(size=int(mask.sum()), random_state=rng)
                     * noise_std
+                    * col_stds[col]
                 )
         rows = X + noise
 
         # Recompute the AFFECTED rows through the structural equations
         # (Pearl surgery): descendant = f(new parents) + fresh noise.
+        # Intervene receives ALL target names: every selected row is
+        # affected (additive model), so every target node is noisy.
         affected_rows = np.flatnonzero(affected)
         if affected_rows.size:
             sub = rows[affected_rows]
-            self.dgp.intervene(
-                sub, perturbation_nodes, rng=self.random_generator
-            )
+            self.dgp.intervene(sub, self._node_names(targets), rng=rng)
             rows[affected_rows] = sub
 
         self.deficit_labels_ = affected.copy()
-        return rows, None
+        return rows

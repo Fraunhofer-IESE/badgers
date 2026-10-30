@@ -5,7 +5,7 @@ from benchmarks.models import Scenario
 
 def _erdos_renyi_factory(rng):
     G = nx.erdos_renyi_graph(n=100, p=0.1, seed=42)
-    return G, None
+    return G
 
 
 SCENARIO_ERDOS_RENYI = Scenario(

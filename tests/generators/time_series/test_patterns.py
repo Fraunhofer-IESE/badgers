@@ -43,8 +43,8 @@ def test_randomly_spaced_patterns__1d_no_overlap():
     n_patterns = 3
     X = np.zeros(shape=100).reshape(-1, 1)
     pattern = Pattern(values=np.array([0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0]))
-    generator = RandomlySpacedPatterns()
-    Xt, _ = generator.generate(X=X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
+    generator = RandomlySpacedPatterns(random_generator=np.random.default_rng(0))
+    Xt = generator.generate(X=X, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
     assert n_patterns == len(generator.patterns_indices_)
     for i in range(n_patterns - 1):
         assert generator.patterns_indices_[i][1] < generator.patterns_indices_[i + 1][0]
@@ -56,8 +56,8 @@ def test_randomly_spaced_patterns__2d_no_overlap():
     X = np.zeros(shape=(100, 2))
     pattern = Pattern(
         values=np.array([[0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0], [0, -1, -2, -3, -4, -5, -4, -3, -2, -1, 0]]).T)
-    generator = RandomlySpacedPatterns()
-    Xt, _ = generator.generate(X=X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
+    generator = RandomlySpacedPatterns(random_generator=np.random.default_rng(0))
+    Xt = generator.generate(X=X, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10, pattern=pattern)
     assert n_patterns == len(generator.patterns_indices_)
     for i in range(n_patterns - 1):
         assert generator.patterns_indices_[i][1] < generator.patterns_indices_[i + 1][0]
@@ -66,11 +66,10 @@ def test_randomly_spaced_patterns__2d_no_overlap():
 def test_randomly_spaced_constant_patterns__injects_zeros(time_series_sine):
     """RandomlySpacedConstantPatterns injects constant-zero regions."""
     n_patterns = 3
-    X_sine, _ = time_series_sine
-    X = X_sine
-    generator = RandomlySpacedConstantPatterns()
-    Xt, _ = generator.generate(X=X, y=None, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10,
-                               constant_value=0)
+    X = time_series_sine
+    generator = RandomlySpacedConstantPatterns(random_generator=np.random.default_rng(0))
+    Xt = generator.generate(X=X, n_patterns=n_patterns, min_width_pattern=5, max_width_patterns=10,
+                            constant_value=0)
     assert n_patterns == len(generator.patterns_indices_)
     for start, end in generator.patterns_indices_:
         assert Xt[start:end, :].tolist() == np.zeros((end - start, X.shape[1])).tolist()
@@ -78,10 +77,9 @@ def test_randomly_spaced_constant_patterns__injects_zeros(time_series_sine):
 
 def test_randomly_spaced_linear_patterns__interpolates(time_series_sine):
     """RandomlySpacedLinearPatterns linearly interpolates between endpoints."""
-    X_sine, _ = time_series_sine
-    X = X_sine
-    generator = RandomlySpacedLinearPatterns()
-    Xt, _ = generator.generate(X=X, y=None, n_patterns=3, min_width_pattern=5, max_width_patterns=10)
+    X = time_series_sine
+    generator = RandomlySpacedLinearPatterns(random_generator=np.random.default_rng(0))
+    Xt = generator.generate(X=X, n_patterns=3, min_width_pattern=5, max_width_patterns=10)
     for (start, end) in generator.patterns_indices_:
         for col in range(X.shape[1]):
             assert np.allclose(Xt[start:end, col],

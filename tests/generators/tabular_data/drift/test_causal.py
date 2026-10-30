@@ -1,7 +1,7 @@
 """Tests for CausalDriftGenerator (delta propagation semantics).
 
-Drift semantics: a single systematic shift (drawn once, applied to every
-affected row) at the perturbation node, propagated to the descendants as a
+Drift semantics: a single deterministic shift (applied to every affected
+row) at the perturbation node, propagated to the descendants as a
 delta: descendant_new = descendant_orig + beta @ delta_parents. Each node's
 own exogenous noise is preserved exactly.
 """
@@ -9,6 +9,8 @@ own exogenous noise is preserved exactly.
 import numpy as np
 import pytest
 
+from badgers.core.dgp import DGPMixin
+from badgers.core.selectors import AlwaysSelector, BernoulliSelector
 from badgers.generators.tabular_data.drift.causal import CausalDriftGenerator
 
 
@@ -16,9 +18,9 @@ def test_generate__drift_systematic_shift(chain_data, make_gcm_dgp):
     X, graph, column_mapping = chain_data
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
-        drift_std=1.0,
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0]),
+        shift_amount=1.0,
     )
     # in-place: same shape
     assert Xt.shape == X.shape
@@ -33,13 +35,14 @@ def test_generate__drift_shift_is_constant_across_rows(chain_data, make_gcm_dgp)
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
-        drift_std=1.0,
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0]),
+        shift_amount=1.0,
     )
-    # Drift is systematic: the shift is drawn ONCE and applied identically to
-    # every affected row. With the default selector all rows are affected, so
-    # the per-row change at the perturbation node must be a single constant.
+    # Drift is systematic: the shift is applied identically to
+    # every affected row (deterministic). With the default selector all
+    # rows are affected, so the per-row change at the perturbation node
+    # must be a single constant.
     shift = Xt[:, 0] - X_orig[:, 0]
     assert np.allclose(shift, shift[0], atol=1e-8)
 
@@ -49,11 +52,11 @@ def test_generate__drift_zero_shift_recompute(chain_data, make_gcm_dgp):
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
-        drift_std=0.0,
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0]),
+        shift_amount=0.0,
     )
-    # drift_std=0 -> shift of exactly 0: the perturbed column is written
+    # shift_amount=0 -> shift of exactly 0: the perturbed column is written
     # back unchanged (bit-identical). The DESCENDANTS are recomputed with
     # FRESH noise: statistically equivalent to the originals, not identical
     # (Pearl surgery, not delta propagation).
@@ -77,9 +80,9 @@ def test_generate__drift_propagates_recompute(chain_data, make_gcm_dgp):
     X_orig = X.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
-        drift_std=1.0,
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0]),
+        shift_amount=1.0,
     )
     dX = Xt[:, 0] - X_orig[:, 0]
     dB = Xt[:, 1] - X_orig[:, 1]
@@ -110,15 +113,13 @@ def test_generate__drift_magnitude(chain_data, make_gcm_dgp):
     X_orig = X.copy()
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
-    Xt, yt = gen.generate(
-        X, y=None, perturbation_nodes=["X"],
-        drift_std=2.0,
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0]),
+        shift_amount=2.0,
     )
-    # The systematic shift is drawn once (std ~ drift_std * col_std); its
-    # sampled value can be small, so assert on a generous bound (a tighter
-    # bound would be seed-flaky).
+    # The shift is deterministic: exactly shift_amount * col_std.
     shift = abs(Xt[0, 0] - X_orig[0, 0])
-    assert shift > 0.05 * (2.0 * np.std(X_orig[:, 0]))
+    np.testing.assert_allclose(shift, 2.0 * np.std(X_orig[:, 0]), rtol=1e-8)
 
 
 def test_generate__drift_closed_form_exact(make_gcm_dgp):
@@ -134,24 +135,43 @@ def test_generate__drift_closed_form_exact(make_gcm_dgp):
     data_orig = data.copy()  # capture BEFORE generate (in-place generator)
     gen = CausalDriftGenerator(random_generator=np.random.default_rng(3))
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(data))
-    Xt, _ = gen.generate(
-        data, y=None, perturbation_nodes=["X"],
-        drift_std=1.0,
-    )
-    dX = Xt[:, 0] - data_orig[:, 0]
-    np.testing.assert_allclose(
-        Xt[:, 1] - data_orig[:, 1], 2.0 * dX, rtol=1e-10, atol=1e-12
+    Xt = gen.generate(
+        data, selector=AlwaysSelector([0]),
+        shift_amount=1.0,
     )
     np.testing.assert_allclose(
-        Xt[:, 2] - data_orig[:, 2], 1.0 * dX, rtol=1e-10, atol=1e-12
+        Xt[:, 1] - data_orig[:, 1], 2.0 * (Xt[:, 0] - data_orig[:, 0]), rtol=1e-10, atol=1e-12
     )
+    np.testing.assert_allclose(
+        Xt[:, 2] - data_orig[:, 2], 1.0 * (Xt[:, 0] - data_orig[:, 0]), rtol=1e-10, atol=1e-12
+    )
+
+
+def test_generate__unfitted_dgp_is_fitted_lazily(chain_data, make_gcm_dgp):
+    # Regression: an UNFITTED dgp must be fitted lazily inside generate()
+    # (_require_dgp) instead of sailing past validation and crashing inside
+    # intervene(). The lazy fit runs on the generate-time data, so the
+    # drift is the same deterministic shift as with an explicitly fitted
+    # DGP.
+    X, graph, column_mapping = chain_data
+    gen = CausalDriftGenerator(
+        random_generator=np.random.default_rng(0),
+        dgp=make_gcm_dgp(graph, column_mapping),
+    )
+    assert not gen.dgp.is_fitted()
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    Xt = gen.generate(X, selector=AlwaysSelector([0]), shift_amount=1.0)
+    assert gen.dgp.is_fitted()
+    # the perturbation column moved deterministically by 1 * column std
+    shift = abs(Xt[0, 0] - X_orig[0, 0])
+    np.testing.assert_allclose(shift, 1.0 * np.std(X_orig[:, 0]), rtol=1e-8)
 
 
 def test_generate__validation_errors(chain_data):
     X, graph, column_mapping = chain_data
-    gen = CausalDriftGenerator()
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
     with pytest.raises(RuntimeError, match="no structure"):
-        gen.generate(X, y=None, perturbation_nodes=["X"])
+        gen.generate(X, selector=AlwaysSelector([0]))
 
 
 def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):
@@ -169,8 +189,8 @@ def test_generate__nan_input_does_not_poison(chain_data, make_gcm_dgp):
     Xn[:50, 1] = np.nan  # stage 1 (e.g. missingness) wrote NaNs into Y
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
     n_nan_y = int(np.isnan(Xn[:, 1]).sum())
-    Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
-                         drift_std=0.5)
+    Xt = gen.generate(Xn, selector=AlwaysSelector([1]),
+                      shift_amount=0.5)
     # The perturbed column gains NO new NaN cells (finite scale).
     assert int(np.isnan(Xt[:, 1]).sum()) == n_nan_y
     # Column X (untouched upstream) gains no NaNs either.
@@ -197,10 +217,123 @@ def test_generate__all_nan_column_does_not_crash(chain_data, make_gcm_dgp):
     Xn = X.copy()
     Xn[:, 1] = np.nan
     before = Xn.copy()  # snapshot BEFORE generate (in-place generator)
-    Xt, _ = gen.generate(Xn, y=None, perturbation_nodes=["Y"],
-                         drift_std=0.5)
+    Xt = gen.generate(Xn, selector=AlwaysSelector([1]),
+                      shift_amount=0.5)
     # No crash; no NEW NaNs in the perturbed or upstream columns.
     assert int(np.isnan(Xt[:, 1]).sum()) == before.shape[0]
     np.testing.assert_array_equal(np.isnan(Xt[:, 0]), np.isnan(before[:, 0]))
     # Descendant Z is NaN exactly where the Y delta was NaN.
     np.testing.assert_array_equal(np.isnan(Xt[:, 2]), np.isnan(before[:, 1]))
+
+
+def test_generate__selector_none_raises(chain_data, make_gcm_dgp):
+    # The selector is required: it owns the intervention targets.
+    # (Unlike the other causal generators, drift's signature has no
+    # selector default -- pass None explicitly to hit the guard.)
+    X, graph, column_mapping = chain_data
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    with pytest.raises(ValueError, match="selector is required"):
+        gen.generate(X, selector=None, shift_amount=1.0)
+
+
+def test_generate__shift_amount_dict_per_target(chain_data, make_gcm_dgp):
+    # shift_amount as a dict keyed by COLUMN POSITION applies a per-target
+    # shift: column 0 (X) moves by 1.0 * std(X), column 1 (Y) by 0.5 * std(Y).
+    X, graph, column_mapping = chain_data
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    Xt = gen.generate(
+        X, selector=AlwaysSelector([0, 1]),
+        shift_amount={0: 1.0, 1: 0.5},
+    )
+    np.testing.assert_allclose(
+        np.abs(Xt[:, 0] - X_orig[:, 0]), 1.0 * np.std(X_orig[:, 0]), rtol=1e-8)
+    np.testing.assert_allclose(
+        np.abs(Xt[:, 1] - X_orig[:, 1]), 0.5 * np.std(X_orig[:, 1]), rtol=1e-8)
+
+
+def test_generate__shift_amount_dict_missing_entry_raises(chain_data, make_gcm_dgp):
+    # A dict keyed by column position must cover EVERY target column.
+    X, graph, column_mapping = chain_data
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    with pytest.raises(ValueError, match="shift_amount dict is missing entries"):
+        gen.generate(X, selector=AlwaysSelector([0, 1]), shift_amount={0: 1.0})
+
+
+def test_generate__selector_gates_rows_bit_exactly(chain_data, make_gcm_dgp):
+    # The selector owns the intervention: a row NOT selected for any
+    # target must leave the output BIT-IDENTICAL to its input row -- no
+    # drift shift, no descendant recompute. Kills the "shift every row"
+    # implementation (labels stay correct there, so label-only tests
+    # cannot detect it).
+    X, graph, column_mapping = chain_data
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    Xt = gen.generate(
+        X, selector=BernoulliSelector([0], rate=0.5,
+                                      rng=gen.random_generator),
+        shift_amount=1.0,
+    )
+    labels = gen.get_drift_labels()
+    assert 0.2 < labels.mean() < 0.8  # the gate actually gates something
+    np.testing.assert_array_equal(Xt[~labels], X_orig[~labels])
+
+
+class _NoiselessChainDGP(DGPMixin):
+    """Deterministic 3-node chain X->Y->Z with Y = 2 X, Z = 0.5 Y, no
+    noise (the GCM backend cannot express a world with a constant node:
+    the regression fit would be degenerate)."""
+
+    def __init__(self, graph, column_mapping, beta):
+        self.graph = graph
+        self.column_mapping = column_mapping
+        self._beta = beta
+        self._fitted = False
+
+    def fit(self, X):
+        self._fitted = True
+        return self
+
+    def is_fitted(self):
+        return self._fitted
+
+    def response(self, node, parent_values):
+        parents = list(self.graph.predecessors(node))
+        coefs = np.array([self._beta[node][p] for p in parents])
+        return parent_values @ coefs
+
+    def draw_noise(self, node, rng, n):
+        return np.zeros(n)
+
+
+def test_generate__constant_column_uses_unit_scale():
+    # G9b: a constant column has std 0; the scale fallback replaces it
+    # with 1.0 so the configured shift_amount is applied IN FULL. Without
+    # the fallback the shift would multiply by std=0 and a constant
+    # target column could never move (and its descendants would never
+    # recompute).
+    import networkx as nx
+
+    graph = nx.DiGraph([("X", "Y"), ("Y", "Z")])
+    column_mapping = {"X": 0, "Y": 1, "Z": 2}
+    X = np.random.default_rng(0).normal(size=(40, 3))
+    X[:, 1] = 5.0  # constant node Y
+    X[:, 2] = 0.5 * X[:, 1]  # deterministic descendant Z
+    before = X.copy()
+
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(_NoiselessChainDGP(graph, column_mapping,
+                                   {"Y": {"X": 2.0}, "Z": {"Y": 0.5}}))
+    Xt = gen.generate(X, selector=AlwaysSelector([1]), shift_amount=1.0)
+    # The constant column moved by exactly shift_amount (unit scale).
+    np.testing.assert_array_equal(Xt[:, 1], before[:, 1] + 1.0)
+    # The deterministic descendant was recomputed from the shifted value.
+    np.testing.assert_array_equal(Xt[:, 2], 0.5 * (before[:, 1] + 1.0))
+    # The untouched upstream column is bit-identical.
+    np.testing.assert_array_equal(Xt[:, 0], before[:, 0])
+    labels = gen.get_drift_labels()
+    assert labels.all()

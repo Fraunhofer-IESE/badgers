@@ -65,7 +65,7 @@ def draw_graph(graph, title=None):
     return fig
 
 
-def plot_2panel(X, Xt, yt=None, x_idx=0, y_idx=1, x_name="X", y_name="Y"):
+def plot_2panel(X, Xt, x_idx=0, y_idx=1, x_name="X", y_name="Y"):
     """Original | Transformed scatter of two dimensions."""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.5), sharex=True, sharey=True)
     axes[0].scatter(X[:, x_idx], X[:, y_idx], color="C0", s=15)

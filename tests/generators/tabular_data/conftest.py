@@ -6,50 +6,41 @@ import pytest
 
 @pytest.fixture(params=["numpy_1D", "numpy_2D", "pandas_1D", "pandas_2D"])
 def tabular_data(request, rng):
-    """Parametrized fixture yielding (X, y=None) for each input type."""
+    """Parametrized fixture yielding X (features only) for each input type."""
     if request.param == "numpy_1D":
-        return rng.normal(size=100).reshape(-1, 1), None
+        return rng.normal(size=100).reshape(-1, 1)
     elif request.param == "numpy_2D":
-        return rng.normal(size=(100, 10)), None
+        return rng.normal(size=(100, 10))
     elif request.param == "pandas_1D":
-        return pd.DataFrame(
-            rng.normal(size=100).reshape(-1, 1), columns=["col"]
-        ), None
+        return pd.DataFrame(rng.normal(size=100).reshape(-1, 1), columns=["col"])
     elif request.param == "pandas_2D":
         return pd.DataFrame(
             rng.normal(size=(100, 10)),
             columns=[f"col{i}" for i in range(10)],
-        ), None
+        )
 
 
 @pytest.fixture(params=["numpy_1D", "numpy_2D", "pandas_1D", "pandas_2D"])
 def tabular_data_labeled(request, rng):
-    """Parametrized fixture yielding (X, y) with 5-class classification labels."""
+    """Parametrized fixture yielding a labeled matrix X whose LAST column holds
+    5-class classification values (added as column "cls" for pandas inputs)."""
     if request.param == "numpy_1D":
-        return (
-            rng.normal(size=100).reshape(-1, 1),
-            np.array([i % 5 for i in range(100)]),
-        )
+        X = rng.normal(size=100).reshape(-1, 1)
+        y = np.array([i % 5 for i in range(100)])
+        return np.column_stack([X, y]).astype(float)
     elif request.param == "numpy_2D":
-        return (
-            rng.normal(size=(100, 10)),
-            np.array([0, 1, 2, 3, 4] * 20),
-        )
+        X = rng.normal(size=(100, 10))
+        y = np.array([0, 1, 2, 3, 4] * 20)
+        return np.column_stack([X, y]).astype(float)
     elif request.param == "pandas_1D":
-        return (
-            pd.DataFrame(
-                rng.normal(size=100).reshape(-1, 1), columns=["col"]
-            ),
-            pd.Series([i % 5 for i in range(100)]),
-        )
+        X = pd.DataFrame(rng.normal(size=100).reshape(-1, 1), columns=["col"])
+        return X.assign(cls=[i % 5 for i in range(100)])
     elif request.param == "pandas_2D":
-        return (
-            pd.DataFrame(
-                rng.normal(size=(100, 10)),
-                columns=[f"col{i}" for i in range(10)],
-            ),
-            pd.Series([0, 1, 2, 3, 4] * 20),
+        X = pd.DataFrame(
+            rng.normal(size=(100, 10)),
+            columns=[f"col{i}" for i in range(10)],
         )
+        return X.assign(cls=[0, 1, 2, 3, 4] * 20)
 
 
 @pytest.fixture

@@ -9,7 +9,7 @@ from benchmarks.models import (
 class TestScenario(unittest.TestCase):
     def test_create_scenario(self):
         def factory(rng):
-            return np.zeros((10, 2)), None
+            return np.zeros((10, 2))
 
         s = Scenario(
             name="test_scenario",
@@ -20,22 +20,21 @@ class TestScenario(unittest.TestCase):
         self.assertEqual(s.name, "test_scenario")
         self.assertEqual(s.data_type, "tabular")
         self.assertEqual(s.tags, ["small", "2D"])
-        X, y = s.factory(np.random.default_rng(0))
+        X = s.factory(np.random.default_rng(0))
         self.assertEqual(X.shape, (10, 2))
-        self.assertIsNone(y)
 
     def test_scenario_default_tags(self):
         s = Scenario(
             name="test",
             data_type="tabular",
-            factory=lambda rng: (None, None),
+            factory=lambda rng: None,
         )
         self.assertEqual(s.tags, [])
 
 
 class TestGeneratorBenchmark(unittest.TestCase):
     def test_create_benchmark(self):
-        s = Scenario("s1", "tabular", lambda rng: (None, None))
+        s = Scenario("s1", "tabular", lambda rng: None)
 
         gb = GeneratorBenchmark(
             generator_cls=type("FakeGen", (), {}),

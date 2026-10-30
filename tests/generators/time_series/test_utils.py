@@ -5,9 +5,9 @@ from badgers.generators.time_series.utils import generate_random_patterns_indice
 
 
 def test_generate_random_patterns_indices__no_patterns_raises():
-    """generate_random_patterns_indices raises AssertionError for n_patterns=0."""
+    """generate_random_patterns_indices raises ValueError for n_patterns=0."""
     rng = np.random.default_rng(0)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         generate_random_patterns_indices(
             random_generator=rng, signal_size=100, n_patterns=0,
             min_width_pattern=5, max_width_patterns=10,
@@ -46,3 +46,33 @@ def test_generate_random_patterns_indices__multiple_patterns():
         assert end - start < 10
         assert 0 <= start < signal_size
         assert 0 <= end < signal_size
+
+
+def test_generate_random_patterns_indices__tight_capacity_boundary():
+    """The tight capacity case max_width_patterns * n_patterns == signal_size works."""
+    rng = np.random.default_rng(0)
+    patterns = generate_random_patterns_indices(
+        random_generator=rng, signal_size=12, n_patterns=2,
+        min_width_pattern=5, max_width_patterns=6,
+    )
+    assert len(patterns) == 2
+    for start, end in patterns:
+        assert start < end
+        assert end - start >= 5
+        assert end - start < 6
+        assert 0 <= start < 12
+        assert 0 <= end < 12
+
+
+def test_generate_random_patterns_indices__capacity_exceeded_raises():
+    """A signal too small for n_patterns full-width patterns raises ValueError.
+
+    Regression test for the off-by-one guard: n_patterns=2, max=6, signal_size=11
+    passed the old guard but crashed inside rng.integers with high <= 0.
+    """
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError):
+        generate_random_patterns_indices(
+            random_generator=rng, signal_size=11, n_patterns=2,
+            min_width_pattern=1, max_width_patterns=6,
+        )

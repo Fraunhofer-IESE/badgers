@@ -7,9 +7,12 @@ from badgers.core.sampling import (
     Sampler,
     NormalSampler,
     UniformSampler,
+    InstanceSampler,
     ZScoreSampler,
     HypersphereSampler,
     UniformOutOfDistributionSampler,
+    IndependentHistogramSampler,
+    JointHistogramSampler,
     create_within_distribution_sampler,
     create_out_of_distribution_sampler,
     _WITHIN_DISTRIBUTION_REGISTRY,
@@ -90,6 +93,26 @@ def test_uniform_sampler_single_column(rng, X):
     assert result.shape == (30, 1)
 
 
+# --- InstanceSampler ---
+def test_instance_sampler_shape(rng, X):
+    out = InstanceSampler().sample(rng, X, [0, 1], 7)
+    assert out.shape == (7, 2)
+
+
+def test_instance_sampler_values_are_real_column_values(rng, X):
+    out = InstanceSampler().sample(rng, X, [1, 0], 50)
+    assert np.isin(out[:, 0], X[:, 1]).all()
+    assert np.isin(out[:, 1], X[:, 0]).all()
+
+
+def test_instance_sampler_full_width_draw_parity():
+    """Full-width call keeps the inline per-cell bootstrap draw shape."""
+    X = np.arange(80.0).reshape(20, 4)
+    out = InstanceSampler().sample(np.random.default_rng(5), X, list(range(4)), 5)
+    ref = X[np.random.default_rng(5).integers(0, 20, size=(5, 4)), np.arange(4)]
+    np.testing.assert_array_equal(out, ref)
+
+
 # --- ZScoreSampler ---
 
 def test_zscore_sampler_shape(rng, X):
@@ -168,13 +191,18 @@ def test_uniform_ood_sampler_beyond_bounds(rng, X):
     assert np.any((result < mins) | (result > maxs))
 
 
-def test_uniform_ood_sampler_no_expansion_raises():
-    with pytest.raises(ValueError, match="expansion must be > 0"):
-        UniformOutOfDistributionSampler(expansion=0)
+def test_uniform_ood_sampler_zero_expansion_allowed(rng, X):
+    """expansion=0 is the exact data bounding box (in-distribution by construction)."""
+    sampler = UniformOutOfDistributionSampler(expansion=0)
+    result = sampler.sample(rng, X, [0, 1], 50)
+    mins = np.min(X, axis=0)
+    maxs = np.max(X, axis=0)
+    assert np.all(result >= mins)
+    assert np.all(result <= maxs)
 
 
 def test_uniform_ood_sampler_negative_expansion_raises():
-    with pytest.raises(ValueError, match="expansion must be > 0"):
+    with pytest.raises(ValueError, match="expansion must be >= 0"):
         UniformOutOfDistributionSampler(expansion=-0.5)
 
 
@@ -182,6 +210,91 @@ def test_uniform_ood_sampler_single_column(rng, X):
     sampler = UniformOutOfDistributionSampler(expansion=0.3)
     result = sampler.sample(rng, X, [1], 30)
     assert result.shape == (30, 1)
+
+
+# --- Histogram out-of-distribution samplers ---
+
+def test_independent_histogram_sampler_shape_and_seeded_values():
+    X = np.linspace(-3.0, 3.0, 101).reshape(-1, 1)
+    first = IndependentHistogramSampler(bins=8).sample(
+        np.random.default_rng(11), X, [0], 12)
+    second = IndependentHistogramSampler(bins=8).sample(
+        np.random.default_rng(11), X, [0], 12)
+
+    assert first.shape == (12, 1)
+    np.testing.assert_array_equal(first, second)
+    assert np.isfinite(first).all()
+
+
+def test_independent_histogram_sampler_returns_requested_columns_only():
+    rng = np.random.default_rng(13)
+    X = np.column_stack([
+        rng.normal(size=60),
+        rng.normal(loc=150.0, scale=12.0, size=60),
+    ])
+    result = IndependentHistogramSampler(bins=6).sample(
+        np.random.default_rng(12), X, [1], 9)
+
+    assert result.shape == (9, 1)
+    assert np.all((result[:, 0] >= X[:, 1].min())
+                  & (result[:, 0] <= X[:, 1].max()))
+
+
+def test_independent_histogram_sampler_rejects_nonpositive_bins():
+    with pytest.raises(ValueError, match="bins"):
+        IndependentHistogramSampler(bins=0)
+
+
+def test_joint_histogram_sampler_shape_and_seeded_values():
+    rng = np.random.default_rng(21)
+    X = rng.normal(size=(160, 2))
+    first = JointHistogramSampler(
+        bins=5, threshold_low_density=0.2
+    ).sample(np.random.default_rng(22), X, [0, 1], 10)
+    second = JointHistogramSampler(
+        bins=5, threshold_low_density=0.2
+    ).sample(np.random.default_rng(22), X, [0, 1], 10)
+
+    assert first.shape == (10, 2)
+    np.testing.assert_array_equal(first, second)
+    assert np.isfinite(first).all()
+
+
+def test_joint_histogram_sampler_returns_only_requested_columns():
+    rng = np.random.default_rng(23)
+    X = rng.normal(size=(160, 3))
+    result = JointHistogramSampler(
+        bins=5, threshold_low_density=0.2
+    ).sample(np.random.default_rng(24), X, [2], 8)
+
+    assert result.shape == (8, 1)
+    assert np.all((result[:, 0] >= X[:, 2].min() - 1e-12)
+                  & (result[:, 0] <= X[:, 2].max() + 1e-12))
+
+
+def test_joint_histogram_sampler_raises_when_no_bin_meets_threshold():
+    X = np.linspace(-1.0, 1.0, 20).reshape(-1, 1)
+    with pytest.raises(ValueError, match="no low-density region"):
+        JointHistogramSampler(
+            bins=1, threshold_low_density=0.1
+        ).sample(np.random.default_rng(27), X, [0], 3)
+
+
+@pytest.mark.parametrize("kwargs, message", [
+    ({"bins": 0}, "bins"),
+    ({"threshold_low_density": 0.0}, "threshold_low_density"),
+    ({"threshold_low_density": 1.0}, "threshold_low_density"),
+])
+def test_joint_histogram_sampler_rejects_invalid_configuration(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        JointHistogramSampler(**kwargs)
+
+
+def test_joint_histogram_sampler_rejects_more_than_five_columns():
+    X = np.random.default_rng(25).normal(size=(100, 6))
+    with pytest.raises(NotImplementedError, match="at most 5"):
+        JointHistogramSampler().sample(
+            np.random.default_rng(26), X, list(range(6)), 4)
 
 
 # --- create_within_distribution_sampler factory ---
@@ -229,6 +342,21 @@ def test_create_out_of_distribution_sampler_unknown_raises():
 def test_create_out_of_distribution_sampler_default_kwargs():
     sampler = create_out_of_distribution_sampler("zscore")
     assert sampler.scale == 1.0
+
+
+def test_create_out_of_distribution_sampler_independent_histogram():
+    sampler = create_out_of_distribution_sampler(
+        "independent_histogram", bins=7)
+    assert isinstance(sampler, IndependentHistogramSampler)
+    assert sampler.bins == 7
+
+
+def test_create_out_of_distribution_sampler_histogram():
+    sampler = create_out_of_distribution_sampler(
+        "histogram", bins=6, threshold_low_density=0.25)
+    assert isinstance(sampler, JointHistogramSampler)
+    assert sampler.bins == 6
+    assert sampler.threshold_low_density == 0.25
 
 
 # --- Registries ---
