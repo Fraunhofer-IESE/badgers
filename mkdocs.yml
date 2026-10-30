@@ -33,6 +33,8 @@ nav:
             -   Creating Tabular Generators: tutorials/dev/Create-New-Tabular-Generators.ipynb
             -   Creating Selectors: tutorials/dev/Create-New-Selectors.ipynb
             -   Using DGPs: tutorials/dev/Using-DGPs.ipynb
+    - Examplary Use Cases:
+            -   Impact of deficits on ML predictors: tutorials/use-cases/Impact-of-deficits-on-ML-predictors.ipynb
     -   About: about.md
     -   Changes: changelog.md
     - Architecture: architecture.md
