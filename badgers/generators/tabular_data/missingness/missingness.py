@@ -13,9 +13,14 @@ def _mar_weights(X, rng):
     """Per-column selection probabilities for classic MAR: for each column
     i a random OTHER column j is drawn (uniform, one rng.choice per column,
     in column order) and p[:, i] = normalized (reversed) values of j.
-    Single-column input: p = normalized own values, no driver draw."""
+    Single-column input: p = normalized own values, no driver draw.
+    Constant columns get uniform probabilities."""
     k = X.shape[1]
-    X_norm = (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
+    ranges = X.max(axis=0) - X.min(axis=0)
+    X_norm = (X.max(axis=0) - X) / np.where(ranges > 0, ranges, 1.0)
+    # A constant column has no defined ordering: uniform weights keep the
+    # selection for that column data-independent.
+    X_norm[:, ranges == 0] = 1.0
     p = np.zeros_like(X)
     if k > 1:
         for i in range(k):
@@ -28,10 +33,15 @@ def _mar_weights(X, rng):
 
 def _mnar_weights(X):
     """Per-column selection probabilities for classic MNAR: normalized
-    (reversed) own-column values (no randomness, no driver)."""
-    return normalize_proba(
-        (X.max(axis=0) - X) / (X.max(axis=0) - X.min(axis=0))
-    )
+    own-column values (no randomness, no driver). Selection probability
+    grows with the own value (docstring: a cell at the column maximum has
+    missing probability 1, one at the minimum 0).
+    Constant columns get uniform probabilities."""
+    ranges = X.max(axis=0) - X.min(axis=0)
+    weights = (X - X.min(axis=0)) / np.where(ranges > 0, ranges, 1.0)
+    # A constant column has no defined ordering: uniform weights.
+    weights[:, ranges == 0] = 1.0
+    return normalize_proba(weights)
 
 
 class MissingValueGenerator(GeneratorMixin):
@@ -181,6 +191,7 @@ class DummyMissingNotAtRandom(MissingValueGenerator):
     where the probability of a data instance X[i,j] missing depends linearly upon its own value.
     A data point X[i,j] = max(X[:,j]) has a missing probability of 1.
     A data point X[i,j] = min(X[:,j]) has a missing probability of 0.
+    A constant column X[:,j] has no defined ordering: values are selected uniformly.
 
     Routes the row selection through the shared ``ExactCountSelector``
     preset (exact-count, optional soft probabilities).

@@ -4,6 +4,20 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ## Unreleased
 
+### Fixed
+
+- **MNAR missingness direction** — `_mnar_weights` now normalizes forward
+  (`(X - X.min) / range`), matching the documented semantics: HIGH values of
+  a column are the more likely to be missing (previously the normalization
+  was reversed, making low values the more likely to be missing).
+  Constant columns now get uniform missingness weights (scale 1.0 fallback)
+  in both the MAR and MNAR mechanisms instead of raising a
+  `FloatingPointError` on the 0/0 division.
+- **`ExactCountSelector` at `rate=1.0`** — asking for exactly all rows with
+  weighted sampling no longer raises
+  (`ValueError: Fewer non-zero entries in p than size` from
+  `numpy.random.Generator.choice`); all rows are returned directly.
+
 ### Added
 
 - **`UndersamplingGenerator`** (in `badgers.generators.tabular_data.imbalance`)

@@ -9,7 +9,8 @@ own exogenous noise is preserved exactly.
 import numpy as np
 import pytest
 
-from badgers.core.selectors import AlwaysSelector
+from badgers.core.dgp import DGPMixin
+from badgers.core.selectors import AlwaysSelector, BernoulliSelector
 from badgers.generators.tabular_data.drift.causal import CausalDriftGenerator
 
 
@@ -260,3 +261,79 @@ def test_generate__shift_amount_dict_missing_entry_raises(chain_data, make_gcm_d
     gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
     with pytest.raises(ValueError, match="shift_amount dict is missing entries"):
         gen.generate(X, selector=AlwaysSelector([0, 1]), shift_amount={0: 1.0})
+
+
+def test_generate__selector_gates_rows_bit_exactly(chain_data, make_gcm_dgp):
+    # The selector owns the intervention: a row NOT selected for any
+    # target must leave the output BIT-IDENTICAL to its input row -- no
+    # drift shift, no descendant recompute. Kills the "shift every row"
+    # implementation (labels stay correct there, so label-only tests
+    # cannot detect it).
+    X, graph, column_mapping = chain_data
+    X_orig = X.copy()  # capture BEFORE generate (in-place generator)
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    Xt = gen.generate(
+        X, selector=BernoulliSelector([0], rate=0.5,
+                                      rng=gen.random_generator),
+        shift_amount=1.0,
+    )
+    labels = gen.get_drift_labels()
+    assert 0.2 < labels.mean() < 0.8  # the gate actually gates something
+    np.testing.assert_array_equal(Xt[~labels], X_orig[~labels])
+
+
+class _NoiselessChainDGP(DGPMixin):
+    """Deterministic 3-node chain X->Y->Z with Y = 2 X, Z = 0.5 Y, no
+    noise (the GCM backend cannot express a world with a constant node:
+    the regression fit would be degenerate)."""
+
+    def __init__(self, graph, column_mapping, beta):
+        self.graph = graph
+        self.column_mapping = column_mapping
+        self._beta = beta
+        self._fitted = False
+
+    def fit(self, X):
+        self._fitted = True
+        return self
+
+    def is_fitted(self):
+        return self._fitted
+
+    def response(self, node, parent_values):
+        parents = list(self.graph.predecessors(node))
+        coefs = np.array([self._beta[node][p] for p in parents])
+        return parent_values @ coefs
+
+    def draw_noise(self, node, rng, n):
+        return np.zeros(n)
+
+
+def test_generate__constant_column_uses_unit_scale():
+    # G9b: a constant column has std 0; the scale fallback replaces it
+    # with 1.0 so the configured shift_amount is applied IN FULL. Without
+    # the fallback the shift would multiply by std=0 and a constant
+    # target column could never move (and its descendants would never
+    # recompute).
+    import networkx as nx
+
+    graph = nx.DiGraph([("X", "Y"), ("Y", "Z")])
+    column_mapping = {"X": 0, "Y": 1, "Z": 2}
+    X = np.random.default_rng(0).normal(size=(40, 3))
+    X[:, 1] = 5.0  # constant node Y
+    X[:, 2] = 0.5 * X[:, 1]  # deterministic descendant Z
+    before = X.copy()
+
+    gen = CausalDriftGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(_NoiselessChainDGP(graph, column_mapping,
+                                   {"Y": {"X": 2.0}, "Z": {"Y": 0.5}}))
+    Xt = gen.generate(X, selector=AlwaysSelector([1]), shift_amount=1.0)
+    # The constant column moved by exactly shift_amount (unit scale).
+    np.testing.assert_array_equal(Xt[:, 1], before[:, 1] + 1.0)
+    # The deterministic descendant was recomputed from the shifted value.
+    np.testing.assert_array_equal(Xt[:, 2], 0.5 * (before[:, 1] + 1.0))
+    # The untouched upstream column is bit-identical.
+    np.testing.assert_array_equal(Xt[:, 0], before[:, 0])
+    labels = gen.get_drift_labels()
+    assert labels.all()

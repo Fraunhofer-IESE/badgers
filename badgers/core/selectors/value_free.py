@@ -150,7 +150,13 @@ class ExactCountSelector:
         for i, col in enumerate(targets):
             # Sampling without replacement: sequential by nature.
             p = None if weights is None else weights[:, i]
-            idx = self.rng.choice(n_rows, size=count, replace=False, p=p)
+            if count == n_rows and p is not None:
+                # The whole population is requested: the draw is forced
+                # regardless of the weights (numpy rejects rows whose
+                # weight is exactly 0 in that case) -- bypass the sampler.
+                idx = np.arange(n_rows)
+            else:
+                idx = self.rng.choice(n_rows, size=count, replace=False, p=p)
             masks[col] = _mask_from_indices(n_rows, idx)
         return masks
 

@@ -168,15 +168,22 @@ def test_random_shift__preserves_shape_array(tabular_data):
 
 
 def test_random_shift__signed_array_shift_std(tabular_data):
-    """generate(X=..., shift_std=negative-array) uses sign as shift direction."""
+    """generate(X=..., shift_std=negative-array) uses sign as shift direction:
+    the result is the mirror of the positive-std run (identical rng draws,
+    sign flipped)."""
     X = tabular_data
     X_np = np.asarray(X)
     n_features = X_np.shape[1] if X_np.ndim > 1 else 1
     # signed magnitudes: alternate positive/negative shift directions
     signed = np.array([2.0 if i % 2 == 0 else -1.0 for i in range(n_features)])
-    generator = RandomShiftGenerator(random_generator=default_rng(0))
-    Xt = generator.generate(X=X_np.copy(), shift_std=signed)
-    assert np.asarray(Xt).shape == X_np.shape
+    # mirror run: sign flip per column, same rng seed
+    mirrored = np.array([-2.0 if i % 2 == 0 else 1.0 for i in range(n_features)])
+    Xt_signed = RandomShiftGenerator(random_generator=default_rng(0)).generate(
+        X=X_np.copy(), shift_std=signed)
+    Xt_mirrored = RandomShiftGenerator(random_generator=default_rng(0)).generate(
+        X=X_np.copy(), shift_std=mirrored)
+    np.testing.assert_allclose(np.asarray(Xt_mirrored),
+                               2 * X_np - np.asarray(Xt_signed))
 
 
 def test_random_shift_classes__preserves_shape_and_modifies_data(tabular_data_labeled):
@@ -305,7 +312,11 @@ def test_random_shift_classes__signed_shift_std_is_direction(tabular_data_labele
     gn = RandomShiftClassesGenerator(random_generator=default_rng(0))
     Xt_pos = gp.generate(Xp, selector=selector, shift_std={c: 4.0 for c in classes})
     Xt_neg = gn.generate(Xn, selector=selector, shift_std={c: -4.0 for c in classes})
-    np.testing.assert_allclose(np.asarray(Xn), 2 * Xc - np.asarray(Xp))
+    # mirror on the OUTPUTS: neg run = point reflection of the pos run
+    # around the original data (identical rng draws, sign flipped). Kills
+    # the sign flip applied only to the input copies (which makes the
+    # assertion trivially true).
+    np.testing.assert_allclose(np.asarray(Xt_neg), 2 * Xc - np.asarray(Xt_pos))
 
 
 def test_fixed_shift__deterministic_and_exact(tabular_data):

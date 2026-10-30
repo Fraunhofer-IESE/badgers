@@ -31,7 +31,11 @@ COMMON_GENERATORS = [
     ("uniform", "uniform", {"expansion": 0.0}),
     ("zscore", "zscore", {"scale": 1.0}),
     ("hypersphere", "hypersphere", {"scale": 1.0}),
-    ("histogram", "histogram", {"bins": 3, "threshold_low_density": 0.5}),
+    # ("histogram", JointHistogramSampler) is excluded here: it raises
+    # NotImplementedError for >5 columns (pinned explicitly by
+    # test_histogram__too_many_columns_raises_not_implemented and covered
+    # at 3 columns by test_histogram__3cols_works /
+    # test_histogram__joint_reproducible_3cols).
     ("low_density", "low_density", {}),
     ("independent_histogram", "independent_histogram", {"bins": 3}),
     ("tree", "tree", {"leaf_size": 4}),
@@ -50,13 +54,10 @@ def test_outliers__correct_shape_and_labels(tabular_data):
         selector = CountSelector(
             list(range(X.shape[1])), count=n_outliers, rng=default_rng(1))
 
-        try:
-            Xt = generator.generate(
-                X.copy(), selector,
-                out_of_distribution_sampler=create_out_of_distribution_sampler(
-                    ood_name, **ood_kwargs))
-        except (NotImplementedError, AttributeError, ValueError):
-            continue
+        Xt = generator.generate(
+            X.copy(), selector,
+            out_of_distribution_sampler=create_out_of_distribution_sampler(
+                ood_name, **ood_kwargs))
 
         # Xt has original + outlier rows
         assert Xt.shape[0] == n_samples + n_outliers
@@ -80,17 +81,14 @@ def test_outliers__reproducibility_given_same_seed(tabular_data):
         sel1 = CountSelector(list(range(X.shape[1])), count=20, rng=default_rng(7))
         sel2 = CountSelector(list(range(X.shape[1])), count=20, rng=default_rng(7))
 
-        try:
-            Xt1 = gen1.generate(
-                X.copy(), sel1,
-                out_of_distribution_sampler=create_out_of_distribution_sampler(
-                    ood_name, **ood_kwargs))
-            Xt2 = gen2.generate(
-                X.copy(), sel2,
-                out_of_distribution_sampler=create_out_of_distribution_sampler(
-                    ood_name, **ood_kwargs))
-        except (NotImplementedError, AttributeError, ValueError):
-            continue
+        Xt1 = gen1.generate(
+            X.copy(), sel1,
+            out_of_distribution_sampler=create_out_of_distribution_sampler(
+                ood_name, **ood_kwargs))
+        Xt2 = gen2.generate(
+            X.copy(), sel2,
+            out_of_distribution_sampler=create_out_of_distribution_sampler(
+                ood_name, **ood_kwargs))
 
         np.testing.assert_allclose(Xt1, Xt2)
 
@@ -113,18 +111,15 @@ def test_outliers__scores_worse_than_original():
         generator = OutlierSamplingGenerator(random_generator=default_rng(0))
         selector = CountSelector(
             list(range(X.shape[1])), count=50, rng=default_rng(1))
-        try:
-            Xt = generator.generate(
-                X.copy(), selector,
-                out_of_distribution_sampler=create_out_of_distribution_sampler(
-                    ood_name, **ood_kwargs))
-        except (NotImplementedError, AttributeError, ValueError):
-            continue
+        Xt = generator.generate(
+            X.copy(), selector,
+            out_of_distribution_sampler=create_out_of_distribution_sampler(
+                ood_name, **ood_kwargs))
 
         Xt = np.asarray(Xt)
         n_original = len(X)
-        if len(Xt) == n_original:
-            continue
+        assert len(Xt) == n_original + 50, (
+            f"{gen_name}: expected 50 outlier rows appended")
         # Extract only the outlier rows (appended after original data)
         outliers = Xt[n_original:]
         outlier_scores = detector.decision_function(outliers)
@@ -238,18 +233,15 @@ def test_zscore__explicit_count_selector():
     assert np.all(np.abs(outliers[:, 0] - X[:, 0].mean()) > 3.0 * stds[0])
 
 
-def test_histogram__2d_raises_not_implemented():
+def test_histogram__too_many_columns_raises_not_implemented():
     """JointHistogramSampler raises NotImplementedError for >5 columns."""
     rng = default_rng(0)
     X = pd.DataFrame(rng.normal(size=(100, 10)), columns=[f"col{i}" for i in range(10)])
     generator = OutlierSamplingGenerator(random_generator=default_rng(0))
     selector = CountSelector(range(10), count=10, rng=default_rng(1))
-    try:
+    with pytest.raises(NotImplementedError, match="at most 5 columns"):
         generator.generate(
             X.copy(), selector, out_of_distribution_sampler=JointHistogramSampler(bins=3))
-        assert False, "Expected NotImplementedError"
-    except NotImplementedError:
-        pass
 
 
 def test_histogram__3cols_works():
@@ -469,6 +461,85 @@ def test_decomposition_and_outlier__generates_correct_shape():
         assert outliers.shape[0] == n_outliers
 
 
+# --- StructuredOutlierGenerator alternate paths (preprocessor / inverse) ---
+
+class _IdentityPreprocessor:
+    """Round-trip preprocessor: maps X to itself exactly."""
+
+    def fit(self, X, y=None):
+        return self
+
+    def fit_transform(self, X):
+        return np.asarray(X, dtype=float)
+
+    def transform(self, X):
+        return np.asarray(X, dtype=float)
+
+    def inverse_transform(self, X):
+        return np.asarray(X, dtype=float)
+
+
+def test_structured__identity_preprocessor_maps_original_rows_back():
+    """Custom preprocessor path: with a lossless round-trip preprocessor,
+    the original rows must come back unchanged and only the appended rows
+    differ (the preprocessor is actually used, not ignored)."""
+    X = default_rng(0).normal(size=(50, 4))
+    gen = StructuredOutlierGenerator(
+        outlier_generator=OutlierSamplingGenerator(random_generator=default_rng(0)),
+        preprocessor=_IdentityPreprocessor(),
+    )
+    Xt = np.asarray(gen.generate(
+        X.copy(), selector=CountSelector([0], count=5, rng=default_rng(1))))
+
+    assert Xt.shape == (55, 4)
+    np.testing.assert_array_equal(Xt[:50], X)
+    labels = gen.get_outliers_labels()
+    assert not labels[:50].any()
+    assert labels[50:].all()
+
+
+def test_structured__preprocessor_without_inverse_transform_raises():
+    """Constructor validation: a preprocessor without inverse_transform
+    cannot be mapped back to the original feature space and is rejected."""
+
+    class _NoInverse:
+        def fit(self, X, y=None):
+            return self
+
+        def fit_transform(self, X):
+            return np.asarray(X, dtype=float)
+
+        def transform(self, X):
+            return np.asarray(X, dtype=float)
+
+    with pytest.raises(ValueError, match="inverse_transform"):
+        StructuredOutlierGenerator(
+            outlier_generator=OutlierSamplingGenerator(random_generator=default_rng(0)),
+            preprocessor=_NoInverse(),
+        )
+
+
+def test_structured__default_pipeline_maps_original_rows_back():
+    """Default preprocessor path: with a LOSSLESS decomposition (PCA
+    keeping all components), the standardized originals must be mapped
+    back through the full inverse pipeline (decomposition AND
+    standardization) to the original feature space."""
+    X = default_rng(0).normal(size=(100, 5)) * np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    gen = StructuredOutlierGenerator(
+        dimension_reduction_transformer=PCA(n_components=5),
+        outlier_generator=OutlierSamplingGenerator(random_generator=default_rng(0)),
+    )
+    Xt = np.asarray(gen.generate(
+        X.copy(), selector=CountSelector([0], count=10, rng=default_rng(1))))
+
+    # A lossless decomposition is an exact round trip: the original rows
+    # must be returned in the original feature space, per-column scale intact.
+    np.testing.assert_allclose(Xt[:100], X, rtol=1e-6, atol=1e-8)
+    labels = gen.get_outliers_labels()
+    assert not labels[:100].any()
+    assert labels[100:].all()
+
+
 def test_outliers__labels_before_generate_raises():
     """get_outliers_labels() raises RuntimeError if generate() was not called."""
     generator = OutlierSamplingGenerator(random_generator=default_rng(0))
@@ -537,6 +608,14 @@ def test_instance_sampling__n_outliers_capped_at_row_count():
     generator = UniformInstanceAttributeSampling(random_generator=default_rng(0))
     with pytest.raises(ValueError, match="must not exceed"):
         generator.generate(X.copy(), n_outliers=11)
+
+
+@pytest.mark.parametrize("n_outliers", [0, -1])
+def test_instance_sampling__n_outliers_must_be_positive(n_outliers):
+    X = np.arange(20.0).reshape(10, 2)
+    generator = UniformInstanceAttributeSampling(random_generator=default_rng(0))
+    with pytest.raises(ValueError, match="must be a positive count"):
+        generator.generate(X.copy(), n_outliers=n_outliers)
 
 
 def test_instance_sampling__selector_is_ignored_with_warning():

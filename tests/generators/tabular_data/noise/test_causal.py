@@ -209,3 +209,23 @@ def test_generate__selector_gates_expanded_rows(chain_data, make_gcm_dgp):
     groups = selected.reshape(X.shape[0], 3)
     assert np.all(groups[:, 0] == groups[:, 1]) and np.all(groups[:, 1] == groups[:, 2])
     assert 0.2 < groups.mean() < 0.8
+
+
+def test_generate__selector_gates_expanded_rows__data_not_labels(chain_data, make_gcm_dgp):
+    # Data-level variant of the gating test: the unselected copies must be
+    # BIT-IDENTICAL to their seed row -- no noise injection, no descendant
+    # recompute. Kills the "noise every row" implementation (labels stay
+    # correct there, so the label-only gating test above cannot detect it).
+    X, graph, column_mapping = chain_data
+    gen = CausalNoiseGenerator(random_generator=np.random.default_rng(0))
+    gen.use_dgp(make_gcm_dgp(graph, column_mapping).fit(X))
+    Xt = gen.generate(
+        X, BernoulliSelector([0], rate=0.5, rng=gen.random_generator),
+        n_copies=3, noise_std=0.5,
+    )
+    labels = gen.get_noise_labels()
+    unselected_rows = np.flatnonzero(~labels)
+    assert unselected_rows.size > 0
+    # expanded row j corresponds to seed row j // n_copies
+    seed_of = unselected_rows // 3
+    np.testing.assert_array_equal(Xt[unselected_rows], X[seed_of])
