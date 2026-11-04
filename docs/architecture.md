@@ -1,411 +1,64 @@
-# Architecture and key principles
+# Architecture
 
-## Project Structure
+This section describes how `badgers` is structured, why it is structured that way, and which of
+those claims are enforced automatically.
 
-```
-badgers/
-├── badgers/                          # main library package
-│   ├── __init__.py
-│   ├── core/                         # foundation: base classes, pipeline, utils
-│   │   ├── __init__.py
-│   │   ├── base.py                   # GeneratorMixin abstract base class
-│   │   ├── pipeline.py               # Pipeline for chaining generators
-│   │   ├── utils.py                  # probability normalization, RNG helpers
-│   │   └── decorators/               # input preprocessing decorators
-│   │       ├── __init__.py
-│   │       ├── tabular_data.py
-│   │       └── time_series.py
-│   └── generators/                   # data transformation implementations
-│       ├── __init__.py
-│       ├── tabular_data/             # outliers, drift, imbalance, missingness, noise
-│       │   ├── outliers/
-│       │   │   ├── causal.py
-│       │   │   ├── instance_sampling.py
-│       │   │   ├── sampling.py
-│       │   │   └── _selection.py
-│       │   ├── drift.py
-│       │   ├── imbalance.py
-│       │   ├── missingness.py
-│       │   └── noise.py
-│       ├── time_series/              # changepoints, seasons, trends, errors
-│       │   ├── changepoints.py
-│       │   ├── missingness.py
-│       │   ├── noise.py
-│       │   ├── outliers.py
-│       │   ├── patterns.py
-│       │   ├── seasons.py
-│       │   ├── transmission_errors.py
-│       │   ├── trends.py
-│       │   └── utils.py
-│       ├── graph/                    # graph manipulations
-│       │   └── missingness.py
-│       ├── text/                     # text transformations
-│       │   └── typos.py
-│       ├── image/                    # image processing (stub)
-│       └── geolocated_data/          # geospatial (stub)
-│
-├── benchmarks/                       # performance benchmarking framework
-│   ├── __init__.py
-│   ├── __main__.py                   # entry point: python -m benchmarks
-│   ├── models.py                     # Scenario, GeneratorBenchmark, BenchmarkResult
-│   ├── registry.py                   # auto-discovers _*.py registrations
-│   ├── runner.py                     # run_performance() with time/memory measurement
-│   ├── cli.py                        # run, baseline, compare subcommands
-│   ├── comparator.py                 # regression detection (>20% time, >30% memory)
-│   ├── scenarios/                    # reusable data factories
-│   │   ├── tabular.py
-│   │   ├── time_series.py
-│   │   ├── graph.py
-│   │   └── text.py
-│   └── generators/                   # per-generator benchmark registrations
-│       ├── tabular_data/
-│       │   ├── _drift.py
-│       │   ├── _imbalance.py
-│       │   ├── _missingness.py
-│       │   ├── _noise.py
-│       │   └── _outliers.py
-│       ├── time_series/
-│       │   ├── _changepoints.py
-│       │   ├── _missingness.py
-│       │   ├── _noise.py
-│       │   ├── _outliers.py
-│       │   ├── _patterns.py
-│       │   ├── _seasons.py
-│       │   ├── _transmission_errors.py
-│       │   └── _trends.py
-│       ├── graph/
-│       │   └── _missingness.py
-│       └── text/
-│           └── _typos.py
-│
-├── tests/                            # pytest test suite (148 tests)
-│   ├── conftest.py                   # shared fixtures (rng)
-│   ├── core/
-│   │   ├── test_pipelines.py
-│   │   └── test_utils.py
-│   ├── benchmarks/
-│   │   ├── test_cli.py
-│   │   ├── test_comparator.py
-│   │   ├── test_models.py
-│   │   ├── test_registry.py
-│   │   ├── test_runner.py
-│   │   └── test_scenarios.py
-│   └── generators/
-│       ├── tabular_data/
-│       │   ├── conftest.py           # tabular_small, tabular_large fixtures
-│       │   ├── test_drift.py
-│       │   ├── test_imbalance.py
-│       │   ├── test_missingness.py
-│       │   ├── test_noise.py
-│       │   └── test_outliers.py
-│       ├── time_series/
-│       │   ├── conftest.py           # time_series_sine, time_series_walk fixtures
-│       │   ├── test_changepoints.py
-│       │   ├── test_missingness.py
-│       │   ├── test_noise.py
-│       │   ├── test_outliers.py
-│       │   ├── test_patterns.py
-│       │   ├── test_seasons.py
-│       │   ├── test_transmission_errors.py
-│       │   ├── test_trends.py
-│       │   └── test_utils.py
-│       ├── graph/
-│       │   ├── conftest.py           # graph_erdos_renyi fixture
-│       │   └── test_missingness.py
-│       └── text/
-│           ├── conftest.py           # text_word_list fixture
-│           └── test_typos.py
-│
-├── docs/                             # mkdocs documentation
-│   ├── index.md
-│   ├── architecture.md
-│   ├── benchmarking.md
-│   ├── changelog.md
-│   ├── getting-started.md
-│   ├── tutorials/                    # Jupyter notebook tutorials
-│   └── superpowers/                  # design specs and implementation plans
-│
-├── experiments/                      # ad-hoc experiments and benchmark results
-├── pyproject.toml                    # project metadata, dependencies and build config
-├── tox.ini                           # multi-version test matrix (py311–py314)
-└── mkdocs.yml                        # documentation site config
-```
+It follows a trimmed [arc42](https://arc42.org/) outline — only the sections that carry
+information for a single-process Python library — plus a [C4](https://c4model.com/) level-1
+context diagram and a log of architecture decision records (ADRs).
 
-## Core Module
+## How to read this section
 
-The `core` module serves as the foundation of the Badgers framework, providing essential building blocks and infrastructure that other components rely on.
-
-### Main Responsibilities:
-
-1. **Base Classes**: Defines the fundamental `GeneratorMixin` abstract base class that all generators must inherit from, ensuring a consistent interface across the entire system.
-
-2. **Standardized Interface**: Enforces a uniform `generate(X, **params)` method signature that returns the single generated object `Xt` for all generators (target-like data lives inside `X`).
-
-3. **Input Preprocessing**: Provides decorator functions (`preprocess_inputs`) that automatically validate and convert input data to standardized formats (numpy arrays).
-
-4. **Pipeline Infrastructure**: Implements the `Pipeline` class that enables chaining multiple generators together in sequential workflows.
-
-5. **Utility Functions**: Offers helper functions for common operations like probability normalization and random number generation.
-
-## Generators Module
-
-The `generators` module contains the actual implementation of various data transformation algorithms, organized by data type categories.
-
-### Main Responsibilities:
-
-1. **Data Transformation Implementation**: Houses concrete implementations of various data generation techniques across different data domains:
-   - Tabular data transformations (outliers, drift, imbalance, missingness, noise)
-   - Time series modifications (changepoints, seasons, trends, transmission errors)
-   - Graph-based manipulations
-   - Text transformation tools
-
-2. **Domain-Specific Organization**: Structures generators by data type categories, making it easy to find and use appropriate transformations for specific data modalities.
-
-3. **Extensibility**: Provides a plug-and-play architecture where new generators can be easily added by following the established `GeneratorMixin` interface.
-
-## Benchmarks Module
-
-The `benchmarks` package provides a systematic framework for measuring performance (time/memory) of all generators. It lives outside the main `badgers` source to avoid coupling.
-
-### Architecture (3 Layers)
-
-1. **Registration Layer** (`models.py`, `registry.py`, `scenarios/`, `generators/`):
-   - `Scenario` dataclasses define reusable data factories for each data type (tabular, time series, graph, text).
-   - `GeneratorBenchmark` ties a generator class to its scenarios.
-   - The `Registry` auto-discovers `_*.py` registration modules from `benchmarks/generators/`.
-
-2. **Execution Layer** (`runner.py`, `cli.py`):
-   - `run_performance()` measures wall-clock time and peak memory over multiple iterations.
-   - CLI provides `run`, `baseline`, and `compare` subcommands.
-
-3. **Analysis Layer** (`comparator.py`):
-   - `compare_results()` diffs two result sets and flags regressions (>20% time, >30% memory).
-
-### Usage
-
-```bash
-# Run all benchmarks (performance)
-python -m benchmarks run
-
-# Filter by generator category
-python -m benchmarks run --generators tabular_data.outliers
-
-# Save a baseline for regression detection
-python -m benchmarks baseline save --name v1.0
-
-# Compare latest results against a baseline
-python -m benchmarks compare --baseline v1.0
-```
-
-### Adding a New Generator to Benchmarks
-
-Create a `_<name>.py` file in the appropriate `benchmarks/generators/<category>/` directory:
-
-```python
-from benchmarks.models import GeneratorBenchmark
-from benchmarks.registry import register
-from benchmarks.scenarios.tabular import SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS
-from badgers.generators.tabular_data.noise import AdditiveNoiseGenerator
-
-register(GeneratorBenchmark(
-    generator_cls=AdditiveNoiseGenerator,
-    name="AdditiveNoise",
-    module_path="tabular_data.noise",
-    default_params={"distribution": scipy.stats.norm(scale=0.5)},
-    scenarios=[SCENARIO_SMALL_BLOBS, SCENARIO_MEDIUM_BLOBS],
-))
-```
-
-The registry auto-discovers all `_*.py` files — no other changes needed.
-
-## Tests
-
-Tests live under `tests/` and use **pytest** with function-based tests (no `unittest.TestCase` classes). The test structure mirrors the source layout:
-
-```
-tests/
-├── conftest.py                  # shared fixtures (e.g., rng)
-├── core/                        # tests for badgers.core
-├── benchmarks/                  # tests for the benchmarks package
-└── generators/
-    ├── tabular_data/
-    │   ├── conftest.py          # tabular-specific fixtures
-    │   ├── test_outliers.py
-    │   ├── test_noise.py
-    │   └── ...
-    ├── time_series/
-    │   ├── conftest.py          # time-series fixtures (sine, random walk)
-    │   └── ...
-    ├── graph/
-    │   ├── conftest.py          # graph fixtures (Erdős-Rényi)
-    │   └── ...
-    └── text/
-        ├── conftest.py          # text fixtures (word list)
-        └── ...
-```
-
-### Key Conventions
-
-- **Fixtures over classes**: Each data type has a `conftest.py` with reusable fixtures (e.g., `tabular_small`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`). Fixtures return the input data `X` directly (with class values as a column of `X` where labeled data is needed) and use deterministic random seeds.
-- **Flat test functions**: Tests are plain `test_<subject>__<behavior>` functions (double underscore separator), not methods on `TestCase` classes.
-- **Generator tests are independent**: Generator correctness is tested directly via pytest, not through the benchmark framework's functional checks. This keeps tests fast, focused, and free of benchmark infrastructure coupling.
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest tests/
-
-# Run only generator tests
-pytest tests/generators/
-
-# Run a specific category
-pytest tests/generators/tabular_data/ -v
-```
-
-## Architectural Decisions
-
-This section records significant architectural decisions made during the project's evolution. Each decision includes the rationale and date of adoption.
-
-### ADR-1: Strict Separation of Tests and Benchmarks (2026-06-23)
-
-**Decision:** Unit tests (`tests/`) and performance benchmarks (`benchmarks/`) serve distinct purposes and must not overlap.
-
-| Concern | Unit Tests | Benchmarks |
+| Page | Question it answers | Changes how often |
 |---|---|---|
-| **Purpose** | Catch logic bugs | Measure perf, detect regressions |
-| **Data** | Small, varied (numpy/pandas × 1D/2D) | Medium-large, standardized |
-| **Data source** | Per-type `conftest.py` fixtures | `benchmarks/scenarios/` |
-| **Speed** | Fast (<1ms each) | Measured (timed iterations) |
-| **Checks** | Exact assertions | Performance stats only |
+| [System context](architecture/context.md) | Who uses badgers, and what does it depend on? | Rarely |
+| [Building blocks](architecture/building-blocks.md) | Which modules exist, and which may depend on which? | When a package is added |
+| [Runtime scenarios](architecture/runtime.md) | What happens during a `generate()` call? | When a flow changes |
+| [Quality goals](architecture/quality.md) | What does "good architecture" mean here, testably? | Rarely |
+| [Causal defect family](architecture/causal-design.md) | How do the causal generators, DGPs and backends fit together? | When the causal API changes |
+| [Decisions](architecture/adr/index.md) | Why is it like this, and what was rejected? | Append-only |
 
-**Rationale:** The benchmarks module originally duplicated functional assertions via `FunctionalCheck`/`FunctionalResult`. These were removed so that `tests/` is the single source of truth for correctness and benchmarks focus exclusively on timing, memory, and regression detection. Generator correctness is tested directly via pytest, not through the benchmark framework.
+## The one-paragraph version
 
-### ADR-2: Per-Data-Type Pytest Fixture Architecture (2026-06-23)
+`badgers` is a library of **generators**: objects exposing `generate(X, **params) -> Xt` that
+augment data with quality deficits (outliers, missing values, noise, drift, imbalance, typos,
+…). Everything modality-specific (e.g., tabular_data, time.series, text, etc.) lives under `badgers.generators`; everything reusable lives
+under `badgers.core`. The core is split into four independent concerns — the generator
+contract, the *selector* contract (which rows get a deficit), the *sampler* contract (what
+values replace them), and the *DGP* contract (how a causal model propagates a deficit). A
+generator composes these; it never reimplements them.
 
-**Decision:** Tests use per-data-type `conftest.py` files with parametrized pytest fixtures instead of `unittest.TestCase` classes or a monolithic fixture file.
+## What is enforced, not just documented
 
-```
-tests/
-  conftest.py                          # shared: rng fixture only
-  generators/
-    tabular_data/
-      conftest.py                      # tabular_data, tabular_data_labeled fixtures
-    time_series/
-      conftest.py                      # time_series_sine, time_series_walk fixtures
-    graph/
-      conftest.py                      # graph_erdos_renyi fixture
-    text/
-      conftest.py                      # text_word_list fixture
-```
-
-**Naming conventions:**
-- Fixtures: prefixed with data type (`tabular_data`, `time_series_sine`, `graph_erdos_renyi`, `text_word_list`)
-- Test functions: `test_<subject>__<behavior>` with double underscore separator (e.g., `test_gaussian_noise__increases_variance`)
-- No `unittest.TestCase` classes — flat pytest functions only
-- Only numpy and pandas input types (no `list_1D`/`list_2D`)
-
-**Rationale:** Fixtures are auto-discovered by pytest's `conftest.py` mechanism, scoped to the nearest directory. This keeps test data close to the tests that use it, avoids a single monolithic fixture file, and enables pytest's built-in parametrization for testing across input types.
-
-### ADR-3: Benchmark Registration via Auto-Discovered Modules (2026-06-24)
-
-**Decision:** Each generator category has a `_*.py` registration module in `benchmarks/generators/<data_type>/` that imports generator classes and calls `register(GeneratorBenchmark(...))`. The registry auto-discovers these modules.
-
-**Key constraint:** The `OutlierSamplingGenerator` benchmarks using `JointHistogramSampler` (registry name `"histogram"`) must only use `SCENARIO_SMALL_BLOBS` (2D) because joint histogram sampling supports at most 5 columns.
-
-**Rationale:** Decouples benchmark definitions from the benchmark runner. Adding a new generator to benchmarks is a single `register()` call in the appropriate `_*.py` file — no other changes needed.
-
-### ADR-4: Vectorized NumPy Over Python Loops (2026-06-26)
-
-**Decision:** All generator implementations must prefer batched/vectorized NumPy operations over Python-level `for` loops, especially when `n_samples` can be large.
-
-**Three canonical patterns:**
-
-1. **Per-row RNG → batched RNG:** Replace `[rng.exponential(size=d) for _ in range(n)]` with `rng.exponential(size=(n, d))`
-2. **Per-column `.iloc`/`.choice` → integer array indexing:** Replace `np.stack([rng.choice(X.iloc[:, i], ...) for i in range(d)])` with `X.values[row_idx, np.arange(d)]`
-3. **Batch variants for utilities:** When a utility operates on a single sample (e.g., `random_spherical_coordinate`), also provide a batch version (`random_spherical_coordinates`) accepting arrays with `axis=` parameters
-
-**When NOT to vectorize:** small `n_samples` (≤10), algorithms requiring sequential state (e.g., rejection sampling with unknown iteration count).
-
-**Rationale:** Badgers generators often produce many samples at once. Python loops over RNG calls or pandas `.iloc` accesses are orders of magnitude slower than batched NumPy operations. The O(d²) `np.prod(sin_phis[:i])` pattern in `random_spherical_coordinate` was also fixed to O(d) via `np.cumprod`.
-
-### ADR-5: Baseline-Based Regression Detection (2026-06-24)
-
-**Decision:** Benchmarks support a baseline workflow for detecting performance regressions with defined thresholds:
+Architecture documents rot. The structural claims on these pages are therefore split into two
+halves: a narrative half (this section) and an **enforced half** — import contracts checked by
+[`import-linter`](https://import-linter.readthedocs.io/) in CI. If the code ever contradicts the
+[building blocks](architecture/building-blocks.md) page, the build fails.
 
 ```bash
-python -m benchmarks run --iterations 10
-python -m benchmarks baseline save --name v0.0.13
-python -m benchmarks compare --baseline v0.0.13
+# run the contracts locally
+lint-imports
 ```
 
-**Regression thresholds:** >20% time increase or >30% memory increase triggers a flag in `comparator.py`.
+The contracts live in `pyproject.toml` under `[tool.importlinter]`; see
+[ADR-0007](architecture/adr/0007-import-contracts.md) for the full list and the reasoning.
 
-**Rationale:** Baselines are versioned snapshots of generator performance. They enable automated detection of performance regressions before merging, providing a quantitative gate for optimization work.
+| Contract | Meaning |
+|---|---|
+| `core must not depend on generators` | The foundation never imports a concrete generator. |
+| `generators must not import DGP backends` | Generators are backend-blind; backends are injected. |
+| `core.dgp must not import generators` | The DGP protocol does not know about deficits. |
+| `the library must not import the benchmarks package` | `benchmarks/` is a consumer, never a dependency. |
+| `Layered architecture: generators -> dgp -> selectors -> utils` | Dependency direction is one-way. |
 
-### ADR-6: Outlier Value Synthesis Is Owned by Shared OOD Samplers (2026-10-25)
+Import hygiene is additionally pinned by `tests/core/test_import_hygiene.py`, which asserts that
+importing `badgers.core.dgp` never pulls `pymc`, `pytensor` or `dowhy` into `sys.modules`.
 
-**Decision:** All non-causal outlier value synthesis is delegated to the reusable OOD samplers in `badgers.core.sampling`, which one generic `OutlierSamplingGenerator` selects at `generate()` time (a string registry name is resolved via `create_out_of_distribution_sampler`):
+## Conventions used on these pages
 
-| Strategy | Sampler (`badgers.core.sampling`) | Registry name |
-|---|---|---|
-| z-score (±(3 + exponential)·σ per column) | `ZScoreSampler(scale)` | `"zscore"` (default) |
-| hypersphere shell (radius ≥ 3σ) | `HypersphereSampler(scale)` | `"hypersphere"` |
-| uniform around the observed range | `UniformOutOfDistributionSampler(expansion)` | `"uniform"` |
-| per-column low-density histogram bins | `IndependentHistogramSampler(bins)` | `"independent_histogram"` |
-| joint low-density histogram bins (≤ 5 columns) | `JointHistogramSampler(bins, threshold_low_density)` | `"histogram"` |
-| grid-CDF KDE: scores a bounded regular grid, categorical over low-density cells, exact count, no rejection | `KernelDensitySampler(threshold_low_density, grid_budget)` | `"low_density"` |
-| adaptive kd partition (median splits), axis-aligned Voronoi cells extended across the full gap to the data-box boundary on every axis, uncovered box regions added as always-qualifying count-0 cells, categorical over cells with extended-territory density <= threshold × mean density, exact count | `TreeCellSampler(threshold_low_density, leaf_size)` | `"tree"` |
-
-The generator keeps its responsibilities outside synthesis: the required `selector` owns the outlier count and the perturbed targets, the generator copies the seed rows, replaces the selected cells with the sampler's values, appends the rows, and records `get_outliers_labels()`. `CausalOutlierPropagationGenerator` consumes the same samplers for its perturbation nodes, so both outlier families share one strategy set and one interface (`sample(rng, X, columns, n)`).
-
-**Rationale:** The sampling algorithms are useful beyond the outlier generators (e.g., for custom pipelines); exposing them as samplers avoids code duplication and makes a new strategy a new sampler — not a new generator class — for both the non-causal and the causal generator.
-
-## Causal defect family: three-layer design
-
-1. **Structure** (static, user-provided): the structural `nx.DiGraph` (latent
-   variables), the `column_mapping` (node -> integer column), and an optional
-   observation `nx.DiGraph` (measurement nodes, `R_<name>` indicator nodes,
-   derivation edges). Validation is functions in `badgers.core.causal_graph`.
-2. **Fitted knowledge** (the `DGP` protocol): backends implement exactly one
-   operation — `fit_node(node, parents, data)` — and expose two views:
-   `response(node, parent_values)` (the fitted deterministic part) and
-   `draw_noise(node, rng, n)` (the node's own shock; parametric or
-   empirical). `fit(X)` is a provided topological loop. The DGP is
-   **immutable and rngless**: every stochastic method takes the caller's
-   `rng`; nothing retains training data.
-3. **Cascade composition** (the `structural` hook, default in `DGPMixin`):
-   `structural(node, parent_values, rng, n)` composes ONE node's values
-   for a cascade as `response(parent_values) + draw_noise(node, rng, n)`.
-   Backends whose mechanisms are not additive override it — the gcm
-   backend delegates to the mechanism's own
-   `evaluate(parents, noise)` (rounded discrete predictions, class CDFs)
-   while badgers still draws the noise. `sample`/`intervene` never
-   compose the two views themselves.
-4. **Deficit algebra** (written once, backend-blind): the generic
-   `DGPMixin` cascade — `intervene(rows, nodes, values=None, *, rng=None)`
-   (Pearl surgery on given rows: fix the nodes, recompute ALL descendants
-   in topological order with fresh noise; intervened nodes stay pinned)
-   and `sample(rng, n)` — both start by calling the
-   **`pick_parameters(rng)` hook** (default: `self`; the PyMC backend
-   overrides it to pin one coherent posterior draw per cascade).
-   Structure edits are **free functions** in `badgers.core.dgp.edits`
-   (the DGP itself has NO edit methods): `scale_edge`/`remove_edge`
-   (edge reweighting with variance-budget calibration — no coefficient
-   access needed), `exogenize` (make a node a root; INTERVENTION-ONLY
-   semantics), `set_form` (replace a node's functional form),
-   `add_edge_contribution` (ANM-scoped cheap edge addition). Re-
-   estimation after a structural modification is out of scope: build
-   the modified SCM with the wrapped library's own API, fit it, and
-   wrap it again with `GcmSCMDGP`/`PyMCSCMDGP`. Edits return
-   read-only views and never mutate the base DGP. Indicator derivation
-   from the observation graph lives in the missingness generator
-   (structure-layer helpers + generator-local selection/spread logic).
-
-Backend selection is **object injection only** (`dgp=...` / `use_dgp`).
-Deficit semantics live in the generators; they never see which backend ran.
-The generator carries NO structure of its own: `CausalGenerator.__init__`
-accepts only `random_generator=` and `dgp=`, derives its `graph`/`
-column_mapping` views from the DGP, and there is no generator-side `fit` or
-implicit default backend — a missing `dgp=` is a hard error. Unfitted DGPs are
-fitted lazily on first `generate(X)`.
+- **Module paths** are written as `badgers.core.selectors`, not as file paths.
+- **Diagrams** are Mermaid and are rendered by mkdocs-material; they are hand-written and
+  deliberately few, because hand-written diagrams are the part that rots fastest.
+- **API-level detail** is *not* duplicated here — it is generated from docstrings into the
+  [API reference](reference/badgers/index.md). If you want to know what a class does, read
+  the API reference; if you want to know why it exists, read this section.
