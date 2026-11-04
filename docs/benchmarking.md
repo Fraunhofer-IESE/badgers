@@ -80,8 +80,23 @@ The registry auto-discovers all `_*.py` files — no other registration needed.
 
 ## Testing Generators
 
-Generator correctness is tested separately from benchmarks using **pytest**. See the [Architecture](architecture.md#tests) page for the test structure and conventions.
+Generator correctness is tested separately from benchmarks using **pytest**. See
+[CONTRIBUTING.md](https://github.com/Fraunhofer-IESE/badgers/blob/main/CONTRIBUTING.md#testing)
+for the test structure and conventions, and
+[ADR-0001](architecture/adr/0001-tests-vs-benchmarks.md) for why the two are kept apart.
 
 ## Architecture
 
-See the [Architecture](architecture.md#benchmarks-module) page for the 3-layer design (Registration → Execution → Analysis).
+The benchmarks package is built in three layers:
+
+1. **Registration** (`models.py`, `registry.py`, `scenarios/`, `generators/`) — `Scenario`
+   dataclasses define reusable data factories per data type; `GeneratorBenchmark` ties a
+   generator class to its scenarios; the `Registry` auto-discovers `_*.py` registration modules.
+2. **Execution** (`runner.py`, `cli.py`) — `run_performance()` measures wall-clock time and peak
+   memory over multiple iterations; the CLI provides `run`, `baseline` and `compare`.
+3. **Analysis** (`comparator.py`) — `compare_results()` diffs two result sets and flags
+   regressions (>20 % time, >30 % memory).
+
+`benchmarks/` lives outside the `badgers` package on purpose: the library must never depend on
+it. This is enforced by an import contract — see
+[ADR-0007](architecture/adr/0007-import-contracts.md).

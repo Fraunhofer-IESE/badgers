@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "badgers"
 version = "0.1.0"
-keywords = ["data quality", "bad data", "data science"]
+keywords = ["data quality", "data synthesis", "data science", "causal inference", "machine learning", "bad data"]
 authors = [
     { name = "Julien Siebert", email = "julien.siebert@iese.fraunhofer.de" },
 ]
@@ -52,6 +52,7 @@ dev = [
     "pytest-timeout~=2.4.0",
     "pytest-benchmark>=5.2.3,<5.4.0",
     "flake8>=7.3,<7.5",
+    "import-linter>=2.0,<3.0",
 ]
 [project.urls]
 "Homepage" = "https://github.com/Fraunhofer-IESE/badgers"
@@ -80,3 +81,41 @@ exclude = [
     "*.egg-info",
 ]
 
+
+[tool.importlinter]
+root_package = "badgers"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "core must not depend on generators"
+type = "forbidden"
+source_modules = ["badgers.core"]
+forbidden_modules = ["badgers.generators"]
+
+[[tool.importlinter.contracts]]
+name = "generators must not import DGP backends"
+type = "forbidden"
+source_modules = ["badgers.generators"]
+forbidden_modules = ["badgers.core.dgp.backends"]
+
+[[tool.importlinter.contracts]]
+name = "core.dgp must not import generators"
+type = "forbidden"
+source_modules = ["badgers.core.dgp"]
+forbidden_modules = ["badgers.generators"]
+
+[[tool.importlinter.contracts]]
+name = "the library must not import the benchmarks package"
+type = "forbidden"
+source_modules = ["badgers"]
+forbidden_modules = ["benchmarks"]
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture: generators -> dgp -> selectors -> utils"
+type = "layers"
+layers = [
+    "badgers.generators",
+    "badgers.core.dgp",
+    "badgers.core.selectors",
+    "badgers.core.utils",
+]

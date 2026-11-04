@@ -82,6 +82,12 @@ See https://github.com/Fraunhofer-IESE/badgers/releases
 
 ### Changed
 
+- **Architecture documentation restructured.** The monolithic
+  `docs/architecture.md` is now a short index over `docs/architecture/`
+  (system context, building blocks, runtime scenarios, quality goals, causal
+  design) plus a decision log in `docs/architecture/adr/`. The layering is
+  additionally enforced by `import-linter` contracts in `pyproject.toml`
+  (`lint-imports`), which now runs in CI and in `tox`.
 - **The imbalance API is split into under- and oversampling (breaking).**
   Imbalance is no longer a single score-driven resampler. Deficit-based row
   removal lives in `UndersamplingGenerator` (a deficit `Selector` decides

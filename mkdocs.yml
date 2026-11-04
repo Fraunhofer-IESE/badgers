@@ -37,7 +37,22 @@ nav:
             -   Impact of deficits on ML predictors: tutorials/use-cases/Impact-of-deficits-on-ML-predictors.ipynb
     -   About: about.md
     -   Changes: changelog.md
-    - Architecture: architecture.md
+    - Architecture:
+            - Overview: architecture.md
+            - System context: architecture/context.md
+            - Building blocks: architecture/building-blocks.md
+            - Runtime scenarios: architecture/runtime.md
+            - Quality goals: architecture/quality.md
+            - Causal defect family: architecture/causal-design.md
+            - Decisions:
+                    - Index: architecture/adr/index.md
+                    - ADR-0001 Tests vs benchmarks: architecture/adr/0001-tests-vs-benchmarks.md
+                    - ADR-0002 Per-data-type fixtures: architecture/adr/0002-per-data-type-fixtures.md
+                    - ADR-0003 Benchmark auto-registration: architecture/adr/0003-benchmark-auto-registration.md
+                    - ADR-0004 Vectorized NumPy: architecture/adr/0004-vectorized-numpy.md
+                    - ADR-0005 Baseline regression detection: architecture/adr/0005-baseline-regression-detection.md
+                    - ADR-0006 Shared OOD samplers: architecture/adr/0006-shared-ood-samplers.md
+                    - ADR-0007 Import contracts: architecture/adr/0007-import-contracts.md
     -   Benchmarking: benchmarking.md
     -   API: reference/
 

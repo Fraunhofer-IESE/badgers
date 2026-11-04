@@ -30,11 +30,22 @@ flake8 badgers tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
 This must produce **zero** errors before submitting.
 
-### 4. PR Submission Checklist
+### 4. Check architecture import contracts
+
+```bash
+lint-imports
+```
+
+This must report **zero broken contracts**. The contracts encode the layering documented in
+`docs/architecture/building-blocks.md`; a broken contract means an import violates it. Fix the
+import, not the contract.
+
+### 5. PR Submission Checklist
 
 - [ ] `tox` passes on all environments
 - [ ] `pytest -v tests` passes locally
 - [ ] `flake8` produces zero syntax/name errors
+- [ ] `lint-imports` reports zero broken contracts
 - [ ] New functionality has tests
 - [ ] Documentation is updated (docstrings, README, or mkdocs)
 - [ ] Branch is rebased on latest `main`
